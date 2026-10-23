@@ -1,0 +1,45 @@
+{
+  "name": "@abapro/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "predev": "npm run build -w @abapro/shared",
+    "dev": "nest start --watch",
+    "prebuild": "npm run build -w @abapro/shared",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src test"
+  },
+  "dependencies": {
+    "@abapro/shared": "0.1.0",
+    "@electric-sql/pglite": "^0.3.14",
+    "@hapi/iron": "^7.0.1",
+    "@nestjs/common": "^11.0.12",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.0.12",
+    "@nestjs/platform-express": "^11.0.12",
+    "bcryptjs": "^2.4.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "helmet": "^8.1.0",
+    "oidc-provider": "^8.8.1",
+    "openid-client": "^6.8.1",
+    "pg": "^8.16.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.23.0",
+    "@nestjs/cli": "^11.0.6",
+    "@nestjs/schematics": "^11.0.2",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.14",
+    "@types/pg": "^8.15.5",
+    "eslint": "^9.23.0",
+    "globals": "^16.0.0",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.28.0"
+  }
+}

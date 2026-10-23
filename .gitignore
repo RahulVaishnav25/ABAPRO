@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+.DS_Store
+npm-debug.log*
+apps/web/dist/
+apps/api/dist/
+packages/shared/dist/
+apps/api/data/
+data/

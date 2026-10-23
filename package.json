@@ -1,0 +1,25 @@
+{
+  "name": "abapro",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Multi-tenant ABA therapy management platform.",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @abapro/shared && concurrently -n api,web -c blue,green \"npm run dev -w @abapro/api\" \"npm run dev -w @abapro/web\"",
+    "build": "npm run build -w @abapro/shared && npm run build -w @abapro/api && npm run build -w @abapro/web",
+    "typecheck": "npm run build -w @abapro/shared && npm run typecheck -w @abapro/api && npm run typecheck -w @abapro/web",
+    "lint": "npm run lint -w @abapro/api && npm run lint -w @abapro/web && npm run lint -w @abapro/shared",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "vitest": "^3.0.9"
+  }
+}
