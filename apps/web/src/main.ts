@@ -4,6 +4,7 @@ import App from './App.vue';
 import { setUnauthorizedHandler } from './api/client';
 import { router } from './router';
 import { useAuthStore } from './stores/auth';
+import { useBrandingStore } from './stores/branding';
 import './styles/global.css';
 
 const app = createApp(App);
@@ -26,7 +27,8 @@ setUnauthorizedHandler((message) => {
 });
 
 async function start(): Promise<void> {
-  await auth.restore();
+  const branding = useBrandingStore();
+  await Promise.all([auth.restore(), branding.initialize()]);
   await router.isReady();
   app.mount('#app');
 }

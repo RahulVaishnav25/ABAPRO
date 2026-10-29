@@ -1,5 +1,5 @@
 import type { CollectedObservation, SessionGraphPoint, TherapySessionDetail, TherapySessionSummary } from '@abapro/shared';
-import { apiRequest } from './client';
+import { apiRequest, encodedPath } from './client';
 
 export interface ObservationPayload {
   idempotencyKey: string;
@@ -30,7 +30,7 @@ export function sessionsRequest(clientId?: string, status?: string): Promise<The
 }
 
 export function sessionRequest(sessionId: string): Promise<TherapySessionDetail> {
-  return apiRequest(`/sessions/${sessionId}`);
+  return apiRequest(encodedPath`/sessions/${sessionId}`);
 }
 
 export function startSessionRequest(body: {
@@ -45,7 +45,7 @@ export function startSessionRequest(body: {
 }
 
 export function recordSessionObservationRequest(sessionId: string, body: ObservationPayload): Promise<CollectedObservation> {
-  return apiRequest(`/sessions/${sessionId}/observations`, { method: 'POST', body });
+  return apiRequest(encodedPath`/sessions/${sessionId}/observations`, { method: 'POST', body });
 }
 
 export function addSessionTrialRequest(
@@ -53,31 +53,31 @@ export function addSessionTrialRequest(
   observationId: string,
   body: { idempotencyKey: string; trialNumber: number; result: 'correct' | 'incorrect' | 'prompted' | 'no_response'; promptLevel?: string },
 ): Promise<CollectedObservation> {
-  return apiRequest(`/sessions/${sessionId}/observations/${observationId}/trials`, { method: 'POST', body });
+  return apiRequest(encodedPath`/sessions/${sessionId}/observations/${observationId}/trials`, { method: 'POST', body });
 }
 
 export function undoSessionTrialRequest(sessionId: string, observationId: string, trialId: string, reason: string): Promise<CollectedObservation> {
-  return apiRequest(`/sessions/${sessionId}/observations/${observationId}/trials/${trialId}/undo`, { method: 'POST', body: { reason } });
+  return apiRequest(encodedPath`/sessions/${sessionId}/observations/${observationId}/trials/${trialId}/undo`, { method: 'POST', body: { reason } });
 }
 
 export function voidSessionObservationRequest(sessionId: string, observationId: string, reason: string): Promise<CollectedObservation> {
-  return apiRequest(`/sessions/${sessionId}/observations/${observationId}/void`, { method: 'POST', body: { reason } });
+  return apiRequest(encodedPath`/sessions/${sessionId}/observations/${observationId}/void`, { method: 'POST', body: { reason } });
 }
 
 export function completeSessionRequest(sessionId: string, note?: string): Promise<TherapySessionDetail> {
-  return apiRequest(`/sessions/${sessionId}/complete`, { method: 'POST', body: { note } });
+  return apiRequest(encodedPath`/sessions/${sessionId}/complete`, { method: 'POST', body: { note } });
 }
 
 export function interruptSessionRequest(sessionId: string): Promise<TherapySessionDetail> {
-  return apiRequest(`/sessions/${sessionId}/interrupt`, { method: 'POST', body: {} });
+  return apiRequest(encodedPath`/sessions/${sessionId}/interrupt`, { method: 'POST', body: {} });
 }
 
 export function resumeSessionRequest(sessionId: string): Promise<TherapySessionDetail> {
-  return apiRequest(`/sessions/${sessionId}/resume`, { method: 'POST', body: {} });
+  return apiRequest(encodedPath`/sessions/${sessionId}/resume`, { method: 'POST', body: {} });
 }
 
 export function sessionGraphRequest(clientId: string): Promise<SessionGraphPoint[]> {
-  return apiRequest(`/sessions/graph?clientId=${clientId}`);
+  return apiRequest(`/sessions/graph?${new URLSearchParams({ clientId })}`);
 }
 
 export function submissionKey(): string {

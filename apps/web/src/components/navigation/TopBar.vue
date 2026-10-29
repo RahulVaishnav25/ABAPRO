@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import AppButton from '@/components/ui/AppButton.vue';
-import AppSelect from '@/components/ui/AppSelect.vue';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 
 defineProps<{
@@ -24,19 +24,7 @@ const confirmOpen = ref(false);
 const notificationsRef = ref<HTMLElement | null>(null);
 const userRef = ref<HTMLElement | null>(null);
 
-const clinicOptions = computed(() =>
-  (auth.user?.clinics ?? []).map((clinic) => ({
-    value: clinic.id,
-    label: `${clinic.name} · ${clinic.location}`,
-  })),
-);
-const contextLabel = computed(() => {
-  const organization = auth.user?.organization?.name;
-  const clinic = auth.user?.clinic;
-  if (!organization) return auth.user?.platformAdmin ? '' : 'No organisation';
-  if (!clinic) return organization;
-  return `${organization} · ${clinic.name}, ${clinic.location}`;
-});
+const isPlatformAdmin = computed(() => auth.user?.platformAdmin === true);
 
 function onDocumentPointer(event: PointerEvent): void {
   const target = event.target;
@@ -68,24 +56,11 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown);
 });
 
-async function onClinicChange(clinicId: string): Promise<void> {
-  if (!clinicId || clinicId === auth.user?.clinic?.id) {
-    return;
-  }
-  try {
-    await auth.switchClinic(clinicId);
-    toast.push({
-      tone: 'success',
-      title: 'Clinic updated',
-      message: auth.user?.clinic ? `${auth.user.clinic.name}, ${auth.user.clinic.location}` : undefined,
-    });
-  } catch (error) {
-    toast.push({
-      tone: 'danger',
-      title: 'Could not switch clinic',
-      message: error instanceof Error ? error.message : 'Try again.',
-    });
-  }
+async function openMyOrganisation(): Promise<void> {
+  const organizationId = auth.user?.organization?.id;
+  if (!organizationId) return;
+  userOpen.value = false;
+  await router.push(`/organizations/${organizationId}`);
 }
 
 async function signOut(): Promise<void> {
@@ -116,18 +91,7 @@ async function signOut(): Promise<void> {
         <path v-else d="M4 7h16M4 12h16M4 17h16" />
       </svg>
     </button>
-    <div class="topbar-start">
-      <p v-if="clinicOptions.length > 1" class="org-name">{{ auth.user?.organization?.name }}</p>
-      <AppSelect
-        v-if="clinicOptions.length > 1"
-        :model-value="auth.user?.clinic?.id ?? ''"
-        label="Clinic"
-        :options="clinicOptions"
-        :disabled="auth.switching"
-        @update:model-value="onClinicChange"
-      />
-      <p v-else-if="contextLabel" class="org-name">{{ contextLabel }}</p>
-    </div>
+    <div class="topbar-start"></div>
     <div class="topbar-end">
       <div ref="notificationsRef" class="menu">
         <button
@@ -137,7 +101,8 @@ async function signOut(): Promise<void> {
           :aria-expanded="notificationsOpen"
           @click="notificationsOpen = !notificationsOpen"
         >
-          Notifications
+          <AppIcon name="notification" />
+          <span>Notification</span>
         </button>
         <div v-if="notificationsOpen" class="dropdown" role="dialog" aria-label="Notifications">
           <strong>Notifications</strong>
@@ -153,7 +118,7 @@ async function signOut(): Promise<void> {
           :aria-label="auth.user ? `${auth.user.name}, ${auth.user.roleLabel ?? 'Account'}` : 'Account'"
           @click="userOpen = !userOpen"
         >
-          <span class="avatar" aria-hidden="true">{{ auth.user?.name.slice(0, 1) }}</span>
+          <span class="avatar" aria-hidden="true">{{ (auth.user?.name || auth.user?.email || 'A').slice(0, 1) }}</span>
           <span class="user-copy">
             <span>{{ auth.user?.name }}</span>
             <span>{{ auth.user?.roleLabel ?? 'Account' }}</span>
@@ -161,7 +126,32 @@ async function signOut(): Promise<void> {
         </button>
         <div v-if="userOpen" class="dropdown" role="menu">
           <p>{{ auth.user?.email }}</p>
-          <AppButton variant="secondary" block @click="confirmOpen = true">Sign out</AppButton>
+          <div class="dropdown-actions">
+            <AppButton
+              variant="secondary"
+              block
+              @click="userOpen = false; router.push('/programs/tasks')"
+            >
+              Clinical Tasks
+            </AppButton>
+            <AppButton
+              v-if="isPlatformAdmin"
+              variant="secondary"
+              block
+              @click="userOpen = false; router.push('/platform')"
+            >
+              Platform Admin
+            </AppButton>
+            <AppButton
+              v-if="!isPlatformAdmin && auth.user?.organization?.id"
+              variant="secondary"
+              block
+              @click="openMyOrganisation"
+            >
+              My Organisation
+            </AppButton>
+            <AppButton variant="secondary" block @click="confirmOpen = true">Sign out</AppButton>
+          </div>
         </div>
       </div>
     </div>
@@ -233,10 +223,6 @@ async function signOut(): Promise<void> {
   stroke-linecap: round;
 }
 
-.topbar-start :deep(.field) {
-  width: min(280px, 46vw);
-}
-
 .org-name {
   font-weight: 700;
   white-space: nowrap;
@@ -258,8 +244,12 @@ async function signOut(): Promise<void> {
 
 .icon-button {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 0 12px;
   font-weight: 700;
+  cursor: pointer;
 }
 
 .user-button {
@@ -306,6 +296,11 @@ async function signOut(): Promise<void> {
 .dropdown p {
   margin: 6px 0 12px;
   color: var(--color-text-muted);
+}
+
+.dropdown-actions {
+  display: grid;
+  gap: 8px;
 }
 
 @media (max-width: 959px) {

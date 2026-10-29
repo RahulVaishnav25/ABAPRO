@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import type { ClientPlacementOrganization, ContactChannel, GuardianRelationship, MeasurementType, StaffOption } from '@abapro/shared';
+import type { ClientPlacementOrganization, ClientWrite, ContactChannel, GuardianRelationship, MeasurementType, StaffOption } from '@abapro/shared';
 import {
   assignClientRequest,
   behaviorsRequest,
@@ -20,7 +20,6 @@ import {
   saveGuardianRequest,
   updateClientRequest,
   uploadDocumentRequest,
-  type ClientWriteBody,
 } from '@/api/clients';
 import { ApiError } from '@/api/client';
 import AppButton from '@/components/ui/AppButton.vue';
@@ -37,6 +36,7 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { currentUserRequest, switchOrganizationRequest } from '@/api/resources';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { errorMessage } from '@/lib/loader';
 
 interface GuardianDraft {
   id?: string;
@@ -306,13 +306,13 @@ async function load(): Promise<void> {
       Object.assign(clinical, await clinicalProfileRequest(clientId.value));
     }
   } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'The client form could not be loaded.';
+    error.value = errorMessage(loadError, 'The client form could not be loaded.');
   } finally {
     loading.value = false;
   }
 }
 
-function body(): ClientWriteBody {
+function body(): ClientWrite {
   return {
     displayName: personal.displayName.trim(),
     clientCode: personal.clientCode.trim() || undefined,

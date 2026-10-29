@@ -3,7 +3,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { AssessmentDetail, AuthUser, ProgramDetail, ProgramTemplate } from '@abapro/shared';
+import type { AssessmentDetail, AuthUser, ProgramDetail, TargetListItem } from '@abapro/shared';
 import { createApplication, type RunningApplication } from '../src/create-application';
 
 const password = 'correct-horse-battery';
@@ -23,6 +23,7 @@ describe.sequential('program and target management', () => {
   let programId = '';
   let trialTargetId = '';
   let observationId = '';
+  let taskTargetId = '';
 
   beforeAll(async () => {
     const apiPort = await freePort();
@@ -126,25 +127,38 @@ describe.sequential('program and target management', () => {
       body: JSON.stringify({
         clientId,
         title: 'Requesting program',
+        domain: 'Communication',
+        dateImplemented: '2026-10-02',
+        assessmentType: 'VB-MAPP',
+        sd: 'Give me the toy',
+        masterySteps: 'Step 1: prompt, Step 2: independent',
+        errorCorrectionProcedure: '4-step error correction',
+        teachingMethod: 'DTT',
+        netTeachingIdea: 'Use preferred vehicles',
+        measurementProcedure: 'Probe',
         description: 'Practice requests during play.',
         objective: 'The learner requests a preferred item.',
         assessmentId,
         goalStatement: 'Request a preferred item across two settings.',
         teachingProcedure: 'Model the request, then wait.',
-        startedOn: '2026-10-02',
         reviewOn: '2026-11-02',
         measurementType: 'frequency',
         masteryCriteria: 'Recorded for the clinician. The application does not apply it.',
         notes: 'Synthetic teaching notes.',
-        therapistIds: [therapistId],
       }),
     });
     expect(program.response.status).toBe(201);
     const detail = program.body as ProgramDetail;
     programId = detail.id;
+    expect(detail.domain).toBe('Communication');
+    expect(detail.dateImplemented).toBe('2026-10-02');
+    expect(detail.teachingProcedure).toBe('Model the request, then wait.');
+    expect(detail.assessmentType).toBe('VB-MAPP');
+    expect(detail.sd).toBe('Give me the toy');
+    expect(detail.teachingMethod).toBe('DTT');
+    expect(detail.measurementProcedure).toBe('Probe');
     expect(detail.assessmentId).toBe(assessmentId);
     expect(detail.goals[0]?.statement).toBe('Request a preferred item across two settings.');
-    expect(detail.staff.map((person) => person.userId)).toContain(therapistId);
     expect(detail.configurationVersion).toBe(1);
 
     const trial = await api(admin, `/api/v1/programs/${programId}/targets`, {
@@ -246,38 +260,116 @@ describe.sequential('program and target management', () => {
     expect((deactivated.body as ProgramDetail).targets.find((item) => item.id === trialTargetId)?.status).toBe('inactive');
   });
 
-  it('copies a template without letting later template edits change the client program', async () => {
-    const saved = await api(admin, '/api/v1/programs/templates', {
+  it('keeps one field each for the implementation date and teaching steps', async () => {
+    const program = {
+      clientId,
+      title: 'Requesting program',
+      measurementType: 'frequency',
+      masteryCriteria: 'Recorded for the clinician. The application does not apply it.',
+      teachingProcedure: 'Model the request, then wait.',
+    };
+    const cleared = await api(admin, `/api/v1/programs/${programId}`, { method: 'PATCH', body: JSON.stringify(program) });
+    expect(cleared.response.status).toBe(200);
+    expect((cleared.body as ProgramDetail).dateImplemented).toBeNull();
+
+    const stepsWithoutReason = await api(admin, `/api/v1/programs/${programId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...program, teachingProcedure: 'Model, wait five seconds, then prompt.' }),
+    });
+    expect(stepsWithoutReason.response.status).toBe(400);
+    const steps = await api(admin, `/api/v1/programs/${programId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...program, teachingProcedure: 'Model, wait five seconds, then prompt.', changeReason: 'Added a wait before prompting.' }),
+    });
+    expect(steps.response.status).toBe(200);
+    expect((steps.body as ProgramDetail).teachingProcedure).toBe('Model, wait five seconds, then prompt.');
+    expect((steps.body as ProgramDetail).configurationVersion).toBe(2);
+  });
+
+  it('stores task criteria on targets and lists targets across programs', async () => {
+    const created = await api(admin, `/api/v1/programs/${programId}/targets`, {
       method: 'POST',
       body: JSON.stringify({
-        title: 'Manding template',
-        objective: 'Practice a request.',
-        measurementType: 'duration',
-        targets: [{ title: 'Request duration', measurementMethod: 'duration' }],
+        title: 'Echoic single words',
+        measurementMethod: 'probe',
+        expectedTrialCount: 4,
+        phase: 'baseline',
+        sd: 'Say "ball"',
+        masterySessions: 3,
+        masteryProbe: 80,
+        baselineSessions: 2,
+        baselineProbe: 70,
       }),
     });
-    expect(saved.response.status).toBe(201);
-    const templateId = (saved.body as ProgramTemplate).id;
-    const copied = await api(admin, `/api/v1/programs/templates/${templateId}/copy`, { method: 'POST', body: JSON.stringify({ clientId }) });
-    expect(copied.response.status).toBe(201);
-    const copyId = (copied.body as ProgramDetail).id;
-    expect((copied.body as ProgramDetail).targets.map((item) => item.title)).toEqual(['Request duration']);
+    expect(created.response.status).toBe(201);
+    const stored = (created.body as ProgramDetail).targets.find((item) => item.title === 'Echoic single words');
+    expect(stored).toMatchObject({ sd: 'Say "ball"', masterySessions: 3, masteryProbe: 80, baselineSessions: 2, baselineProbe: 70 });
+    taskTargetId = stored?.id ?? '';
 
-    const edited = await api(admin, `/api/v1/programs/templates/${templateId}`, {
+    const all = await api(admin, '/api/v1/programs/targets');
+    expect(all.response.status).toBe(200);
+    const listed = (all.body as TargetListItem[]).find((item) => item.id === taskTargetId);
+    expect(listed).toMatchObject({ programId, programTitle: 'Requesting program', clientId, clientName: 'Avery Sample', masteryProbe: 80 });
+    const forProgram = await api(admin, `/api/v1/programs/targets?programId=${programId}`);
+    expect((forProgram.body as TargetListItem[]).map((item) => item.programId)).toEqual([programId, programId, programId]);
+    const assigned = await api(therapist, '/api/v1/programs/targets');
+    expect((assigned.body as TargetListItem[]).some((item) => item.id === taskTargetId)).toBe(true);
+
+    const single = await api(admin, `/api/v1/programs/targets/${taskTargetId}`);
+    expect(single.response.status).toBe(200);
+    expect((single.body as TargetListItem).sd).toBe('Say "ball"');
+    const malformed = await api(admin, '/api/v1/programs/targets/task-1700000000000-abcde');
+    expect(malformed.response.status).toBe(404);
+
+    const base = { title: 'Echoic single words', measurementMethod: 'probe', expectedTrialCount: 4, phase: 'baseline', status: 'active' };
+    const sdOnly = await api(admin, `/api/v1/programs/${programId}/targets/${taskTargetId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ title: 'Renamed template', measurementType: 'frequency', targets: [{ title: 'Different target', measurementMethod: 'frequency' }] }),
+      body: JSON.stringify({ ...base, sd: 'Say "car"' }),
     });
-    expect(edited.response.status).toBe(200);
-    const clientProgram = await api(admin, `/api/v1/programs/${copyId}`);
-    expect((clientProgram.body as ProgramDetail).title).toBe('Manding template');
-    expect((clientProgram.body as ProgramDetail).targets.map((item) => item.title)).toEqual(['Request duration']);
+    expect(sdOnly.response.status).toBe(200);
+    const kept = (sdOnly.body as ProgramDetail).targets.find((item) => item.id === taskTargetId);
+    expect(kept).toMatchObject({ sd: 'Say "car"', masterySessions: 3, masteryProbe: 80, baselineSessions: 2, configurationVersion: 1 });
 
+    const noReason = await api(admin, `/api/v1/programs/${programId}/targets/${taskTargetId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...base, masteryProbe: 90 }),
+    });
+    expect(noReason.response.status).toBe(400);
+    const withReason = await api(admin, `/api/v1/programs/${programId}/targets/${taskTargetId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...base, masteryProbe: 90, changeReason: 'Raised the probe criterion after review.' }),
+    });
+    expect(withReason.response.status).toBe(200);
+    expect((withReason.body as ProgramDetail).targets.find((item) => item.id === taskTargetId)).toMatchObject({ masteryProbe: 90, configurationVersion: 2 });
+  });
+
+  it('isolates programs between organizations', async () => {
     await api(admin, '/api/v1/auth/switch-organization', { method: 'POST', body: JSON.stringify({ organizationId: otherOrganizationId }) });
     const foreign = await api(admin, `/api/v1/programs/${programId}`);
     expect(foreign.response.status).toBe(404);
+    const foreignTarget = await api(admin, `/api/v1/programs/targets/${taskTargetId}`);
+    expect(foreignTarget.response.status).toBe(404);
+    const foreignList = await api(admin, '/api/v1/programs/targets');
+    expect(foreignList.body).toEqual([]);
     await api(admin, '/api/v1/auth/switch-organization', { method: 'POST', body: JSON.stringify({ organizationId }) });
     const home = await api(admin, `/api/v1/programs/${programId}`);
     expect(home.response.status).toBe(200);
+
+    const customProgram = await api(admin, '/api/v1/programs', {
+      method: 'POST',
+      body: JSON.stringify({
+        clientId,
+        title: 'Custom Measurement Program',
+        domain: 'Adaptive',
+        measurementProcedure: 'Custom Interval Probe',
+        sd: 'Touch your nose',
+        teachingMethod: 'NET',
+      }),
+    });
+    expect(customProgram.response.status).toBe(201);
+    expect((customProgram.body as ProgramDetail).measurementProcedure).toBe('Custom Interval Probe');
+    expect((customProgram.body as ProgramDetail).sd).toBe('Touch your nose');
+    expect((customProgram.body as ProgramDetail).teachingMethod).toBe('NET');
   });
 });
 

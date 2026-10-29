@@ -14,12 +14,11 @@ import FilterBar from '@/components/ui/FilterBar.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import { useLoader } from '@/lib/loader';
 
 const router = useRouter();
 const auth = useAuthStore();
 const platformAdmin = computed(() => auth.user?.platformAdmin === true);
-const loading = ref(true);
-const error = ref('');
 const search = ref('');
 const organizationId = ref('');
 const country = ref('');
@@ -45,28 +44,20 @@ const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pa
 const rangeEnd = computed(() => Math.min(page.value * pageSize, total.value));
 const filtered = computed(() => Boolean(search.value.trim() || organizationId.value || country.value));
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
-  try {
-    const params = new URLSearchParams();
-    if (search.value.trim()) params.set('q', search.value.trim());
-    if (organizationId.value) params.set('organizationId', organizationId.value);
-    if (country.value) params.set('country', country.value);
-    params.set('page', String(page.value));
-    params.set('pageSize', String(pageSize));
-    const directory = await apiRequest<ClinicDirectoryPage>(`/clinics?${params.toString()}`);
-    items.value = directory.items;
-    total.value = directory.total;
-    page.value = directory.page;
-    countries.value = directory.countries;
-    organizations.value = directory.organizations;
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'Clinics could not be loaded.';
-  } finally {
-    loading.value = false;
-  }
-}
+const { loading, error, load } = useLoader(async () => {
+  const params = new URLSearchParams();
+  if (search.value.trim()) params.set('q', search.value.trim());
+  if (organizationId.value) params.set('organizationId', organizationId.value);
+  if (country.value) params.set('country', country.value);
+  params.set('page', String(page.value));
+  params.set('pageSize', String(pageSize));
+  const directory = await apiRequest<ClinicDirectoryPage>(`/clinics?${params.toString()}`);
+  items.value = directory.items;
+  total.value = directory.total;
+  page.value = directory.page;
+  countries.value = directory.countries;
+  organizations.value = directory.organizations;
+}, 'Clinics could not be loaded.');
 
 function childSummary(count: number): string {
   if (count === 0) return 'No clients';

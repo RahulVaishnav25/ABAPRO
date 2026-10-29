@@ -41,17 +41,26 @@ describe('role permissions', () => {
 
   it('limits therapists to direct-care navigation', () => {
     const keys = navigationFor(permissionsForRole('therapist')).map((item) => item.key);
-    expect(keys).toEqual(['home', 'children', 'sessions', 'progress']);
+    expect(keys).toEqual(['home', 'children', 'programs', 'sessions', 'progress']);
   });
 
   it('keeps clinic administration inside Settings and highlights the section that contains the current page', () => {
     const admin = navigationFor(permissionsForRole('organization_admin'), { platformAdmin: true }).map((item) => item.key);
-    expect(admin).toEqual(['platform', 'organisations', 'clinics', 'children', 'sessions', 'progress', 'settings']);
+    expect(admin).toEqual(['platform', 'organisations', 'clinics', 'children', 'programs', 'sessions', 'progress', 'settings']);
     expect(navigationFor([], { platformAdmin: true }).map((item) => item.key)).toEqual(['platform', 'organisations', 'clinics', 'settings']);
+
+    const superAdminOrgItem = navigationFor([], { platformAdmin: true, organizationId: 'org-1' }).find((item) => item.key === 'organisations');
+    expect(superAdminOrgItem?.route).toBe('/organizations');
+    expect(superAdminOrgItem?.title).toBe('Organisations');
+
+    const orgAdminItem = navigationFor(permissionsForRole('organization_admin'), { platformAdmin: false, organizationId: 'org-1' }).find((item) => item.key === 'organisations');
+    expect(orgAdminItem?.route).toBe('/organizations/org-1');
+    expect(orgAdminItem?.title).toBe('Organisation');
+
     expect(navigationFor(permissionsForRole('therapist')).map((item) => item.key)).not.toContain('organisations');
-    expect(navigationFor(permissionsForRole('therapist'), { organizationId: 'org-1' }).map((item) => item.key)).toEqual(['home', 'organisations', 'clinics', 'children', 'sessions', 'progress']);
+    expect(navigationFor(permissionsForRole('therapist'), { organizationId: 'org-1' }).map((item) => item.key)).toEqual(['home', 'organisations', 'clinics', 'children', 'programs', 'sessions', 'progress']);
     const supervisor = navigationFor(permissionsForRole('clinical_supervisor')).map((item) => item.key);
-    expect(supervisor).toEqual(['home', 'children', 'sessions', 'progress', 'settings']);
+    expect(supervisor).toEqual(['home', 'children', 'programs', 'sessions', 'progress', 'settings']);
     const settings = navigationFor(permissionsForRole('clinical_supervisor')).find((item) => item.key === 'settings');
     expect(settings && navigationItemIsActive(settings, '/team')).toBe(true);
     expect(settings && navigationItemIsActive(settings, '/programs')).toBe(false);
@@ -69,6 +78,7 @@ describe('role permissions', () => {
       'programs',
       'sessions',
       'team',
+      'settings',
     ]);
   });
 });

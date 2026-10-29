@@ -193,7 +193,7 @@ async function confirm(): Promise<void> {
     </form>
 
     <form v-else-if="step === 2" class="panel" @submit.prevent="continueFromClinics">
-      <section v-for="(clinic, index) in clinics" :key="index" class="clinic">
+      <section v-for="(_, index) in clinics" :key="index" class="clinic">
         <header class="clinic-head">
           <h2>Clinic {{ index + 1 }}</h2>
           <AppButton v-if="clinics.length > 1" type="button" variant="ghost" @click="removeClinic(index)">Remove</AppButton>

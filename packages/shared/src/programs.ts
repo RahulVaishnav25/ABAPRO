@@ -2,8 +2,45 @@ export type AssessmentStatus = 'draft' | 'in_progress' | 'completed' | 'reviewed
 export type AssessmentTemplateStatus = 'active' | 'retired';
 export type ResponseKind = 'text' | 'yes_no' | 'rating' | 'count';
 export type MeasurementMethod = 'trial' | 'probe' | 'frequency' | 'duration' | 'abc';
+export type MeasurementProcedure = 'Probe' | 'Step by Step' | (string & {});
 export type TargetStatus = 'active' | 'inactive' | 'mastered' | 'discontinued';
 export type TrialResult = 'correct' | 'incorrect' | 'prompted' | 'no_response';
+
+export interface AssessmentGroup {
+  group: string;
+  options: string[];
+}
+
+export const ASSESSMENT_TYPE_GROUPS: AssessmentGroup[] = [
+  {
+    group: 'Milestone & Language',
+    options: ['VB-MAPP', 'ABLLS-R', 'PEAK'],
+  },
+  {
+    group: 'Functional & Independent Living',
+    options: ['AFLS', 'Essential for Living (EFL)'],
+  },
+  {
+    group: 'Adaptive Behavior',
+    options: ['Vineland-3', 'ABAS-3'],
+  },
+  {
+    group: 'Behavior Function & Preference',
+    options: [
+      'Functional Behavior Assessment (FBA)',
+      'Functional Analysis (FA)',
+      'Preference Assessments (Paired Stimulus, MSWO, etc.)',
+    ],
+  },
+  {
+    group: 'Early Intervention',
+    options: ['ESDM Checklist', 'DATA Model Skills Checklist'],
+  },
+  {
+    group: 'Clinical Diagnostic & Screening',
+    options: ['ADOS-2', 'ADI-R', 'CARS-2'],
+  },
+];
 
 export interface AssessmentTemplateItem {
   id: string;
@@ -123,9 +160,22 @@ export interface TargetSummary {
   startedOn: string | null;
   reviewOn: string | null;
   clinicalNotes: string;
+  sd: string;
+  masterySessions: number | null;
+  masteryProbe: number | null;
+  baselineSessions: number | null;
+  baselineProbe: number | null;
   sortOrder: number;
   configurationVersion: number;
   staff: Array<{ id: string; userId: string; name: string }>;
+}
+
+/** A target listed outside its program, with the program and client it belongs to. */
+export interface TargetListItem extends TargetSummary {
+  programId: string;
+  programTitle: string;
+  clientId: string;
+  clientName: string;
 }
 
 export interface ConfigurationVersion {
@@ -143,10 +193,13 @@ export interface ProgramSummary {
   clientId: string;
   clientName: string;
   title: string;
+  domain?: string;
+  dateImplemented?: string | null;
+  dateMastered?: string | null;
   status: 'active' | 'paused' | 'completed' | 'discontinued';
   measurementType: MeasurementMethod;
+  measurementProcedure?: MeasurementProcedure | null;
   targetCount: number;
-  startedOn: string | null;
   reviewOn: string | null;
 }
 
@@ -155,25 +208,31 @@ export interface ProgramDetail {
   clientId: string;
   clientName: string;
   title: string;
+  domain: string;
+  dateImplemented: string | null;
+  dateMastered: string | null;
+  assessmentType: string | null;
+  sd: string;
+  masterySteps: string;
+  errorCorrectionProcedure: string;
+  teachingMethod: string;
+  netTeachingIdea: string;
+  measurementProcedure: MeasurementProcedure;
+  masteryCriteria: string;
   description: string;
   objective: string;
   assessmentId: string | null;
   assessmentName: string | null;
   teachingProcedure: string;
-  startedOn: string | null;
   reviewOn: string | null;
-  responsibleClinicianId: string | null;
-  responsibleClinicianName: string | null;
   status: ProgramSummary['status'];
   measurementType: MeasurementMethod;
   expectedTrialCount: number | null;
-  masteryCriteria: string;
   notes: string;
   templateId: string | null;
   configurationVersion: number;
   goals: ProgramGoalView[];
   targets: TargetSummary[];
-  staff: ProgramStaff[];
   versions: ConfigurationVersion[];
   documents: AssessmentDocumentLink[];
 }
@@ -182,6 +241,107 @@ export interface TrialEntry {
   trialNumber: number;
   result: TrialResult;
   promptLevel?: string;
+}
+
+// Request bodies. The API validates each one with a DTO class that implements it.
+
+export interface AssessmentItemWrite {
+  label: string;
+  responseKind: ResponseKind;
+  guidance?: string;
+  responseText?: string;
+}
+
+export interface AssessmentWrite {
+  clientId: string;
+  templateId?: string;
+  name: string;
+  assessmentType: string;
+  status?: AssessmentStatus;
+  assessedOn?: string;
+  reviewOn?: string;
+  assignedClinicianId?: string;
+  summary?: string;
+  resultsNote?: string;
+  changeReason?: string;
+  items?: AssessmentItemWrite[];
+}
+
+export interface AssessmentTemplateWrite {
+  name: string;
+  assessmentType: string;
+  description?: string;
+  status?: AssessmentTemplateStatus;
+  items?: AssessmentItemWrite[];
+}
+
+export interface ProgramWrite {
+  clientId: string;
+  title: string;
+  domain?: string;
+  dateImplemented?: string;
+  dateMastered?: string;
+  assessmentType?: string;
+  sd?: string;
+  masterySteps?: string;
+  errorCorrectionProcedure?: string;
+  teachingMethod?: string;
+  netTeachingIdea?: string;
+  measurementProcedure?: MeasurementProcedure;
+  description?: string;
+  objective?: string;
+  assessmentId?: string;
+  goalStatement?: string;
+  goalObjective?: string;
+  /** Shown as "Teaching Steps". Versioned with the measurement configuration. */
+  teachingProcedure?: string;
+  reviewOn?: string;
+  status?: ProgramSummary['status'];
+  measurementType?: MeasurementMethod;
+  expectedTrialCount?: number;
+  masteryCriteria?: string;
+  notes?: string;
+  changeReason?: string;
+}
+
+export interface TargetWrite {
+  title: string;
+  description?: string;
+  operationalDefinition?: string;
+  measurementMethod: MeasurementMethod;
+  expectedTrialCount?: number;
+  baselineNote?: string;
+  teachingInstructions?: string;
+  promptHierarchy?: string;
+  masteryCriteria?: string;
+  phase?: string;
+  status?: TargetStatus;
+  startedOn?: string;
+  reviewOn?: string;
+  clinicalNotes?: string;
+  sd?: string;
+  masterySessions?: number | null;
+  masteryProbe?: number | null;
+  baselineSessions?: number | null;
+  baselineProbe?: number | null;
+  staffIds?: string[];
+  changeReason?: string;
+}
+
+export interface ObservationWrite {
+  note?: string;
+  frequencyCount?: number;
+  durationSeconds?: number;
+  antecedent?: string;
+  behaviorNote?: string;
+  consequence?: string;
+  trials?: TrialEntry[];
+}
+
+export interface DocumentUpload {
+  fileName: string;
+  contentType: string;
+  contentBase64: string;
 }
 
 export interface SessionObservationView {

@@ -10,28 +10,19 @@ import FileUpload from '@/components/ui/FileUpload.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import { useLoader } from '@/lib/loader';
 
 const route = useRoute();
-const loading = ref(true);
-const error = ref('');
 const status = ref<UnimplementedModuleResponse | null>(null);
 const draft = ref('');
 const files = ref<File[]>([]);
 
 const feature = computed(() => featureByKey(String(route.meta.featureKey)));
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
+const { loading, error, load } = useLoader(async () => {
   status.value = null;
-  try {
-    status.value = await moduleStatusRequest(feature.value.apiPath);
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'This page could not be loaded.';
-  } finally {
-    loading.value = false;
-  }
-}
+  status.value = await moduleStatusRequest(feature.value.apiPath);
+}, 'This page could not be loaded.');
 
 watch(() => route.fullPath, () => void load(), { immediate: true });
 </script>

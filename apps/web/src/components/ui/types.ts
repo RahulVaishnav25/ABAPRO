@@ -14,6 +14,11 @@ export interface SelectOption {
   label: string;
 }
 
+export interface SelectGroup {
+  group: string;
+  options: SelectOption[];
+}
+
 export interface TabItem {
   id: string;
   label: string;

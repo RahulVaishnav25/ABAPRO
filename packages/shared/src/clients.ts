@@ -1,4 +1,17 @@
 export type ClientStatus = 'active' | 'inactive';
+
+/** Create and update body for a client. `status` and `confirmDeactivation` apply to updates only. */
+export interface ClientWrite {
+  displayName: string;
+  clientCode?: string;
+  clinicId?: string;
+  preferredName?: string;
+  language?: string;
+  timezone?: string;
+  dateOfBirth?: string;
+  status?: ClientStatus;
+  confirmDeactivation?: boolean;
+}
 export type ProgramStatus = 'active' | 'paused' | 'completed' | 'discontinued';
 export type GuardianRelationship = 'parent' | 'guardian' | 'grandparent' | 'caregiver' | 'other';
 export type ContactChannel = 'email' | 'phone' | 'portal';

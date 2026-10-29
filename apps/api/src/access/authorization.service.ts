@@ -86,11 +86,24 @@ export class AuthorizationService {
     permission?: Permission,
     recordId?: string,
   ): Promise<ClientRecord> {
-    return this.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.findClient(tx, organizationId, clientId);
-      await this.assertClientAccess(tx, user, client, mode, permission, recordId);
-      return client;
-    });
+    return this.withOrganization(user, (tx, organizationId) =>
+      this.findAccessibleClient(tx, user, organizationId, clientId, mode, permission, recordId),
+    );
+  }
+
+  /** Loads a client in the current transaction and checks the user's access to it. */
+  async findAccessibleClient(
+    tx: Queryable,
+    user: AuthUser,
+    organizationId: string,
+    clientId: string,
+    mode: AccessMode,
+    permission?: Permission,
+    recordId?: string,
+  ): Promise<ClientRecord> {
+    const client = await this.findClient(tx, organizationId, clientId);
+    await this.assertClientAccess(tx, user, client, mode, permission, recordId);
+    return client;
   }
 
   async assertClientAccess(

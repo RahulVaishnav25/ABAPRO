@@ -15,6 +15,7 @@ import AppSelect from '@/components/ui/AppSelect.vue';
 import FileUpload from '@/components/ui/FileUpload.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { errorMessage } from '@/lib/loader';
 
 const DRAFT_KEY = 'abapro.onboarding';
 const countries = [
@@ -157,7 +158,7 @@ async function createOrganization(): Promise<void> {
     toast.push({ tone: 'success', title: 'Organization created', message: auth.user.organization?.name });
     await router.push('/');
   } catch (error) {
-    formError.value = error instanceof Error ? error.message : 'The organization could not be created.';
+    formError.value = errorMessage(error, 'The organization could not be created.');
   } finally {
     saving.value = false;
   }

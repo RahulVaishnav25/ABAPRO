@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import type { ClientDirectoryItem, ProgramSummary, ProgramTemplate } from '@abapro/shared';
+import type { ClientDirectoryItem, ProgramSummary } from '@abapro/shared';
 import { clientDirectoryRequest } from '@/api/clients';
-import { copyProgramTemplateRequest, programTemplatesRequest, programsRequest } from '@/api/programs';
-import { ApiError } from '@/api/client';
+import { programsRequest } from '@/api/programs';
 import AppButton from '@/components/ui/AppButton.vue';
+import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
@@ -13,84 +13,358 @@ import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
+import type { BadgeTone } from '@/components/ui/types';
+import { formatShortDate } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth';
-import { useToastStore } from '@/stores/toast';
+import { useLoader } from '@/lib/loader';
 
 const auth = useAuthStore();
-const toast = useToastStore();
 const router = useRouter();
-const loading = ref(true);
-const error = ref('');
+
 const programs = ref<ProgramSummary[]>([]);
-const templates = ref<ProgramTemplate[]>([]);
 const clients = ref<ClientDirectoryItem[]>([]);
-const copyClientId = ref('');
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
-  try {
-    programs.value = await programsRequest();
-    templates.value = await programTemplatesRequest();
-    clients.value = (await clientDirectoryRequest({ pageSize: 50 })).items;
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'Programs could not be loaded.';
-  } finally {
-    loading.value = false;
+const page = ref(1);
+const pageSize = 20;
+const search = ref('');
+const status = ref('');
+const clientId = ref('');
+const sort = ref('title');
+const direction = ref<'asc' | 'desc'>('asc');
+let searchTimer = 0;
+
+const canEdit = computed(() => auth.can('programs.edit'));
+
+const clientOptions = computed(() => [
+  { value: '', label: 'Any client' },
+  ...clients.value.map((c) => ({ value: c.id, label: c.displayName })),
+]);
+
+const filteredPrograms = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  const st = status.value;
+  const cid = clientId.value;
+
+  return programs.value.filter((p) => {
+    if (st && p.status !== st) return false;
+    if (cid && p.clientId !== cid) return false;
+    if (q) {
+      const matchTitle = (p.title || '').toLowerCase().includes(q);
+      const matchClient = (p.clientName || '').toLowerCase().includes(q);
+      const matchDomain = (p.domain || '').toLowerCase().includes(q);
+      const matchProcedure = (p.measurementProcedure || p.measurementType || '').toLowerCase().includes(q);
+      if (!matchTitle && !matchClient && !matchDomain && !matchProcedure) return false;
+    }
+    return true;
+  });
+});
+
+const sortedPrograms = computed(() => {
+  const list = [...filteredPrograms.value];
+  const dir = direction.value === 'asc' ? 1 : -1;
+  const key = sort.value;
+
+  list.sort((a, b) => {
+    if (key === 'title') {
+      return dir * (a.title || '').localeCompare(b.title || '');
+    }
+    if (key === 'client') {
+      return dir * (a.clientName || '').localeCompare(b.clientName || '');
+    }
+    if (key === 'domain') {
+      return dir * (a.domain || '').localeCompare(b.domain || '');
+    }
+    if (key === 'procedure') {
+      const procA = a.measurementProcedure || a.measurementType || '';
+      const procB = b.measurementProcedure || b.measurementType || '';
+      return dir * procA.localeCompare(procB);
+    }
+    if (key === 'targets') {
+      return dir * ((a.targetCount ?? 0) - (b.targetCount ?? 0));
+    }
+    if (key === 'status') {
+      return dir * (a.status || '').localeCompare(b.status || '');
+    }
+    if (key === 'implemented') {
+      const dateA = a.dateImplemented || '';
+      const dateB = b.dateImplemented || '';
+      return dir * dateA.localeCompare(dateB);
+    }
+    if (key === 'mastered') {
+      return dir * (a.dateMastered || '').localeCompare(b.dateMastered || '');
+    }
+    return 0;
+  });
+
+  return list;
+});
+
+const total = computed(() => sortedPrograms.value.length);
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
+const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize + 1));
+const rangeEnd = computed(() => Math.min(page.value * pageSize, total.value));
+const pagedItems = computed(() => {
+  const start = (page.value - 1) * pageSize;
+  return sortedPrograms.value.slice(start, start + pageSize);
+});
+
+function toggleSort(key: string): void {
+  if (sort.value === key) {
+    direction.value = direction.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sort.value = key;
+    direction.value = key === 'implemented' || key === 'mastered' ? 'desc' : 'asc';
+  }
+  page.value = 1;
+}
+
+function statusTone(programStatus: string): BadgeTone {
+  switch (programStatus) {
+    case 'active':
+      return 'success';
+    case 'paused':
+      return 'warning';
+    case 'completed':
+      return 'info';
+    case 'discontinued':
+      return 'neutral';
+    default:
+      return 'neutral';
   }
 }
 
-async function copy(templateId: string): Promise<void> {
-  if (!copyClientId.value) return;
+function statusLabel(programStatus: string): string {
+  if (!programStatus) return 'Unknown';
+  return programStatus.charAt(0).toUpperCase() + programStatus.slice(1);
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return '—';
   try {
-    const program = await copyProgramTemplateRequest(templateId, copyClientId.value);
-    toast.push({ tone: 'success', title: 'Program copied', message: 'The client program is now independent of the template.' });
-    await router.push(`/programs/${program.id}`);
-  } catch (copyError) {
-    toast.push({ tone: 'danger', title: 'Program was not copied', message: copyError instanceof ApiError ? copyError.message : 'Try again.' });
+    return formatShortDate(value);
+  } catch {
+    return value;
   }
 }
+
+const { loading, error, load } = useLoader(async () => {
+  programs.value = await programsRequest();
+
+  try {
+    const clientsData = await clientDirectoryRequest({ pageSize: 50 });
+    clients.value = clientsData.items;
+  } catch {
+    clients.value = [];
+  }
+}, 'Programs could not be loaded.');
+
+watch([status, clientId], () => {
+  page.value = 1;
+});
+
+watch(search, () => {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(() => {
+    page.value = 1;
+  }, 250);
+});
 
 onMounted(() => void load());
 </script>
 
 <template>
   <PageContainer>
-    <PageHeader title="Programs" description="Client programs are separate from reusable templates. Editing a template does not change programs already copied.">
+    <nav class="program-module-tabs" aria-label="Programs navigation">
+      <RouterLink to="/programs" class="module-tab-link is-active">
+        Programs
+      </RouterLink>
+      <RouterLink to="/programs/tasks" class="module-tab-link">
+        Tasks
+      </RouterLink>
+    </nav>
+
+    <PageHeader title="Programs" description="Search and manage clinical programs and target mastery.">
       <template #actions>
-        <AppButton v-if="auth.can('programs.edit')" variant="secondary" @click="router.push('/programs/templates/new')">New template</AppButton>
-        <AppButton v-if="auth.can('programs.edit')" @click="router.push('/programs/new')">New program</AppButton>
+        <AppButton variant="secondary" @click="router.push('/programs/tasks')">View Tasks</AppButton>
+        <AppButton v-if="canEdit" @click="router.push('/programs/new')">New program</AppButton>
       </template>
     </PageHeader>
-    <SkeletonBlock v-if="loading" height="220px" />
-    <ErrorState v-else-if="error" title="Programs unavailable" :description="error" @retry="load" />
-    <template v-else>
-      <section class="panel stack">
-        <h2>Client programs</h2>
-        <EmptyState v-if="programs.length === 0" title="No programs" description="Create a program for a client or copy a template." />
-        <button v-for="program in programs" :key="program.id" class="row" type="button" @click="router.push(`/programs/${program.id}`)">
-          <strong>{{ program.title }}</strong>
-          <span>{{ program.clientName }} · {{ program.targetCount }} targets · {{ program.measurementType }}</span>
-          <span>Start {{ program.startedOn || 'not set' }} · Review {{ program.reviewOn || 'not set' }}</span>
-          <StatusBadge :tone="program.status === 'active' ? 'success' : 'neutral'" :label="program.status" />
-        </button>
-      </section>
-      <section class="panel stack">
-        <h2>Templates</h2>
-        <AppSelect v-if="auth.can('programs.edit')" v-model="copyClientId" label="Copy into client" :options="[{ value: '', label: 'Select a client' }, ...clients.map((client) => ({ value: client.id, label: client.displayName }))]" />
-        <EmptyState v-if="templates.length === 0" title="No templates" description="A template is a starting copy. It is not the client’s program." />
-        <article v-for="template in templates" :key="template.id">
-          <strong>{{ template.title }}</strong>
-          <p>{{ template.objective || 'No objective' }} · {{ template.targets.length }} targets · {{ template.measurementType }}</p>
-          <AppButton v-if="auth.can('programs.edit')" type="button" variant="secondary" :disabled="!copyClientId" @click="copy(template.id)">Copy to client</AppButton>
-        </article>
-      </section>
-    </template>
+
+    <div class="filter-bar">
+      <AppInput v-model="search" label="Search" placeholder="Program name, client, or domain" />
+      <AppSelect
+        v-model="status"
+        label="Status"
+        :options="[
+          { value: '', label: 'Any status' },
+          { value: 'active', label: 'Active' },
+          { value: 'paused', label: 'Paused' },
+          { value: 'completed', label: 'Completed' },
+          { value: 'discontinued', label: 'Discontinued' },
+        ]"
+      />
+      <AppSelect v-model="clientId" label="Client" :options="clientOptions" />
+    </div>
+
+    <SkeletonBlock v-if="loading" height="240px" />
+    <ErrorState v-else-if="error" title="Program directory unavailable" :description="error" @retry="load" />
+    <EmptyState
+      v-else-if="filteredPrograms.length === 0"
+      title="No programs match"
+      description="Create a program or adjust your filters."
+    />
+    <div v-else class="table-wrap panel">
+      <table>
+        <caption>Program directory</caption>
+        <thead>
+          <tr>
+            <th><button type="button" @click="toggleSort('title')">Program name</button></th>
+            <th><button type="button" @click="toggleSort('client')">Client</button></th>
+            <th><button type="button" @click="toggleSort('domain')">Domain</button></th>
+            <th><button type="button" @click="toggleSort('procedure')">Measurement procedure</button></th>
+            <th><button type="button" @click="toggleSort('targets')">Targets</button></th>
+            <th><button type="button" @click="toggleSort('status')">Status</button></th>
+            <th><button type="button" @click="toggleSort('implemented')">Date implemented</button></th>
+            <th><button type="button" @click="toggleSort('mastered')">Date mastered</button></th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="program in pagedItems" :key="program.id">
+            <td>
+              <RouterLink class="program-link" :to="`/programs/${program.id}`">
+                <strong>{{ program.title }}</strong>
+              </RouterLink>
+            </td>
+            <td>
+              <RouterLink v-if="program.clientId" class="client-link" :to="`/clients/${program.clientId}`">
+                {{ program.clientName || 'Unknown client' }}
+              </RouterLink>
+              <span v-else>{{ program.clientName || '—' }}</span>
+            </td>
+            <td>{{ program.domain || '—' }}</td>
+            <td>{{ program.measurementProcedure || program.measurementType || '—' }}</td>
+            <td>{{ program.targetCount }}</td>
+            <td>
+              <StatusBadge :tone="statusTone(program.status)" :label="statusLabel(program.status)" />
+            </td>
+            <td>{{ formatDate(program.dateImplemented) }}</td>
+            <td>{{ formatDate(program.dateMastered) }}</td>
+            <td>
+              <div class="row-actions">
+                <AppButton size="sm" variant="secondary" @click="router.push(`/programs/${program.id}`)">View</AppButton>
+                <AppButton v-if="canEdit" size="sm" variant="secondary" @click="router.push(`/programs/${program.id}/edit`)">Edit</AppButton>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="!loading && !error && filteredPrograms.length > 0" class="pager">
+      <span>Showing {{ rangeStart }}–{{ rangeEnd }} of {{ total }}</span>
+      <AppButton variant="secondary" size="sm" :disabled="page <= 1" @click="page -= 1">Previous</AppButton>
+      <span>Page {{ page }} of {{ pageCount }}</span>
+      <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="page += 1">Next</AppButton>
+    </div>
   </PageContainer>
 </template>
 
 <style scoped>
-.stack { display: grid; gap: 12px; }
-.row { display: grid; gap: 4px; text-align: left; padding: 12px; border: 0; border-bottom: 1px solid var(--color-border); background: transparent; cursor: pointer; }
-h2 { margin: 0; }
+.program-module-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 20px;
+}
+
+.module-tab-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.module-tab-link:hover {
+  color: var(--color-ink);
+}
+
+.module-tab-link.is-active {
+  color: var(--color-primary-ink);
+  border-bottom-color: var(--color-primary);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  padding: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: middle;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+th button {
+  border: 0;
+  background: transparent;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+caption {
+  text-align: left;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.program-link {
+  text-decoration: none;
+  color: inherit;
+  display: inline-block;
+}
+
+.program-link:hover strong,
+.client-link:hover {
+  text-decoration: underline;
+}
+
+.client-link {
+  text-decoration: none;
+  color: var(--color-primary, inherit);
+}
+
+.pager {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: var(--color-text-muted);
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.actions-col {
+  width: 1%;
+  white-space: nowrap;
+}
 </style>

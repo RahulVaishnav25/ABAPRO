@@ -1,11 +1,19 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { PERMISSIONS, type AssessmentDetail, type AssessmentSummary, type AssessmentTemplate, type AuthUser } from '@abapro/shared';
+import {
+  PERMISSIONS,
+  type AssessmentDetail,
+  type AssessmentSummary,
+  type AssessmentTemplate,
+  type AssessmentTemplateWrite,
+  type AssessmentWrite,
+  type AuthUser,
+} from '@abapro/shared';
 import { recordAudit } from '../common/audit';
+import { recordChangeReason, requireReason } from '../common/clinical-change';
 import { asDate, asString } from '../common/http';
 import type { Queryable } from '../db/database';
 import { AuthorizationService } from '../access/authorization.service';
-import type { AssessmentWrite, TemplateWrite } from './clinical.dto';
 
 const DOCUMENT_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
 const MAX_DOCUMENT_BYTES = 512 * 1024;
@@ -19,8 +27,7 @@ export class AssessmentService {
       const params: unknown[] = [organizationId];
       const scope = clientScope(user, params);
       if (clientId) {
-        const client = await this.authorization.findClient(tx, organizationId, clientId);
-        await this.authorization.assertClientAccess(tx, user, client, 'view', PERMISSIONS.assessmentsView);
+        const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', PERMISSIONS.assessmentsView);
         params.push(client.id);
       }
       const rows = await tx.query<{
@@ -68,8 +75,7 @@ export class AssessmentService {
 
   async create(user: AuthUser, input: AssessmentWrite): Promise<AssessmentDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, input.clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.assessmentsCreate);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, input.clientId, 'write', PERMISSIONS.assessmentsCreate);
       if (input.assignedClinicianId) {
         await assertClinician(tx, organizationId, input.assignedClinicianId);
       }
@@ -112,15 +118,10 @@ export class AssessmentService {
   async update(user: AuthUser, assessmentId: string, input: AssessmentWrite): Promise<AssessmentDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const current = await this.find(tx, organizationId, assessmentId);
-      const client = await this.authorization.findClient(tx, organizationId, current.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.assessmentsCreate);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, current.client_id, 'write', PERMISSIONS.assessmentsCreate);
       const statusChanged = input.status !== undefined && input.status !== current.status;
       if (statusChanged && (input.status === 'completed' || input.status === 'reviewed')) {
-        await tx.query(
-          `INSERT INTO clinical_change_reasons (organization_id, record_type, record_id, reason, created_by)
-           VALUES ($1, 'assessment', $2, $3, $4)`,
-          [organizationId, assessmentId, requireReason(input.changeReason), user.id],
-        );
+        await recordChangeReason(tx, { organizationId, recordType: 'assessment', recordId: assessmentId, reason: requireReason(input.changeReason), userId: user.id });
       }
       if (input.assignedClinicianId) {
         await assertClinician(tx, organizationId, input.assignedClinicianId);
@@ -171,7 +172,7 @@ export class AssessmentService {
     });
   }
 
-  async saveTemplate(user: AuthUser, input: TemplateWrite, templateId?: string): Promise<AssessmentTemplate> {
+  async saveTemplate(user: AuthUser, input: AssessmentTemplateWrite, templateId?: string): Promise<AssessmentTemplate> {
     if (!user.permissions.includes(PERMISSIONS.assessmentsCreate)) {
       throw new BadRequestException('Assessment templates require permission to create assessments.');
     }
@@ -229,8 +230,7 @@ export class AssessmentService {
     }
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const current = await this.find(tx, organizationId, assessmentId);
-      const client = await this.authorization.findClient(tx, organizationId, current.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.documentsUpload);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, current.client_id, 'write', PERMISSIONS.documentsUpload);
       const id = randomUUID();
       await tx.query(
         `INSERT INTO client_documents (
@@ -306,8 +306,7 @@ export class AssessmentService {
     if (!row) {
       throw new NotFoundException('That assessment was not found.');
     }
-    const client = await this.authorization.findClient(tx, organizationId, asString(row.client_id));
-    await this.authorization.assertClientAccess(tx, user, client, 'view', PERMISSIONS.assessmentsView);
+    await this.authorization.findAccessibleClient(tx, user, organizationId, asString(row.client_id), 'view', PERMISSIONS.assessmentsView);
     const items = await tx.query<{ id: string; label: string; response_kind: AssessmentDetail['items'][number]['responseKind']; response_text: string; sort_order: number }>(
       `SELECT id, label, response_kind, response_text, sort_order FROM assessment_items WHERE assessment_id = $1 ORDER BY sort_order`,
       [assessmentId],
@@ -369,7 +368,7 @@ function clientScope(user: AuthUser, params: unknown[]): string {
   )`;
 }
 
-async function templateItems(tx: Queryable, organizationId: string, templateId: string): Promise<TemplateWrite['items']> {
+async function templateItems(tx: Queryable, organizationId: string, templateId: string): Promise<AssessmentTemplateWrite['items']> {
   const rows = await tx.query<{ label: string; response_kind: 'text' | 'yes_no' | 'rating' | 'count'; guidance: string }>(
     `SELECT label, response_kind, guidance FROM assessment_template_items
      WHERE template_id = $1 AND organization_id = $2 ORDER BY sort_order`,
@@ -444,10 +443,3 @@ async function assertClinician(tx: Queryable, organizationId: string, userId: st
   }
 }
 
-function requireReason(reason: string | undefined): string {
-  const text = reason?.trim() ?? '';
-  if (text.length < 12) {
-    throw new BadRequestException('Enter a reason of at least 12 characters for this clinical change.');
-  }
-  return text;
-}

@@ -1,19 +1,36 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import sceneUrl from '@/assets/clinic-session.jpg';
+import appIconUrl from '@/assets/brand/app-icon.png';
+import { useBrandingStore } from '@/stores/branding';
+
+const branding = useBrandingStore();
+
+const brandName = computed(() => branding.platformBranding.portalName || 'ABAPro');
+const brandLogo = computed(() => branding.platformBranding.logoUrl || appIconUrl);
+const headline = computed(() => branding.platformBranding.loginHeadline || 'Better care starts with clarity.');
+const subtitle = computed(
+  () => branding.platformBranding.loginSubtitle || "One simple workspace for your team, your sessions, and every client's progress.",
+);
+
+const bgStyle = computed(() => {
+  const p = branding.platformBranding.primaryColor || '#14665e';
+  const s = branding.platformBranding.secondaryColor || '#0c3330';
+  return {
+    background: `radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.12), transparent 34%), linear-gradient(165deg, ${p} 0%, ${s} 100%)`,
+  };
+});
 </script>
 
 <template>
-  <section class="intro">
+  <section class="intro" :style="bgStyle">
     <div class="intro-copy">
       <p class="brand">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-          <rect width="32" height="32" rx="8" fill="#f4fbfa" />
-          <path d="M9 22.5 16 8.5l7 14M11.6 18.2h8.8" />
-        </svg>
-        <span>ABAPro</span>
+        <img :src="brandLogo" :alt="brandName" class="brand-badge" />
+        <span>{{ brandName }}</span>
       </p>
-      <h1>Better care starts with clarity.</h1>
-      <p class="marketing">One simple workspace for your team, your sessions, and every client's progress.</p>
+      <h1>{{ headline }}</h1>
+      <p class="marketing">{{ subtitle }}</p>
     </div>
     <figure class="scene">
       <img :src="sceneUrl" alt="Therapist and client stacking colorful blocks together at a table in a bright therapy room" />
@@ -60,10 +77,8 @@ import sceneUrl from '@/assets/clinic-session.jpg';
   min-width: 0;
   overflow: hidden;
   padding: 32px 48px 24px;
-  background:
-    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.1), transparent 34%),
-    linear-gradient(165deg, #14665e 0%, #0c3330 72%);
   color: #f4fbfa;
+  transition: background 0.3s ease;
 }
 
 .brand {
@@ -76,18 +91,14 @@ import sceneUrl from '@/assets/clinic-session.jpg';
   line-height: 1;
 }
 
-.brand-mark {
+.brand-badge {
   width: 44px;
   height: 44px;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 4px;
+  object-fit: contain;
   flex: 0 0 auto;
-}
-
-.brand-mark path {
-  fill: none;
-  stroke: #0e6b62;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .intro h1 {
@@ -105,10 +116,11 @@ import sceneUrl from '@/assets/clinic-session.jpg';
 
 .scene {
   margin: 0;
-  width: min(520px, 100%);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
+  max-width: 620px;
 }
 
 .scene img {
@@ -117,72 +129,57 @@ import sceneUrl from '@/assets/clinic-session.jpg';
   height: auto;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  object-position: center;
 }
 
 .points {
+  list-style: none;
   margin: 0;
   padding: 0;
-  list-style: none;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .points li {
   display: flex;
-  gap: 12px;
   align-items: flex-start;
+  gap: 10px;
+  font-size: 0.94rem;
+}
+
+.points li strong {
+  display: block;
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.points li span {
+  display: block;
+  color: rgba(244, 251, 250, 0.8);
+  font-size: 0.88rem;
+  line-height: 1.35;
 }
 
 .point-icon {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
-  margin-top: 1px;
-  color: #9ddecf;
-}
-
-.point-icon path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
+  width: 18px;
+  height: 18px;
+  stroke: #ffffff;
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.points div {
-  display: grid;
-  gap: 2px;
-}
-
-.points strong {
-  font-size: 1rem;
-}
-
-.points span,
-.closing {
-  color: rgba(244, 251, 250, 0.86);
+  fill: none;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .closing {
-  margin: 0;
-  font-weight: 600;
-  white-space: nowrap;
+  font-size: 0.85rem;
+  color: rgba(244, 251, 250, 0.72);
+  margin-top: 4px;
 }
 
-@media (max-width: 1199px) {
+@media (max-width: 1100px) {
   .intro {
-    padding: 28px 28px 24px;
-  }
-
-  .intro h1,
-  .marketing,
-  .closing {
-    white-space: normal;
-  }
-
-  .intro h1 {
-    font-size: 1.85rem;
+    padding: 24px 32px 20px;
   }
 }
 </style>

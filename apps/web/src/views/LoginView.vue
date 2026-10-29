@@ -7,6 +7,7 @@ import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import { safeRedirect } from '@/lib/redirect';
 import { useAuthStore } from '@/stores/auth';
+import { errorMessage } from '@/lib/loader';
 
 const route = useRoute();
 const router = useRouter();
@@ -27,7 +28,7 @@ async function submit(): Promise<void> {
     }
     await router.push(safeRedirect(route.query.redirect));
   } catch (error) {
-    formError.value = error instanceof Error ? error.message : 'The email or password is incorrect.';
+    formError.value = errorMessage(error, 'The email or password is incorrect.');
   } finally {
     saving.value = false;
   }

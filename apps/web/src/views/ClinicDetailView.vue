@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import type { ClinicDetail } from '@abapro/shared';
-import { apiRequest } from '@/api/client';
+import { apiRequest, encodedPath } from '@/api/client';
 import { displayStoredAddress } from '@/components/address/postal-address';
 import ClinicFormFields from '@/components/organization/ClinicFormFields.vue';
 import { clinicDraftFrom, clinicFormFrom, emptyClinicForm, type ClinicFormValue } from '@/components/organization/form-values';
@@ -13,13 +13,12 @@ import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { useToastStore } from '@/stores/toast';
+import { errorMessage, useLoader } from '@/lib/loader';
 
 const route = useRoute();
 const toast = useToastStore();
-const loading = ref(true);
 const saving = ref(false);
 const editing = ref(false);
-const error = ref('');
 const editError = ref('');
 const clinic = ref<ClinicDetail | null>(null);
 const draft = ref<ClinicFormValue>(emptyClinicForm());
@@ -51,32 +50,24 @@ async function saveClinic(): Promise<void> {
   }
   saving.value = true;
   try {
-    clinic.value = await apiRequest<ClinicDetail>(`/clinics/${clinic.value.id}`, {
+    clinic.value = await apiRequest<ClinicDetail>(encodedPath`/clinics/${clinic.value.id}`, {
       method: 'PATCH',
       body: clinicDraftFrom(draft.value, clinic.value),
     });
     editing.value = false;
     toast.push({ tone: 'success', title: 'Clinic updated' });
   } catch (saveError) {
-    editError.value = saveError instanceof Error ? saveError.message : 'The clinic could not be updated.';
+    editError.value = errorMessage(saveError, 'The clinic could not be updated.');
   } finally {
     saving.value = false;
   }
 }
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
+const { loading, error, load } = useLoader(async () => {
   editing.value = false;
   clinic.value = null;
-  try {
-    clinic.value = await apiRequest<ClinicDetail>(`/clinics/${route.params.clinicId}`);
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'This clinic could not be loaded.';
-  } finally {
-    loading.value = false;
-  }
-}
+  clinic.value = await apiRequest<ClinicDetail>(encodedPath`/clinics/${String(route.params.clinicId)}`);
+}, 'This clinic could not be loaded.');
 
 watch(() => route.params.clinicId, () => {
   void load();

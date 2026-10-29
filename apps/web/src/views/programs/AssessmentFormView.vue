@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import type { AssessmentDocumentLink, AssessmentTemplate, ClientDirectoryItem, ResponseKind, StaffOption } from '@abapro/shared';
+import type { AssessmentDocumentLink, AssessmentTemplate, AssessmentWrite, ClientDirectoryItem, ResponseKind, StaffOption } from '@abapro/shared';
 import { clientAssigneesRequest, clientDirectoryRequest, fileToBase64 } from '@/api/clients';
-import { assessmentRequest, assessmentTemplatesRequest, saveAssessmentRequest, uploadAssessmentDocumentRequest, type AssessmentBody } from '@/api/programs';
+import { assessmentRequest, assessmentTemplatesRequest, saveAssessmentRequest, uploadAssessmentDocumentRequest } from '@/api/programs';
 import { ApiError } from '@/api/client';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
@@ -16,6 +16,7 @@ import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { useLoader } from '@/lib/loader';
 
 interface ItemDraft {
   label: string;
@@ -30,9 +31,7 @@ const router = useRouter();
 const assessmentId = computed(() => (typeof route.params.assessmentId === 'string' ? route.params.assessmentId : ''));
 const editing = computed(() => Boolean(assessmentId.value) && route.name !== 'assessment-detail');
 const reading = computed(() => route.name === 'assessment-detail');
-const loading = ref(true);
 const saving = ref(false);
-const error = ref('');
 const formError = ref('');
 const clients = ref<ClientDirectoryItem[]>([]);
 const templates = ref<AssessmentTemplate[]>([]);
@@ -44,7 +43,7 @@ const clientId = ref('');
 const templateId = ref('');
 const name = ref('');
 const assessmentType = ref('');
-const status = ref<AssessmentBody['status']>('draft');
+const status = ref<AssessmentWrite['status']>('draft');
 const assessedOn = ref('');
 const reviewOn = ref('');
 const clinicianId = ref('');
@@ -60,37 +59,29 @@ const kinds = [
   { value: 'count', label: 'Count' },
 ];
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
-  try {
-    const directory = await clientDirectoryRequest({ pageSize: 50 });
-    clients.value = directory.items;
-    templates.value = await assessmentTemplatesRequest();
-    clinicians.value = (await clientAssigneesRequest()).filter((person) => person.role === 'clinical_supervisor');
-    if (assessmentId.value) {
-      const assessment = await assessmentRequest(assessmentId.value);
-      clientId.value = assessment.clientId;
-      templateId.value = assessment.templateId ?? '';
-      name.value = assessment.name;
-      assessmentType.value = assessment.assessmentType;
-      status.value = assessment.status;
-      assessedOn.value = assessment.assessedOn ?? '';
-      reviewOn.value = assessment.reviewOn ?? '';
-      summary.value = assessment.summary;
-      resultsNote.value = assessment.resultsNote;
-      programs.value = assessment.programs;
-      documents.value = assessment.documents;
-      items.value = assessment.items.map((item) => ({ label: item.label, responseKind: item.responseKind, responseText: item.responseText }));
-    } else if (typeof route.query.clientId === 'string') {
-      clientId.value = route.query.clientId;
-    }
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'The assessment could not be loaded.';
-  } finally {
-    loading.value = false;
+const { loading, error, load } = useLoader(async () => {
+  const directory = await clientDirectoryRequest({ pageSize: 50 });
+  clients.value = directory.items;
+  templates.value = await assessmentTemplatesRequest();
+  clinicians.value = (await clientAssigneesRequest()).filter((person) => person.role === 'clinical_supervisor');
+  if (assessmentId.value) {
+    const assessment = await assessmentRequest(assessmentId.value);
+    clientId.value = assessment.clientId;
+    templateId.value = assessment.templateId ?? '';
+    name.value = assessment.name;
+    assessmentType.value = assessment.assessmentType;
+    status.value = assessment.status;
+    assessedOn.value = assessment.assessedOn ?? '';
+    reviewOn.value = assessment.reviewOn ?? '';
+    summary.value = assessment.summary;
+    resultsNote.value = assessment.resultsNote;
+    programs.value = assessment.programs;
+    documents.value = assessment.documents;
+    items.value = assessment.items.map((item) => ({ label: item.label, responseKind: item.responseKind, responseText: item.responseText }));
+  } else if (typeof route.query.clientId === 'string') {
+    clientId.value = route.query.clientId;
   }
-}
+}, 'The assessment could not be loaded.');
 
 function applyTemplate(): void {
   const template = templates.value.find((item) => item.id === templateId.value);

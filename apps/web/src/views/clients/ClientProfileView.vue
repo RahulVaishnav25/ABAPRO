@@ -63,6 +63,7 @@ import { formatDateTime } from '@/lib/format';
 import { sessionGraphRequest } from '@/api/sessions';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { useLoader } from '@/lib/loader';
 
 const ACTION_LABELS: Record<string, string> = {
   'client.created': 'Client created',
@@ -88,8 +89,6 @@ const toast = useToastStore();
 const route = useRoute();
 const router = useRouter();
 const clientId = computed(() => String(route.params.clientId ?? ''));
-const loading = ref(true);
-const error = ref('');
 const profile = ref<ClientProfile | null>(null);
 const tab = ref('overview');
 const clinical = ref<ClinicalProfile | null>(null);
@@ -526,21 +525,13 @@ async function confirmAction(): Promise<void> {
   await deactivate();
 }
 
-async function loadProfile(): Promise<void> {
-  loading.value = true;
-  error.value = '';
+const { loading, error, load: loadProfile } = useLoader(async () => {
   loaded.value = new Set();
-  try {
-    profile.value = await clientProfileRequest(clientId.value);
-    if (auth.can('assignments.manage')) {
-      staff.value = await clientAssigneesRequest();
-    }
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'The client profile could not be loaded.';
-  } finally {
-    loading.value = false;
+  profile.value = await clientProfileRequest(clientId.value);
+  if (auth.can('assignments.manage')) {
+    staff.value = await clientAssigneesRequest();
   }
-}
+}, 'The client profile could not be loaded.');
 
 async function loadTab(id: string): Promise<void> {
   if (!profile.value || loaded.value.has(id)) return;
@@ -873,7 +864,7 @@ onMounted(async () => {
       <section v-else-if="tab === 'assessments'" class="panel stack">
         <div class="heading">
           <h2>Assessments</h2>
-          <AppButton v-if="auth.can('assessments.create')" type="button" @click="router.push(`/assessments/new?clientId=${profile.id}`)">New assessment</AppButton>
+          <AppButton v-if="auth.can('assessments.create')" type="button" @click="router.push({ path: '/assessments/new', query: { clientId: profile.id } })">New assessment</AppButton>
         </div>
         <EmptyState v-if="clinicalAssessments.length === 0 && assessments.length === 0" title="No assessments" description="Create an assessment with items written by the clinic. References already on the client record stay listed below." />
         <article v-for="item in clinicalAssessments" :key="item.id" class="record">
@@ -892,7 +883,7 @@ onMounted(async () => {
       <section v-else-if="tab === 'programs'" class="panel stack">
         <div class="heading">
           <h2>Programs</h2>
-          <AppButton v-if="auth.can('programs.edit')" type="button" @click="router.push(`/programs/new?clientId=${profile.id}`)">New program</AppButton>
+          <AppButton v-if="auth.can('programs.edit')" type="button" @click="router.push({ path: '/programs/new', query: { clientId: profile.id } })">New program</AppButton>
         </div>
         <EmptyState v-if="programs.length === 0" title="No programs" description="Programs created for this client stay on the record when their status changes." />
         <article v-for="program in programs" :key="program.id" class="record">
@@ -945,7 +936,7 @@ onMounted(async () => {
       <section v-else-if="tab === 'sessions'" class="panel stack">
         <div class="heading">
           <h2>Sessions</h2>
-          <AppButton v-if="auth.can('observations.record')" type="button" @click="router.push(`/sessions?clientId=${profile.id}`)">Collect data</AppButton>
+          <AppButton v-if="auth.can('observations.record')" type="button" @click="router.push({ path: '/sessions', query: { clientId: profile.id } })">Collect data</AppButton>
         </div>
         <EmptyState v-if="sessions.length === 0" title="No sessions" description="Sessions started for this client stay here, including a session that was interrupted before it was completed." />
         <ul class="records">

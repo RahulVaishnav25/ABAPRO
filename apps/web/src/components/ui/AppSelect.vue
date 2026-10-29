@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue';
-import type { SelectOption } from './types';
+import type { SelectGroup, SelectOption } from './types';
 import FieldError from './FieldError.vue';
 
 const model = defineModel<string>({ default: '' });
 
 const props = defineProps<{
   label: string;
-  options: SelectOption[];
+  options?: SelectOption[];
+  groups?: SelectGroup[];
   placeholder?: string;
   hint?: string;
   error?: string;
@@ -39,8 +40,15 @@ const describedBy = computed(() => {
       :aria-invalid="error ? 'true' : undefined"
       :aria-describedby="describedBy"
     >
-      <option v-if="placeholder" disabled value="">{{ placeholder }}</option>
-      <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
+      <option v-if="placeholder" :disabled="required" value="">{{ placeholder }}</option>
+      <template v-if="groups && groups.length > 0">
+        <optgroup v-for="grp in groups" :key="grp.group" :label="grp.group">
+          <option v-for="option in grp.options" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </optgroup>
+      </template>
+      <template v-else-if="options">
+        <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
+      </template>
     </select>
     <p v-if="hint" :id="`${inputId}-hint`" class="field-hint">{{ hint }}</p>
     <FieldError :id="`${inputId}-error`" :message="error" />

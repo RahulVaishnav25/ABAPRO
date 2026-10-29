@@ -21,8 +21,22 @@ const crumbs = computed(() => {
     if (route.name !== 'clinics') trail.push({ label, to: route.path });
     return trail;
   }
+  if (route.path === '/organizations' || route.path.startsWith('/organizations/')) {
+    if (auth.user?.platformAdmin) {
+      const trail = [root, { label: 'Organisations', to: '/organizations' }];
+      if (route.name !== 'organizations') trail.push({ label, to: route.path });
+      return trail;
+    }
+  }
   if (route.path === '/team' || route.path.startsWith('/team/')) {
     return [root, { label: 'Settings', to: '/settings' }, { label, to: route.path }];
+  }
+  if (route.path === '/programs/tasks' || route.path.startsWith('/programs/tasks/')) {
+    const trail = [root, { label: 'Programs', to: '/programs' }, { label: 'Tasks', to: '/programs/tasks' }];
+    if (route.path !== '/programs/tasks') {
+      trail.push({ label, to: route.path });
+    }
+    return trail;
   }
   return [root, { label, to: route.path }];
 });

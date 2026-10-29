@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { INVITABLE_ROLES, ROLE_LABELS, type InvitableRole, type OrganizationDirectoryItem } from '@abapro/shared';
-import { apiRequest } from '@/api/client';
+import { apiRequest, encodedPath } from '@/api/client';
 import { createOrganizationMemberRequest } from '@/api/resources';
 import { displayStoredAddress } from '@/components/address/postal-address';
 import ClinicFormFields from '@/components/organization/ClinicFormFields.vue';
@@ -25,13 +25,12 @@ import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { errorMessage, useLoader } from '@/lib/loader';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToastStore();
-const loading = ref(true);
-const error = ref('');
 const saving = ref(false);
 const adding = ref(false);
 const formError = ref('');
@@ -70,7 +69,7 @@ async function saveOrganisation(): Promise<void> {
   }
   saving.value = true;
   try {
-    organization.value = await apiRequest<OrganizationDirectoryItem>(`/organizations/${organization.value.id}`, {
+    organization.value = await apiRequest<OrganizationDirectoryItem>(encodedPath`/organizations/${organization.value.id}`, {
       method: 'PATCH',
       body: organizationUpdateFrom(organisationDraft.value, organization.value.address),
     });
@@ -83,23 +82,15 @@ async function saveOrganisation(): Promise<void> {
     editingOrganisation.value = false;
     toast.push({ tone: 'success', title: 'Organisation updated' });
   } catch (saveError) {
-    editError.value = saveError instanceof Error ? saveError.message : 'The organisation could not be updated.';
+    editError.value = errorMessage(saveError, 'The organisation could not be updated.');
   } finally {
     saving.value = false;
   }
 }
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
-  try {
-    organization.value = await apiRequest<OrganizationDirectoryItem>(`/organizations/${route.params.organizationId}`);
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'This organisation could not be loaded.';
-  } finally {
-    loading.value = false;
-  }
-}
+const { loading, error, load } = useLoader(async () => {
+  organization.value = await apiRequest<OrganizationDirectoryItem>(encodedPath`/organizations/${String(route.params.organizationId)}`);
+}, 'This organisation could not be loaded.');
 
 function candidates(clinicId: string) {
   return (organization.value?.members ?? []).filter((member) => member.role !== 'organization_admin' && !member.clinicIds.includes(clinicId));
@@ -109,7 +100,7 @@ async function grantAccess(clinicId: string): Promise<void> {
   if (!organization.value) return;
   const userId = grantUserId.value[clinicId];
   if (!userId) return;
-  organization.value = await apiRequest<OrganizationDirectoryItem>(`/organizations/${organization.value.id}/clinics/${clinicId}/access`, {
+  organization.value = await apiRequest<OrganizationDirectoryItem>(encodedPath`/organizations/${organization.value.id}/clinics/${clinicId}/access`, {
     method: 'POST',
     body: { userId },
   });
@@ -143,7 +134,7 @@ async function createMember(): Promise<void> {
     memberRole.value = 'organization_admin';
     toast.push({ tone: 'success', title: 'Team member created', message: `${name} can sign in with this email and password.` });
   } catch (createError) {
-    memberError.value = createError instanceof Error ? createError.message : 'The team member could not be created.';
+    memberError.value = errorMessage(createError, 'The team member could not be created.');
   } finally {
     creatingMember.value = false;
   }
@@ -158,16 +149,27 @@ async function addClinic(): Promise<void> {
       formError.value = 'Each clinic needs a name.';
       return;
     }
-    organization.value = await apiRequest<OrganizationDirectoryItem>(`/organizations/${organization.value.id}/clinics`, {
+    organization.value = await apiRequest<OrganizationDirectoryItem>(encodedPath`/organizations/${organization.value.id}/clinics`, {
       method: 'POST',
       body: clinicDraftFrom(clinicForm.value),
     });
     clinicForm.value = emptyClinicForm();
     toast.push({ tone: 'success', title: 'Clinic added' });
   } catch (addError) {
-    formError.value = addError instanceof Error ? addError.message : 'The clinic could not be added.';
+    formError.value = errorMessage(addError, 'The clinic could not be added.');
   } finally {
     adding.value = false;
+  }
+}
+
+async function enterWorkspace(): Promise<void> {
+  if (!organization.value) return;
+  try {
+    await auth.switchOrganization(organization.value.id);
+    toast.push({ tone: 'success', title: `Entered ${organization.value.name}` });
+    await router.push('/programs/tasks');
+  } catch (err) {
+    toast.push({ tone: 'danger', title: 'Could not enter workspace', message: errorMessage(err, 'Try again.') });
   }
 }
 
@@ -183,6 +185,7 @@ onMounted(() => {
     <template v-else>
       <PageHeader :title="organization.name">
         <template #actions>
+          <AppButton type="button" @click="enterWorkspace">Enter Workspace</AppButton>
           <AppButton v-if="canManage && !editingOrganisation" type="button" variant="secondary" @click="startOrganisationEdit">Edit organisation</AppButton>
         </template>
       </PageHeader>

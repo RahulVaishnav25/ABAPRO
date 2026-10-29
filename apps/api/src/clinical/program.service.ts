@@ -4,17 +4,22 @@ import {
   PERMISSIONS,
   type AuthUser,
   type MeasurementMethod,
+  type MeasurementProcedure,
+  type ObservationWrite,
   type ProgramDetail,
   type ProgramSummary,
-  type ProgramTemplate,
+  type ProgramWrite,
   type SessionObservationView,
+  type TargetListItem,
   type TargetStatus,
+  type TargetSummary,
+  type TargetWrite,
 } from '@abapro/shared';
 import { recordAudit } from '../common/audit';
-import { asDate, asString } from '../common/http';
+import { recordChangeReason, requireReason } from '../common/clinical-change';
+import { asDate, asNullableNumber, asString } from '../common/http';
 import type { Queryable } from '../db/database';
 import { AuthorizationService } from '../access/authorization.service';
-import type { ObservationDto, ProgramDto, ProgramTemplateDto, TargetDto } from './clinical.dto';
 
 @Injectable()
 export class ProgramService {
@@ -25,8 +30,7 @@ export class ProgramService {
       const params: unknown[] = [organizationId];
       let clientClause = '';
       if (clientId) {
-        const client = await this.authorization.findClient(tx, organizationId, clientId);
-        await this.authorization.assertClientAccess(tx, user, client, 'view', PERMISSIONS.programsView);
+        const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', PERMISSIONS.programsView);
         params.push(client.id);
         clientClause = `AND p.client_id = $${params.length}`;
       }
@@ -36,15 +40,20 @@ export class ProgramService {
         client_id: string;
         client_name: string;
         name: string;
+        domain: string | null;
+        date_implemented: string | null;
+        date_mastered: string | null;
         status: ProgramSummary['status'];
         measurement_type: MeasurementMethod;
+        measurement_procedure: MeasurementProcedure | null;
         target_count: number | string;
-        started_on: string | null;
         review_on: string | null;
       }>(
-        `SELECT p.id, p.client_id, c.display_name AS client_name, p.name, p.status, p.measurement_type,
+        `SELECT p.id, p.client_id, c.display_name AS client_name, p.name, p.domain,
+                to_char(p.date_implemented, 'YYYY-MM-DD') AS date_implemented,
+                to_char(p.date_mastered, 'YYYY-MM-DD') AS date_mastered,
+                p.status, p.measurement_type, p.measurement_procedure,
                 (SELECT count(*) FROM client_targets t WHERE t.program_id = p.id) AS target_count,
-                to_char(p.started_on, 'YYYY-MM-DD') AS started_on,
                 to_char(p.review_on, 'YYYY-MM-DD') AS review_on
          FROM client_programs p
          JOIN clients c ON c.id = p.client_id
@@ -57,10 +66,13 @@ export class ProgramService {
         clientId: asString(row.client_id),
         clientName: asString(row.client_name),
         title: asString(row.name),
+        domain: row.domain ? asString(row.domain) : undefined,
+        dateImplemented: row.date_implemented ? asString(row.date_implemented) : null,
+        dateMastered: row.date_mastered ? asString(row.date_mastered) : null,
         status: row.status,
         measurementType: row.measurement_type,
+        measurementProcedure: (row.measurement_procedure as MeasurementProcedure | null) || (row.measurement_type === 'trial' ? 'Step by Step' : 'Probe'),
         targetCount: Number(row.target_count ?? 0),
-        startedOn: row.started_on ? asString(row.started_on) : null,
         reviewOn: row.review_on ? asString(row.review_on) : null,
       }));
     });
@@ -70,41 +82,73 @@ export class ProgramService {
     return this.authorization.withOrganization(user, async (tx, organizationId) => this.load(tx, user, organizationId, programId));
   }
 
-  async create(user: AuthUser, input: ProgramDto): Promise<ProgramDetail> {
+  async listTargets(user: AuthUser, programId?: string): Promise<TargetListItem[]> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, input.clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.programsEdit);
-      const measurement = normalizeMeasurement(input.measurementType, input.expectedTrialCount);
+      const params: unknown[] = [organizationId];
+      let programClause = '';
+      if (programId) {
+        const program = await this.programRow(tx, organizationId, programId);
+        await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'view', PERMISSIONS.programsView);
+        params.push(programId);
+        programClause = `AND t.program_id = $${params.length}`;
+      }
+      const scope = assignmentScope(user, params);
+      return queryTargets(tx, `p.organization_id = $1 ${programClause} ${scope}`, params);
+    });
+  }
+
+  async getTarget(user: AuthUser, targetId: string): Promise<TargetListItem> {
+    return this.authorization.withOrganization(user, async (tx, organizationId) => {
+      const [target] = await queryTargets(tx, 'p.organization_id = $1 AND t.id = $2', [organizationId, targetId]);
+      if (!target) throw new NotFoundException('That target was not found.');
+      await this.authorization.findAccessibleClient(tx, user, organizationId, target.clientId, 'view', PERMISSIONS.programsView);
+      return target;
+    });
+  }
+
+  async create(user: AuthUser, input: ProgramWrite): Promise<ProgramDetail> {
+    return this.authorization.withOrganization(user, async (tx, organizationId) => {
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, input.clientId, 'write', PERMISSIONS.programsEdit);
+      const measurement = normalizeProgramMeasurement(input.measurementType, input.measurementProcedure, input.expectedTrialCount);
       if (input.assessmentId) {
         await assertAssessment(tx, organizationId, client.id, input.assessmentId);
       }
-      if (input.responsibleClinicianId) {
-        await assertClinician(tx, organizationId, input.responsibleClinicianId);
-      }
       const id = randomUUID();
+      const domain = input.domain?.trim() || 'General';
+      const dateImplemented = input.dateImplemented || null;
+      const dateMastered = input.dateMastered || null;
+      const assessmentType = input.assessmentType?.trim() || null;
+      const sd = input.sd?.trim() ?? '';
+      const masterySteps = input.masterySteps?.trim() ?? '';
+      const errorCorrectionProcedure = input.errorCorrectionProcedure?.trim() ?? '';
+      const teachingMethod = input.teachingMethod?.trim() ?? '';
+      const netTeachingIdea = input.netTeachingIdea?.trim() ?? '';
+      const masteryCriteria = input.masteryCriteria?.trim() ?? '';
+
       await tx.query(
         `INSERT INTO client_programs (
            id, organization_id, client_id, name, description, objective, assessment_id, teaching_procedure,
-           started_on, review_on, responsible_clinician_id, status, measurement_type, expected_trial_count,
-           mastery_criteria, notes, created_by
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+           date_implemented, review_on, status, measurement_type, expected_trial_count,
+           mastery_criteria, notes, created_by,
+           domain, date_mastered, assessment_type, sd, mastery_steps,
+           error_correction_procedure, teaching_method, net_teaching_idea, measurement_procedure
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
         [
           id, organizationId, client.id, input.title.trim(), input.description?.trim() ?? '', input.objective?.trim() ?? '',
-          input.assessmentId ?? null, input.teachingProcedure?.trim() ?? '', input.startedOn || null, input.reviewOn || null,
-          input.responsibleClinicianId ?? null, input.status ?? 'active', measurement.method, measurement.trials,
-          input.masteryCriteria?.trim() ?? '', input.notes?.trim() ?? '', user.id,
+          input.assessmentId ?? null, input.teachingProcedure?.trim() ?? '', dateImplemented, input.reviewOn || null,
+          input.status ?? 'active', measurement.method, measurement.trials,
+          masteryCriteria, input.notes?.trim() ?? '', user.id,
+          domain, dateMastered, assessmentType, sd, masterySteps,
+          errorCorrectionProcedure, teachingMethod, netTeachingIdea, measurement.procedure,
         ],
       );
-      await insertProgramVersion(tx, organizationId, id, 1, measurement, input.teachingProcedure ?? '', input.masteryCriteria ?? '', 'Initial configuration', user.id);
+      await insertProgramVersion(tx, organizationId, id, 1, measurement, input.teachingProcedure ?? '', masteryCriteria, 'Initial configuration', user.id);
       if (input.goalStatement?.trim()) {
         await tx.query(
           `INSERT INTO program_goals (organization_id, client_id, program_id, assessment_id, statement, objective, review_on, created_by)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [organizationId, client.id, id, input.assessmentId ?? null, input.goalStatement.trim(), input.goalObjective?.trim() ?? '', input.reviewOn || null, user.id],
         );
-      }
-      for (const therapistId of input.therapistIds ?? []) {
-        await assignStaff(tx, organizationId, id, therapistId, user.id);
       }
       await recordAudit(tx, {
         organizationId, actorUserId: user.id, action: 'program.created', targetType: 'program', targetId: id, metadata: { clientId: client.id },
@@ -113,12 +157,11 @@ export class ProgramService {
     });
   }
 
-  async update(user: AuthUser, programId: string, input: ProgramDto): Promise<ProgramDetail> {
+  async update(user: AuthUser, programId: string, input: ProgramWrite): Promise<ProgramDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const current = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findClient(tx, organizationId, current.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.programsEdit);
-      const measurement = normalizeMeasurement(input.measurementType, input.expectedTrialCount);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, current.client_id, 'write', PERMISSIONS.programsEdit);
+      const measurement = normalizeProgramMeasurement(input.measurementType, input.measurementProcedure, input.expectedTrialCount);
       const configChanged = measurement.method !== current.measurement_type
         || measurement.trials !== current.expected_trial_count
         || (input.masteryCriteria?.trim() ?? '') !== current.mastery_criteria
@@ -127,10 +170,7 @@ export class ProgramService {
       const statusChanged = status !== current.status;
       if (configChanged || statusChanged) {
         const reason = requireReason(input.changeReason);
-        await tx.query(
-          `INSERT INTO clinical_change_reasons (organization_id, record_type, record_id, reason, created_by) VALUES ($1, 'program', $2, $3, $4)`,
-          [organizationId, programId, reason, user.id],
-        );
+        await recordChangeReason(tx, { organizationId, recordType: 'program', recordId: programId, reason, userId: user.id });
         if (configChanged) {
           const version = current.configuration_version + 1;
           await insertProgramVersion(tx, organizationId, programId, version, measurement, input.teachingProcedure ?? '', input.masteryCriteria ?? '', reason, user.id);
@@ -138,17 +178,37 @@ export class ProgramService {
         }
       }
       if (input.assessmentId) await assertAssessment(tx, organizationId, client.id, input.assessmentId);
-      if (input.responsibleClinicianId) await assertClinician(tx, organizationId, input.responsibleClinicianId);
+      const domain = input.domain?.trim();
+      const dateMastered = input.dateMastered || null;
+      const assessmentType = input.assessmentType !== undefined ? (input.assessmentType.trim() || null) : undefined;
+      const sd = input.sd?.trim();
+      const masterySteps = input.masterySteps?.trim();
+      const errorCorrectionProcedure = input.errorCorrectionProcedure?.trim();
+      const teachingMethod = input.teachingMethod?.trim();
+      const netTeachingIdea = input.netTeachingIdea?.trim();
+
       await tx.query(
         `UPDATE client_programs
          SET name = $2, description = $3, objective = $4, assessment_id = $5, teaching_procedure = $6,
-             started_on = $7, review_on = $8, responsible_clinician_id = $9, status = $10,
-             measurement_type = $11, expected_trial_count = $12, mastery_criteria = $13, notes = $14, updated_at = now()
+             date_implemented = $7, review_on = $8, status = $9,
+             measurement_type = $10, expected_trial_count = $11, mastery_criteria = $12, notes = $13,
+             domain = COALESCE($14, domain),
+             date_mastered = COALESCE($15, date_mastered),
+             assessment_type = CASE WHEN $16::text IS NOT NULL THEN $16 ELSE assessment_type END,
+             sd = COALESCE($17, sd),
+             mastery_steps = COALESCE($18, mastery_steps),
+             error_correction_procedure = COALESCE($19, error_correction_procedure),
+             teaching_method = COALESCE($20, teaching_method),
+             net_teaching_idea = COALESCE($21, net_teaching_idea),
+             measurement_procedure = $22,
+             updated_at = now()
          WHERE id = $1`,
         [
           programId, input.title.trim(), input.description?.trim() ?? '', input.objective?.trim() ?? '', input.assessmentId ?? null,
-          input.teachingProcedure?.trim() ?? '', input.startedOn || null, input.reviewOn || null, input.responsibleClinicianId ?? null,
+          input.teachingProcedure?.trim() ?? '', input.dateImplemented || null, input.reviewOn || null,
           status, measurement.method, measurement.trials, input.masteryCriteria?.trim() ?? '', input.notes?.trim() ?? '',
+          domain, dateMastered, assessmentType, sd, masterySteps,
+          errorCorrectionProcedure, teachingMethod, netTeachingIdea, measurement.procedure,
         ],
       );
       await recordAudit(tx, {
@@ -159,122 +219,48 @@ export class ProgramService {
     });
   }
 
-  async templates(user: AuthUser): Promise<ProgramTemplate[]> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const rows = await tx.query<{ id: string }>(`SELECT id FROM program_templates WHERE organization_id = $1 ORDER BY title`, [organizationId]);
-      const templates: ProgramTemplate[] = [];
-      for (const row of rows) templates.push(await loadTemplate(tx, asString(row.id)));
-      return templates;
-    });
-  }
-
-  async saveTemplate(user: AuthUser, input: ProgramTemplateDto, templateId?: string): Promise<ProgramTemplate> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      if (!user.permissions.includes(PERMISSIONS.programsEdit)) {
-        throw new BadRequestException('Program templates require permission to edit programs.');
-      }
-      const measurement = normalizeMeasurement(input.measurementType, input.expectedTrialCount);
-      const id = templateId ?? randomUUID();
-      if (templateId) {
-        const existing = await tx.query(`SELECT 1 AS present FROM program_templates WHERE id = $1 AND organization_id = $2`, [templateId, organizationId]);
-        if (existing.length === 0) throw new NotFoundException('That program template was not found.');
-        await tx.query(
-          `UPDATE program_templates
-           SET title = $2, description = $3, objective = $4, teaching_procedure = $5, measurement_type = $6,
-               expected_trial_count = $7, mastery_criteria = $8, notes = $9, status = $10, updated_at = now()
-           WHERE id = $1`,
-          [id, input.title.trim(), input.description?.trim() ?? '', input.objective?.trim() ?? '', input.teachingProcedure?.trim() ?? '', measurement.method, measurement.trials, input.masteryCriteria?.trim() ?? '', input.notes?.trim() ?? '', input.status ?? 'active'],
-        );
-        await tx.query(`DELETE FROM program_template_targets WHERE template_id = $1`, [id]);
-      } else {
-        await tx.query(
-          `INSERT INTO program_templates (
-             id, organization_id, title, description, objective, teaching_procedure, measurement_type,
-             expected_trial_count, mastery_criteria, notes, status, created_by
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-          [id, organizationId, input.title.trim(), input.description?.trim() ?? '', input.objective?.trim() ?? '', input.teachingProcedure?.trim() ?? '', measurement.method, measurement.trials, input.masteryCriteria?.trim() ?? '', input.notes?.trim() ?? '', input.status ?? 'active', user.id],
-        );
-      }
-      let order = 0;
-      for (const target of input.targets ?? []) {
-        const targetMeasurement = normalizeMeasurement(target.measurementMethod, target.expectedTrialCount);
-        await insertTemplateTarget(tx, organizationId, id, target, targetMeasurement, order);
-        order += 1;
-      }
-      await recordAudit(tx, { organizationId, actorUserId: user.id, action: 'program_template.updated', targetType: 'program_template', targetId: id });
-      return loadTemplate(tx, id);
-    });
-  }
-
-  async copyTemplate(user: AuthUser, templateId: string, clientId: string): Promise<ProgramDetail> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.programsEdit);
-      const template = await loadTemplate(tx, templateId);
-      const owned = await tx.query(`SELECT 1 AS present FROM program_templates WHERE id = $1 AND organization_id = $2`, [templateId, organizationId]);
-      if (owned.length === 0) throw new NotFoundException('That program template was not found.');
-      const id = randomUUID();
-      await tx.query(
-        `INSERT INTO client_programs (
-           id, organization_id, client_id, name, description, objective, teaching_procedure, status,
-           measurement_type, expected_trial_count, mastery_criteria, notes, template_id, created_by
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,'active',$8,$9,$10,$11,$12,$13)`,
-        [id, organizationId, client.id, template.title, template.description, template.objective, template.teachingProcedure, template.measurementType, template.expectedTrialCount, template.masteryCriteria, template.notes, templateId, user.id],
-      );
-      await insertProgramVersion(tx, organizationId, id, 1, { method: template.measurementType, trials: template.expectedTrialCount }, template.teachingProcedure, template.masteryCriteria, 'Copied from template', user.id);
-      for (const target of template.targets) {
-        await insertTarget(tx, organizationId, client.id, id, {
-          title: target.title,
-          description: target.description,
-          operationalDefinition: target.operationalDefinition,
-          measurementMethod: target.measurementMethod,
-          expectedTrialCount: target.expectedTrialCount ?? undefined,
-          baselineNote: target.baselineNote,
-          teachingInstructions: target.teachingInstructions,
-          promptHierarchy: target.promptHierarchy,
-          masteryCriteria: target.masteryCriteria,
-        }, user.id, target.sortOrder);
-      }
-      await recordAudit(tx, { organizationId, actorUserId: user.id, action: 'program.copied', targetType: 'program', targetId: id, metadata: { clientId: client.id, templateId } });
-      return this.load(tx, user, organizationId, id);
-    });
-  }
-
-  async addTarget(user: AuthUser, programId: string, input: TargetDto): Promise<ProgramDetail> {
+  async addTarget(user: AuthUser, programId: string, input: TargetWrite): Promise<ProgramDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findClient(tx, organizationId, program.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.targetsEdit);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.targetsEdit);
       const orderRows = await tx.query<{ next_order: number | string }>(`SELECT COALESCE(max(sort_order), -1) + 1 AS next_order FROM client_targets WHERE program_id = $1`, [programId]);
       await insertTarget(tx, organizationId, client.id, programId, input, user.id, Number(orderRows[0]?.next_order ?? 0));
       return this.load(tx, user, organizationId, programId);
     });
   }
 
-  async updateTarget(user: AuthUser, programId: string, targetId: string, input: TargetDto): Promise<ProgramDetail> {
+  async updateTarget(user: AuthUser, programId: string, targetId: string, input: TargetWrite): Promise<ProgramDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findClient(tx, organizationId, program.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.targetsEdit);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.targetsEdit);
       const current = await targetRow(tx, programId, targetId);
       const nextPhase = input.phase ?? current.phase;
       if (nextPhase !== current.phase && !user.permissions.includes(PERMISSIONS.phasesApprove)) {
         throw new ForbiddenException('Approving a phase change requires the phase approval permission.');
       }
       const measurement = normalizeMeasurement(input.measurementMethod, input.expectedTrialCount);
+      // Task criteria are optional on this endpoint; an omitted field keeps its stored value.
+      const criteria = {
+        sd: input.sd === undefined ? current.sd : input.sd.trim(),
+        masterySessions: input.masterySessions === undefined ? current.mastery_sessions : input.masterySessions,
+        masteryProbe: input.masteryProbe === undefined ? current.mastery_probe : input.masteryProbe,
+        baselineSessions: input.baselineSessions === undefined ? current.baseline_sessions : input.baselineSessions,
+        baselineProbe: input.baselineProbe === undefined ? current.baseline_probe : input.baselineProbe,
+      };
       const configChanged = measurement.method !== current.measurement_method
         || measurement.trials !== current.expected_trial_count
         || (input.masteryCriteria?.trim() ?? '') !== current.mastery_criteria
         || (input.promptHierarchy?.trim() ?? '') !== current.prompt_hierarchy
         || (input.teachingInstructions?.trim() ?? '') !== current.teaching_instructions
-        || (input.baselineNote?.trim() ?? '') !== current.baseline_note;
+        || (input.baselineNote?.trim() ?? '') !== current.baseline_note
+        || criteria.masterySessions !== current.mastery_sessions
+        || criteria.masteryProbe !== current.mastery_probe
+        || criteria.baselineSessions !== current.baseline_sessions
+        || criteria.baselineProbe !== current.baseline_probe;
       const status = input.status ?? current.status;
       if (configChanged || status !== current.status) {
         const reason = requireReason(input.changeReason);
-        await tx.query(
-          `INSERT INTO clinical_change_reasons (organization_id, record_type, record_id, reason, created_by) VALUES ($1, 'target', $2, $3, $4)`,
-          [organizationId, targetId, reason, user.id],
-        );
+        await recordChangeReason(tx, { organizationId, recordType: 'target', recordId: targetId, reason, userId: user.id });
         if (configChanged) {
           const version = current.configuration_version + 1;
           await insertTargetVersion(tx, organizationId, targetId, version, measurement, input, reason, user.id);
@@ -285,13 +271,16 @@ export class ProgramService {
         `UPDATE client_targets
          SET name = $2, description = $3, operational_definition = $4, measurement_method = $5, expected_trial_count = $6,
              baseline_note = $7, teaching_instructions = $8, prompt_hierarchy = $9, mastery_criteria = $10,
-             phase = $11, status = $12, started_on = $13, review_on = $14, clinical_notes = $15, updated_at = now()
+             phase = $11, status = $12, started_on = $13, review_on = $14, clinical_notes = $15,
+             sd = $16, mastery_sessions = $17, mastery_probe = $18, baseline_sessions = $19, baseline_probe = $20,
+             updated_at = now()
          WHERE id = $1`,
         [
           targetId, input.title.trim(), input.description?.trim() ?? '', input.operationalDefinition?.trim() ?? '',
           measurement.method, measurement.trials, input.baselineNote?.trim() ?? '', input.teachingInstructions?.trim() ?? '',
           input.promptHierarchy?.trim() ?? '', input.masteryCriteria?.trim() ?? '', nextPhase, status,
           input.startedOn || null, input.reviewOn || null, input.clinicalNotes?.trim() ?? '',
+          criteria.sd, criteria.masterySessions, criteria.masteryProbe, criteria.baselineSessions, criteria.baselineProbe,
         ],
       );
       if (input.staffIds) {
@@ -315,8 +304,7 @@ export class ProgramService {
   async reorder(user: AuthUser, programId: string, targetIds: string[]): Promise<ProgramDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findClient(tx, organizationId, program.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.targetsEdit);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.targetsEdit);
       const existing = await tx.query<{ id: string }>(`SELECT id FROM client_targets WHERE program_id = $1`, [programId]);
       const known = new Set(existing.map((row) => asString(row.id)));
       if (targetIds.length !== known.size || targetIds.some((id) => !known.has(id))) {
@@ -330,36 +318,10 @@ export class ProgramService {
     });
   }
 
-  async assign(user: AuthUser, programId: string, userId: string): Promise<ProgramDetail> {
+  async recordObservation(user: AuthUser, programId: string, targetId: string, input: ObservationWrite): Promise<SessionObservationView> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findClient(tx, organizationId, program.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.assignmentsManage);
-      await assignStaff(tx, organizationId, programId, userId, user.id);
-      await recordAudit(tx, { organizationId, actorUserId: user.id, action: 'program.assignment_changed', targetType: 'program', targetId: programId, metadata: { clientId: client.id, userId } });
-      return this.load(tx, user, organizationId, programId);
-    });
-  }
-
-  async endAssignment(user: AuthUser, programId: string, assignmentId: string): Promise<ProgramDetail> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findClient(tx, organizationId, program.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.assignmentsManage);
-      const updated = await tx.query(
-        `UPDATE program_assignments SET ended_at = now() WHERE id = $1 AND program_id = $2 AND ended_at IS NULL RETURNING id`,
-        [assignmentId, programId],
-      );
-      if (updated.length === 0) throw new NotFoundException('That assignment was not found.');
-      return this.load(tx, user, organizationId, programId);
-    });
-  }
-
-  async recordObservation(user: AuthUser, programId: string, targetId: string, input: ObservationDto): Promise<SessionObservationView> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findClient(tx, organizationId, program.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.observationsRecord);
       const target = await targetRow(tx, programId, targetId);
       if (target.status !== 'active') {
         throw new BadRequestException('Record data on an active target.');
@@ -433,8 +395,7 @@ export class ProgramService {
     }
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findClient(tx, organizationId, program.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.documentsUpload);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.documentsUpload);
       const id = randomUUID();
       await tx.query(
         `INSERT INTO client_documents (
@@ -470,7 +431,7 @@ export class ProgramService {
     return {
       ...row,
       client_id: asString(row.client_id),
-      expected_trial_count: row.expected_trial_count == null ? null : Number(row.expected_trial_count),
+      expected_trial_count: asNullableNumber(row.expected_trial_count),
       configuration_version: Number(row.configuration_version),
       mastery_criteria: asString(row.mastery_criteria),
       teaching_procedure: asString(row.teaching_procedure),
@@ -481,54 +442,41 @@ export class ProgramService {
     const rows = await tx.query<{
       id: string; client_id: string; client_name: string; name: string; description: string; objective: string;
       assessment_id: string | null; assessment_name: string | null; teaching_procedure: string;
-      started_on: string | null; review_on: string | null; responsible_clinician_id: string | null; clinician_name: string | null;
+      review_on: string | null;
       status: ProgramDetail['status']; measurement_type: MeasurementMethod; expected_trial_count: number | null;
       mastery_criteria: string; notes: string; template_id: string | null; configuration_version: number;
+      domain: string | null; date_implemented: string | null; date_mastered: string | null;
+      assessment_type: string | null; sd: string | null; mastery_steps: string | null;
+      error_correction_procedure: string | null;
+      teaching_method: string | null; net_teaching_idea: string | null;
+      measurement_procedure: MeasurementProcedure | null;
     }>(
       `SELECT p.id, p.client_id, c.display_name AS client_name, p.name, p.description, p.objective, p.assessment_id,
-              a.name AS assessment_name, p.teaching_procedure, to_char(p.started_on, 'YYYY-MM-DD') AS started_on,
-              to_char(p.review_on, 'YYYY-MM-DD') AS review_on, p.responsible_clinician_id, clinician.name AS clinician_name,
-              p.status, p.measurement_type, p.expected_trial_count, p.mastery_criteria, p.notes, p.template_id, p.configuration_version
+              a.name AS assessment_name, p.teaching_procedure,
+              to_char(p.review_on, 'YYYY-MM-DD') AS review_on,
+              p.status, p.measurement_type, p.expected_trial_count, p.mastery_criteria, p.notes, p.template_id, p.configuration_version,
+              p.domain, to_char(p.date_implemented, 'YYYY-MM-DD') AS date_implemented,
+              to_char(p.date_mastered, 'YYYY-MM-DD') AS date_mastered,
+              p.assessment_type, p.sd, p.mastery_steps,
+              p.error_correction_procedure, p.teaching_method, p.net_teaching_idea, p.measurement_procedure
        FROM client_programs p
        JOIN clients c ON c.id = p.client_id
        LEFT JOIN assessments a ON a.id = p.assessment_id
-       LEFT JOIN users clinician ON clinician.id = p.responsible_clinician_id
        WHERE p.id = $1 AND p.organization_id = $2`,
       [programId, organizationId],
     );
     const row = rows[0];
     if (!row) throw new NotFoundException('That program was not found.');
-    const client = await this.authorization.findClient(tx, organizationId, asString(row.client_id));
-    await this.authorization.assertClientAccess(tx, user, client, 'view', PERMISSIONS.programsView);
+    await this.authorization.findAccessibleClient(tx, user, organizationId, asString(row.client_id), 'view', PERMISSIONS.programsView);
     const goals = await tx.query<{ id: string; statement: string; objective: string; assessment_id: string | null; status: ProgramDetail['goals'][number]['status']; review_on: string | null }>(
       `SELECT id, statement, objective, assessment_id, status, to_char(review_on, 'YYYY-MM-DD') AS review_on FROM program_goals WHERE program_id = $1`,
       [programId],
     );
-    const targets = await tx.query<{
-      id: string; name: string; description: string; operational_definition: string; measurement_method: MeasurementMethod;
-      expected_trial_count: number | null; baseline_note: string; teaching_instructions: string; prompt_hierarchy: string;
-      mastery_criteria: string; phase: string; status: TargetStatus; started_on: string | null; review_on: string | null;
-      clinical_notes: string; sort_order: number; configuration_version: number;
-    }>(
-      `SELECT id, name, description, operational_definition, measurement_method, expected_trial_count, baseline_note,
-              teaching_instructions, prompt_hierarchy, mastery_criteria, phase, status,
-              to_char(started_on, 'YYYY-MM-DD') AS started_on, to_char(review_on, 'YYYY-MM-DD') AS review_on,
-              clinical_notes, sort_order, configuration_version
-       FROM client_targets WHERE program_id = $1 ORDER BY sort_order, created_at`,
+    const targets = await tx.query<TargetSelectRow>(
+      `SELECT ${TARGET_COLUMNS} FROM client_targets t WHERE t.program_id = $1 ORDER BY t.sort_order, t.created_at`,
       [programId],
     );
-    const staff = await tx.query<{ id: string; user_id: string; name: string; role: 'therapist' | 'supervisor'; ended_at: Date | string | null }>(
-      `SELECT a.id, a.user_id, u.name, a.role, a.ended_at
-       FROM program_assignments a JOIN users u ON u.id = a.user_id
-       WHERE a.program_id = $1 ORDER BY a.ended_at NULLS FIRST, u.name`,
-      [programId],
-    );
-    const targetStaff = await tx.query<{ id: string; target_id: string; user_id: string; name: string }>(
-      `SELECT a.id, a.target_id, a.user_id, u.name
-       FROM target_assignments a JOIN users u ON u.id = a.user_id
-       WHERE a.ended_at IS NULL AND a.target_id IN (SELECT id FROM client_targets WHERE program_id = $1)`,
-      [programId],
-    );
+    const staff = await targetStaff(tx, 't.program_id = $1', [programId]);
     const documents = await tx.query<{ id: string; file_name: string; content_type: string; byte_size: number | string; scan_status: string }>(
       `SELECT d.id, d.file_name, d.content_type, d.byte_size, d.scan_status
        FROM program_documents link
@@ -547,18 +495,25 @@ export class ProgramService {
       clientId: asString(row.client_id),
       clientName: asString(row.client_name),
       title: asString(row.name),
+      domain: asString(row.domain ?? ''),
+      dateImplemented: row.date_implemented ? asString(row.date_implemented) : null,
+      dateMastered: row.date_mastered ? asString(row.date_mastered) : null,
+      assessmentType: row.assessment_type ? asString(row.assessment_type) : null,
+      sd: asString(row.sd ?? ''),
+      masterySteps: asString(row.mastery_steps ?? ''),
+      errorCorrectionProcedure: asString(row.error_correction_procedure ?? ''),
+      teachingMethod: asString(row.teaching_method ?? ''),
+      netTeachingIdea: asString(row.net_teaching_idea ?? ''),
+      measurementProcedure: (row.measurement_procedure as MeasurementProcedure) || (row.measurement_type === 'trial' ? 'Step by Step' : 'Probe'),
       description: asString(row.description),
       objective: asString(row.objective),
       assessmentId: row.assessment_id ? asString(row.assessment_id) : null,
       assessmentName: row.assessment_name ? asString(row.assessment_name) : null,
       teachingProcedure: asString(row.teaching_procedure),
-      startedOn: row.started_on ? asString(row.started_on) : null,
       reviewOn: row.review_on ? asString(row.review_on) : null,
-      responsibleClinicianId: row.responsible_clinician_id ? asString(row.responsible_clinician_id) : null,
-      responsibleClinicianName: row.clinician_name ? asString(row.clinician_name) : null,
       status: row.status,
       measurementType: row.measurement_type,
-      expectedTrialCount: row.expected_trial_count == null ? null : Number(row.expected_trial_count),
+      expectedTrialCount: asNullableNumber(row.expected_trial_count),
       masteryCriteria: asString(row.mastery_criteria),
       notes: asString(row.notes),
       templateId: row.template_id ? asString(row.template_id) : null,
@@ -575,28 +530,10 @@ export class ProgramService {
         byteSize: Number(document.byte_size),
         scanStatus: document.scan_status === 'rejected' ? 'rejected' : 'not_configured',
       })),
-      targets: targets.map((target) => ({
-        id: asString(target.id), title: asString(target.name), description: asString(target.description),
-        operationalDefinition: asString(target.operational_definition), measurementMethod: target.measurement_method,
-        expectedTrialCount: target.expected_trial_count == null ? null : Number(target.expected_trial_count),
-        baselineNote: asString(target.baseline_note), teachingInstructions: asString(target.teaching_instructions),
-        promptHierarchy: asString(target.prompt_hierarchy), masteryCriteria: asString(target.mastery_criteria),
-        phase: asString(target.phase), status: target.status,
-        startedOn: target.started_on ? asString(target.started_on) : null,
-        reviewOn: target.review_on ? asString(target.review_on) : null,
-        clinicalNotes: asString(target.clinical_notes), sortOrder: Number(target.sort_order),
-        configurationVersion: Number(target.configuration_version),
-        staff: targetStaff.filter((person) => asString(person.target_id) === asString(target.id)).map((person) => ({
-          id: asString(person.id), userId: asString(person.user_id), name: asString(person.name),
-        })),
-      })),
-      staff: staff.map((person) => ({
-        id: asString(person.id), userId: asString(person.user_id), name: asString(person.name), role: person.role,
-        endedAt: person.ended_at ? asDate(person.ended_at).toISOString() : null,
-      })),
+      targets: targets.map((target) => mapTarget(target, staff)),
       versions: versions.map((version) => ({
         id: asString(version.id), version: Number(version.version), measurementMethod: version.measurement_type,
-        expectedTrialCount: version.expected_trial_count == null ? null : Number(version.expected_trial_count),
+        expectedTrialCount: asNullableNumber(version.expected_trial_count),
         masteryCriteria: asString(version.mastery_criteria), reason: asString(version.reason),
         createdAt: asDate(version.created_at).toISOString(),
       })),
@@ -630,6 +567,17 @@ function assignmentScope(user: AuthUser, params: unknown[]): string {
   )`;
 }
 
+function normalizeProgramMeasurement(
+  method?: MeasurementMethod,
+  procedure?: MeasurementProcedure,
+  count?: number,
+): { method: MeasurementMethod; procedure: MeasurementProcedure; trials: number | null } {
+  const proc: MeasurementProcedure = procedure || (method === 'trial' ? 'Step by Step' : 'Probe');
+  const mMethod: MeasurementMethod = method || (proc === 'Step by Step' ? 'trial' : 'probe');
+  const trials = count && count >= 1 && count <= 30 ? count : null;
+  return { method: mMethod, procedure: proc, trials };
+}
+
 function normalizeMeasurement(method: MeasurementMethod, count: number | undefined): { method: MeasurementMethod; trials: number | null } {
   if (method === 'trial' || method === 'probe') {
     if (!count || count < 1 || count > 30) {
@@ -640,15 +588,8 @@ function normalizeMeasurement(method: MeasurementMethod, count: number | undefin
   return { method, trials: null };
 }
 
-function requireReason(reason: string | undefined): string {
-  const text = reason?.trim() ?? '';
-  if (text.length < 12) {
-    throw new BadRequestException('Enter a reason of at least 12 characters for this clinical change.');
-  }
-  return text;
-}
 
-function validateObservation(method: MeasurementMethod, expected: number | null, input: ObservationDto): void {
+function validateObservation(method: MeasurementMethod, expected: number | null, input: ObservationWrite): void {
   if (method === 'trial' || method === 'probe') {
     const trials = input.trials ?? [];
     if (trials.length !== expected) {
@@ -698,7 +639,7 @@ async function insertTarget(
   organizationId: string,
   clientId: string,
   programId: string,
-  input: TargetDto,
+  input: TargetWrite,
   userId: string,
   sortOrder: number,
 ): Promise<void> {
@@ -708,13 +649,16 @@ async function insertTarget(
     `INSERT INTO client_targets (
        id, organization_id, client_id, program_id, name, description, operational_definition, measurement_method,
        expected_trial_count, baseline_note, teaching_instructions, prompt_hierarchy, mastery_criteria, phase, status,
-       started_on, review_on, clinical_notes, sort_order, created_by
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'active',$15,$16,$17,$18,$19)`,
+       started_on, review_on, clinical_notes, sort_order, created_by,
+       sd, mastery_sessions, mastery_probe, baseline_sessions, baseline_probe
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'active',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
     [
       id, organizationId, clientId, programId, input.title.trim(), input.description?.trim() ?? '', input.operationalDefinition?.trim() ?? '',
       measurement.method, measurement.trials, input.baselineNote?.trim() ?? '', input.teachingInstructions?.trim() ?? '',
       input.promptHierarchy?.trim() ?? '', input.masteryCriteria?.trim() ?? '', input.phase ?? 'baseline',
       input.startedOn || null, input.reviewOn || null, input.clinicalNotes?.trim() ?? '', sortOrder, userId,
+      input.sd?.trim() ?? '', input.masterySessions ?? null, input.masteryProbe ?? null,
+      input.baselineSessions ?? null, input.baselineProbe ?? null,
     ],
   );
   await insertTargetVersion(tx, organizationId, id, 1, measurement, input, 'Initial configuration', userId);
@@ -727,7 +671,7 @@ async function insertTargetVersion(
   targetId: string,
   version: number,
   measurement: { method: MeasurementMethod; trials: number | null },
-  input: Pick<TargetDto, 'masteryCriteria' | 'baselineNote' | 'promptHierarchy' | 'teachingInstructions'>,
+  input: Pick<TargetWrite, 'masteryCriteria' | 'baselineNote' | 'promptHierarchy' | 'teachingInstructions'>,
   reason: string,
   userId: string,
 ): Promise<void> {
@@ -743,7 +687,7 @@ async function insertTargetVersion(
   );
 }
 
-async function targetRow(tx: Queryable, programId: string, targetId: string): Promise<{
+interface TargetRow {
   measurement_method: MeasurementMethod;
   expected_trial_count: number | null;
   mastery_criteria: string;
@@ -753,20 +697,18 @@ async function targetRow(tx: Queryable, programId: string, targetId: string): Pr
   phase: string;
   status: TargetStatus;
   configuration_version: number;
-}> {
-  const rows = await tx.query<{
-    measurement_method: MeasurementMethod;
-    expected_trial_count: number | null;
-    mastery_criteria: string;
-    prompt_hierarchy: string;
-    teaching_instructions: string;
-    baseline_note: string;
-    phase: string;
-    status: TargetStatus;
-    configuration_version: number;
-  }>(
+  sd: string;
+  mastery_sessions: number | null;
+  mastery_probe: number | null;
+  baseline_sessions: number | null;
+  baseline_probe: number | null;
+}
+
+async function targetRow(tx: Queryable, programId: string, targetId: string): Promise<TargetRow> {
+  const rows = await tx.query<{ [key: string]: unknown } & TargetRow>(
     `SELECT measurement_method, expected_trial_count, mastery_criteria, prompt_hierarchy, teaching_instructions,
-            baseline_note, phase, status, configuration_version
+            baseline_note, phase, status, configuration_version,
+            sd, mastery_sessions, mastery_probe, baseline_sessions, baseline_probe
      FROM client_targets WHERE id = $1 AND program_id = $2`,
     [targetId, programId],
   );
@@ -774,23 +716,97 @@ async function targetRow(tx: Queryable, programId: string, targetId: string): Pr
   if (!row) throw new NotFoundException('That target was not found.');
   return {
     ...row,
-    expected_trial_count: row.expected_trial_count == null ? null : Number(row.expected_trial_count),
+    expected_trial_count: asNullableNumber(row.expected_trial_count),
     configuration_version: Number(row.configuration_version),
     mastery_criteria: asString(row.mastery_criteria),
     prompt_hierarchy: asString(row.prompt_hierarchy),
     teaching_instructions: asString(row.teaching_instructions),
     baseline_note: asString(row.baseline_note),
+    sd: asString(row.sd),
+    mastery_sessions: asNullableNumber(row.mastery_sessions),
+    mastery_probe: asNullableNumber(row.mastery_probe),
+    baseline_sessions: asNullableNumber(row.baseline_sessions),
+    baseline_probe: asNullableNumber(row.baseline_probe),
   };
 }
 
-async function assignStaff(tx: Queryable, organizationId: string, programId: string, userId: string, actorId: string): Promise<void> {
-  await assertTherapist(tx, organizationId, userId);
-  await tx.query(
-    `INSERT INTO program_assignments (organization_id, program_id, user_id, role, created_by)
-     VALUES ($1, $2, $3, 'therapist', $4)
-     ON CONFLICT (program_id, user_id, role) WHERE ended_at IS NULL DO NOTHING`,
-    [organizationId, programId, userId, actorId],
+const TARGET_COLUMNS = `t.id, t.name, t.description, t.operational_definition, t.measurement_method, t.expected_trial_count,
+  t.baseline_note, t.teaching_instructions, t.prompt_hierarchy, t.mastery_criteria, t.phase, t.status,
+  to_char(t.started_on, 'YYYY-MM-DD') AS started_on, to_char(t.review_on, 'YYYY-MM-DD') AS review_on,
+  t.clinical_notes, t.sd, t.mastery_sessions, t.mastery_probe, t.baseline_sessions, t.baseline_probe,
+  t.sort_order, t.configuration_version`;
+
+interface TargetSelectRow {
+  [key: string]: unknown;
+  id: string; name: string; description: string; operational_definition: string; measurement_method: MeasurementMethod;
+  expected_trial_count: number | null; baseline_note: string; teaching_instructions: string; prompt_hierarchy: string;
+  mastery_criteria: string; phase: string; status: TargetStatus; started_on: string | null; review_on: string | null;
+  clinical_notes: string; sd: string; mastery_sessions: number | null; mastery_probe: number | null;
+  baseline_sessions: number | null; baseline_probe: number | null; sort_order: number; configuration_version: number;
+}
+
+/** Loads active staff for the targets matched by `where`, which may refer to `t` (target) and `p` (program). */
+async function targetStaff(tx: Queryable, where: string, params: unknown[]): Promise<Map<string, TargetSummary['staff']>> {
+  const staff = new Map<string, TargetSummary['staff']>();
+  const rows = await tx.query<{ id: string; target_id: string; user_id: string; name: string }>(
+    `SELECT a.id, a.target_id, a.user_id, u.name
+     FROM target_assignments a JOIN users u ON u.id = a.user_id
+     WHERE a.ended_at IS NULL AND a.target_id IN (
+       SELECT t.id FROM client_targets t JOIN client_programs p ON p.id = t.program_id WHERE ${where}
+     )`,
+    params,
   );
+  for (const row of rows) {
+    const targetId = asString(row.target_id);
+    const list = staff.get(targetId) ?? [];
+    list.push({ id: asString(row.id), userId: asString(row.user_id), name: asString(row.name) });
+    staff.set(targetId, list);
+  }
+  return staff;
+}
+
+/** Lists targets with their program and client. `where` may refer to `t` (target) and `p` (program). */
+async function queryTargets(tx: Queryable, where: string, params: unknown[]): Promise<TargetListItem[]> {
+  const rows = await tx.query<TargetSelectRow & { program_id: string; program_title: string; client_id: string; client_name: string }>(
+    `SELECT ${TARGET_COLUMNS}, t.program_id, p.name AS program_title, t.client_id, c.display_name AS client_name
+     FROM client_targets t
+     JOIN client_programs p ON p.id = t.program_id
+     JOIN clients c ON c.id = t.client_id
+     WHERE ${where}
+     ORDER BY c.display_name, p.name, t.sort_order, t.created_at`,
+    params,
+  );
+  const staff = await targetStaff(tx, where, params);
+  return rows.map((row) => ({
+    ...mapTarget(row, staff),
+    programId: asString(row.program_id),
+    programTitle: asString(row.program_title),
+    clientId: asString(row.client_id),
+    clientName: asString(row.client_name),
+  }));
+}
+
+function mapTarget(target: TargetSelectRow, staff: Map<string, TargetSummary['staff']>): TargetSummary {
+  const id = asString(target.id);
+  return {
+    id, title: asString(target.name), description: asString(target.description),
+    operationalDefinition: asString(target.operational_definition), measurementMethod: target.measurement_method,
+    expectedTrialCount: asNullableNumber(target.expected_trial_count),
+    baselineNote: asString(target.baseline_note), teachingInstructions: asString(target.teaching_instructions),
+    promptHierarchy: asString(target.prompt_hierarchy), masteryCriteria: asString(target.mastery_criteria),
+    phase: asString(target.phase), status: target.status,
+    startedOn: target.started_on ? asString(target.started_on) : null,
+    reviewOn: target.review_on ? asString(target.review_on) : null,
+    clinicalNotes: asString(target.clinical_notes),
+    sd: asString(target.sd),
+    masterySessions: asNullableNumber(target.mastery_sessions),
+    masteryProbe: asNullableNumber(target.mastery_probe),
+    baselineSessions: asNullableNumber(target.baseline_sessions),
+    baselineProbe: asNullableNumber(target.baseline_probe),
+    sortOrder: Number(target.sort_order),
+    configurationVersion: Number(target.configuration_version),
+    staff: staff.get(id) ?? [],
+  };
 }
 
 async function assertTherapist(tx: Queryable, organizationId: string, userId: string): Promise<void> {
@@ -802,82 +818,7 @@ async function assertTherapist(tx: Queryable, organizationId: string, userId: st
   if (rows.length === 0) throw new BadRequestException('Assign an active therapist or supervisor.');
 }
 
-async function assertClinician(tx: Queryable, organizationId: string, userId: string): Promise<void> {
-  const rows = await tx.query(
-    `SELECT 1 AS present FROM organization_memberships
-     WHERE organization_id = $1 AND user_id = $2 AND status = 'active' AND role IN ('clinical_supervisor', 'organization_admin')`,
-    [organizationId, userId],
-  );
-  if (rows.length === 0) throw new BadRequestException('The responsible clinician must be an active supervisor or organization administrator.');
-}
-
 async function assertAssessment(tx: Queryable, organizationId: string, clientId: string, assessmentId: string): Promise<void> {
   const rows = await tx.query(`SELECT 1 AS present FROM assessments WHERE id = $1 AND organization_id = $2 AND client_id = $3`, [assessmentId, organizationId, clientId]);
   if (rows.length === 0) throw new BadRequestException('Choose an assessment for this client.');
-}
-
-async function insertTemplateTarget(
-  tx: Queryable,
-  organizationId: string,
-  templateId: string,
-  target: TargetDto,
-  measurement: { method: MeasurementMethod; trials: number | null },
-  sortOrder: number,
-): Promise<void> {
-  await tx.query(
-    `INSERT INTO program_template_targets (
-       organization_id, template_id, title, description, operational_definition, measurement_method, expected_trial_count,
-       baseline_note, teaching_instructions, prompt_hierarchy, mastery_criteria, sort_order
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-    [
-      organizationId, templateId, target.title.trim(), target.description?.trim() ?? '', target.operationalDefinition?.trim() ?? '',
-      measurement.method, measurement.trials, target.baselineNote?.trim() ?? '', target.teachingInstructions?.trim() ?? '',
-      target.promptHierarchy?.trim() ?? '', target.masteryCriteria?.trim() ?? '', sortOrder,
-    ],
-  );
-}
-
-async function loadTemplate(tx: Queryable, templateId: string): Promise<ProgramTemplate> {
-  const rows = await tx.query<{
-    id: string; title: string; description: string; objective: string; teaching_procedure: string;
-    measurement_type: MeasurementMethod; expected_trial_count: number | null; mastery_criteria: string; notes: string;
-    status: ProgramTemplate['status']; updated_at: Date | string;
-  }>(
-    `SELECT id, title, description, objective, teaching_procedure, measurement_type, expected_trial_count, mastery_criteria, notes, status, updated_at
-     FROM program_templates WHERE id = $1`,
-    [templateId],
-  );
-  const row = rows[0];
-  if (!row) throw new NotFoundException('That program template was not found.');
-  const targets = await tx.query<{
-    id: string; title: string; description: string; operational_definition: string; measurement_method: MeasurementMethod;
-    expected_trial_count: number | null; baseline_note: string; teaching_instructions: string; prompt_hierarchy: string;
-    mastery_criteria: string; sort_order: number;
-  }>(
-    `SELECT id, title, description, operational_definition, measurement_method, expected_trial_count, baseline_note,
-            teaching_instructions, prompt_hierarchy, mastery_criteria, sort_order
-     FROM program_template_targets WHERE template_id = $1 ORDER BY sort_order`,
-    [templateId],
-  );
-  return {
-    id: asString(row.id),
-    title: asString(row.title),
-    description: asString(row.description),
-    objective: asString(row.objective),
-    teachingProcedure: asString(row.teaching_procedure),
-    measurementType: row.measurement_type,
-    expectedTrialCount: row.expected_trial_count == null ? null : Number(row.expected_trial_count),
-    masteryCriteria: asString(row.mastery_criteria),
-    notes: asString(row.notes),
-    status: row.status,
-    updatedAt: asDate(row.updated_at).toISOString(),
-    targets: targets.map((target) => ({
-      id: asString(target.id), title: asString(target.title), description: asString(target.description),
-      operationalDefinition: asString(target.operational_definition), measurementMethod: target.measurement_method,
-      expectedTrialCount: target.expected_trial_count == null ? null : Number(target.expected_trial_count),
-      baselineNote: asString(target.baseline_note), teachingInstructions: asString(target.teaching_instructions),
-      promptHierarchy: asString(target.prompt_hierarchy), masteryCriteria: asString(target.mastery_criteria),
-      sortOrder: Number(target.sort_order),
-    })),
-  };
 }

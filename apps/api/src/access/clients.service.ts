@@ -88,8 +88,7 @@ export class ClientsService {
   async get(user: AuthUser, clientId: string): Promise<ClientProfile> {
     const canSeeDob = user.permissions.includes(PERMISSIONS.clientsSensitiveView);
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'view', viewPermission(user));
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', viewPermission(user));
       return this.loadProfile(tx, client.id, canSeeDob, user.role !== 'parent');
     });
   }
@@ -179,8 +178,7 @@ export class ClientsService {
 
   async update(user: AuthUser, clientId: string, input: UpdateClientDto): Promise<ClientSummary> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.clientsEdit);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.clientsEdit);
       const current = await tx.query<{ status: 'active' | 'inactive'; client_code: string }>(
         `SELECT status, client_code FROM clients WHERE id = $1`,
         [client.id],
@@ -322,8 +320,7 @@ export class ClientsService {
 
   async sensitive(user: AuthUser, clientId: string): Promise<ClinicalProfile> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'sensitive', PERMISSIONS.clientsSensitiveView);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'sensitive', PERMISSIONS.clientsSensitiveView);
       const rows = await tx.query<{
         summary: string;
         medical_history: string;
@@ -348,8 +345,7 @@ export class ClientsService {
 
   async saveSensitive(user: AuthUser, clientId: string, input: SensitiveProfileDto): Promise<ClinicalProfile> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.clientsEdit);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.clientsEdit);
       if (!user.permissions.includes(PERMISSIONS.clientsSensitiveView)) {
         throw new BadRequestException('Sensitive information requires permission to view it as well.');
       }
@@ -394,8 +390,7 @@ export class ClientsService {
 
   async assign(user: AuthUser, clientId: string, input: AssignmentDto): Promise<{ id: string }> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.assignmentsManage);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.assignmentsManage);
       await this.assertAssignableMember(tx, organizationId, input.userId, input.relationship);
       const rows = await tx.query<{ id: string }>(
         `INSERT INTO client_assignments (organization_id, client_id, user_id, relationship, created_by)
@@ -419,8 +414,7 @@ export class ClientsService {
 
   async share(user: AuthUser, clientId: string, input: ShareRecordDto): Promise<{ id: string }> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.guardiansManage);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.guardiansManage);
       const guardian = await tx.query(
         `SELECT 1 AS present FROM client_assignments
          WHERE client_id = $1 AND user_id = $2 AND relationship = 'guardian' AND ended_at IS NULL`,
@@ -451,8 +445,7 @@ export class ClientsService {
   async addDocument(user: AuthUser, clientId: string, input: CreateDocumentDto): Promise<ClientDocumentSummary> {
     const content = decodeDocument(input.contentType, input.contentBase64);
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.documentsUpload);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.documentsUpload);
       const id = randomUUID();
       const storageKey = `private/${organizationId}/clients/${client.id}/documents/${id}`;
       const rows = await tx.query<{ created_at: Date | string }>(
@@ -494,11 +487,11 @@ export class ClientsService {
 
   async document(user: AuthUser, clientId: string, documentId: string): Promise<{ contentType: string; fileName: string; content: Buffer }> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(
+      const client = await this.authorization.findAccessibleClient(
         tx,
         user,
-        client,
+        organizationId,
+        clientId,
         user.role === 'parent' ? 'record' : 'view',
         PERMISSIONS.documentsDownload,
         documentId,
@@ -524,8 +517,7 @@ export class ClientsService {
 
   async addObservation(user: AuthUser, clientId: string, input: CreateObservationDto): Promise<{ id: string }> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.observationsRecord);
       const rows = await tx.query<{ id: string }>(
         `INSERT INTO clinical_observations (organization_id, client_id, note, recorded_by)
          VALUES ($1, $2, $3, $4) RETURNING id`,
@@ -546,8 +538,7 @@ export class ClientsService {
 
   async amendObservation(user: AuthUser, clientId: string, observationId: string, input: AmendObservationDto): Promise<{ id: string }> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsAmend);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.observationsAmend);
       const rows = await tx.query<{ id: string }>(
         `UPDATE clinical_observations
          SET note = $3, amended_by = $4, amended_at = now()
@@ -572,8 +563,7 @@ export class ClientsService {
 
   async addProgram(user: AuthUser, clientId: string, input: CreateProgramDto): Promise<{ id: string }> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.programsEdit);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.programsEdit);
       const rows = await tx.query<{ id: string }>(
         `INSERT INTO client_programs (organization_id, client_id, name, status, created_by)
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,
@@ -592,8 +582,7 @@ export class ClientsService {
 
   async addTarget(user: AuthUser, clientId: string, input: CreateTargetDto): Promise<{ id: string }> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.targetsEdit);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.targetsEdit);
       const program = await tx.query(
         `SELECT 1 AS present FROM client_programs WHERE id = $1 AND client_id = $2`,
         [input.programId, client.id],
@@ -619,8 +608,7 @@ export class ClientsService {
 
   async approvePhase(user: AuthUser, clientId: string, targetId: string, input: ApprovePhaseDto): Promise<{ id: string; phase: string }> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.phasesApprove);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.phasesApprove);
       const rows = await tx.query<{ id: string }>(
         `UPDATE client_targets SET phase = $3 WHERE id = $1 AND client_id = $2 RETURNING id`,
         [targetId, client.id, input.phase],

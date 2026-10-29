@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import type { DashboardResponse, PlatformDashboard, SessionStatus } from '@abapro/shared';
 import { dashboardRequest, platformDashboardRequest } from '@/api/resources';
 import { clinicsByCountryOption, platformSessionTrendOption } from '@/charts/platform-dashboard';
@@ -20,9 +20,11 @@ import StatusBadge from '@/components/ui/StatusBadge.vue';
 import type { TableColumn } from '@/components/ui/types';
 import { formatDateTime, formatShortDate, formatTime, sessionStatusLabel, sessionStatusTone } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth';
+import { errorMessage } from '@/lib/loader';
 
 const auth = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 const platformView = computed(() => route.name === 'platform-dashboard');
 const dashboard = ref<DashboardResponse | null>(null);
 const portal = ref<PlatformDashboard | null>(null);
@@ -113,7 +115,7 @@ async function load(): Promise<void> {
   } catch (loadError) {
     dashboard.value = null;
     portal.value = null;
-    error.value = loadError instanceof Error ? loadError.message : 'The dashboard could not be loaded.';
+    error.value = errorMessage(loadError, 'The dashboard could not be loaded.');
   } finally {
     loading.value = false;
   }
@@ -148,6 +150,7 @@ function isSessionStatus(value: unknown): value is SessionStatus {
       :description="platformView ? 'Counts for every organisation, clinic, client, and session on this portal.' : 'Operational counts for the signed-in scope. Figures on this page are synthetic until clinical queries are connected.'"
     >
       <template #actions>
+        <AppButton v-if="platformView" @click="router.push('/programs/tasks')">Open Tasks</AppButton>
         <AppButton variant="secondary" :loading="loading" @click="load">Refresh</AppButton>
       </template>
     </PageHeader>
@@ -163,7 +166,14 @@ function isSessionStatus(value: unknown): value is SessionStatus {
             <SkeletonBlock width="55%" />
           </article>
         </template>
-        <article v-for="metric in portalMetrics" v-else :key="metric.key" class="metric-card">
+        <article
+          v-for="metric in portalMetrics"
+          v-else
+          :key="metric.key"
+          class="metric-card"
+          :class="{ 'is-clickable': metric.key === 'organisations' || metric.key === 'clinics' }"
+          @click="metric.key === 'organisations' ? router.push('/organizations') : metric.key === 'clinics' ? router.push('/clinics') : null"
+        >
           <span>{{ metric.label }}</span>
           <strong>{{ metric.value }}</strong>
           <small>{{ metric.detail }}</small>

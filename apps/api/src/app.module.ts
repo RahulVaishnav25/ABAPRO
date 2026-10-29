@@ -10,11 +10,8 @@ import { HealthModule } from './health/health.module';
 import { ClinicalAccessModule } from './access/clinical-access.module';
 import { ClinicalProgramsModule } from './clinical/clinical.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
-import { ProgressModule } from './modules/progress/progress.module';
-import { ReportsModule } from './modules/reports/reports.module';
-import { MaintenanceModule } from './modules/maintenance/maintenance.module';
-import { ParentPortalModule } from './modules/parent-portal/parent-portal.module';
-import { MessagesModule } from './modules/messages/messages.module';
+import { UnimplementedFeaturesModule } from './modules/unimplemented-features.module';
+import { BrandingModule } from './branding/branding.module';
 
 @Module({
   imports: [
@@ -26,11 +23,8 @@ import { MessagesModule } from './modules/messages/messages.module';
     ClinicalAccessModule,
     ClinicalProgramsModule,
     SessionsModule,
-    ProgressModule,
-    ReportsModule,
-    MaintenanceModule,
-    ParentPortalModule,
-    MessagesModule,
+    UnimplementedFeaturesModule,
+    BrandingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SessionAuthGuard },

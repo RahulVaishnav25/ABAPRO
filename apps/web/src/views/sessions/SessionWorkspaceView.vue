@@ -30,6 +30,7 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { enqueueSubmission, readQueue, removeQueuedSubmission, type QueuedSubmission } from '@/lib/session-queue';
 import { useAuthStore } from '@/stores/auth';
+import { errorMessage } from '@/lib/loader';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -80,7 +81,7 @@ const saveLabel = computed(() => ({
 
 watch(sessionId, (id) => {
   if (id) void loadSession(id).catch((loadError: unknown) => {
-    error.value = loadError instanceof Error ? loadError.message : 'The session could not be loaded.';
+    error.value = errorMessage(loadError, 'The session could not be loaded.');
   });
 });
 
@@ -98,7 +99,7 @@ async function loadClients(): Promise<void> {
     if (sessionId.value) await loadSession(sessionId.value);
     else if (clientId.value) await loadOpen();
   } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'Sessions could not be loaded.';
+    error.value = errorMessage(loadError, 'Sessions could not be loaded.');
   } finally {
     loading.value = false;
   }
@@ -157,7 +158,7 @@ async function send(path: string, body: unknown, label: string, action: () => Pr
   } catch (submitError) {
     const status = submitError instanceof ApiError ? submitError.status : null;
     const disposition = classifySubmission(status === 0 ? null : status);
-    saveMessage.value = submitError instanceof Error ? submitError.message : 'The observation was not saved.';
+    saveMessage.value = errorMessage(submitError, 'The observation was not saved.');
     if (disposition === 'queued') {
       const id = submissionKey();
       enqueueSubmission({ id, path, body, label });
@@ -172,7 +173,7 @@ async function send(path: string, body: unknown, label: string, action: () => Pr
 function applyFailure(submitError: unknown, body: unknown): void {
   const status = submitError instanceof ApiError ? submitError.status : null;
   saveState.value = classifySubmission(status === 0 ? null : status);
-  saveMessage.value = submitError instanceof Error ? submitError.message : 'The session was not saved.';
+  saveMessage.value = errorMessage(submitError, 'The session was not saved.');
   if (saveState.value === 'queued' && body) {
     enqueueSubmission({ id: submissionKey(), path: '/sessions', body, label: 'Session' });
     queued.value = readQueue();

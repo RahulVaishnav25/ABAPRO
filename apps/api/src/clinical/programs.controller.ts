@@ -1,53 +1,20 @@
-import { Body, Controller, Get, Inject, Param, Patch, Post, Query } from '@nestjs/common';
-import { IsIn, IsString, MaxLength, MinLength } from 'class-validator';
-import { PERMISSIONS, type AuthUser, type ProgramDetail, type ProgramSummary, type ProgramTemplate, type SessionObservationView } from '@abapro/shared';
+import { Body, Controller, Get, HttpStatus, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  PERMISSIONS,
+  type AuthUser,
+  type ProgramDetail,
+  type ProgramSummary,
+  type SessionObservationView,
+  type TargetListItem,
+} from '@abapro/shared';
 import { RequirePermissions } from '../common/auth.decorators';
 import { CurrentUser } from '../common/current-user.decorator';
-import { AssignmentDto, CopyTemplateDto, ObservationDto, ProgramDto, ProgramTemplateDto, ReorderDto, TargetDto } from './clinical.dto';
+import { DocumentUploadDto, ObservationDto, ProgramDto, ReorderDto, TargetDto } from './clinical.dto';
 import { ProgramService } from './program.service';
-
-class DocumentBody {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(180)
-  fileName!: string;
-
-  @IsIn(['application/pdf', 'image/png', 'image/jpeg', 'image/webp'])
-  contentType!: string;
-
-  @IsString()
-  @MinLength(1)
-  @MaxLength(700_000)
-  contentBase64!: string;
-}
 
 @Controller('v1/programs')
 export class ProgramsController {
   constructor(@Inject(ProgramService) private readonly programs: ProgramService) {}
-
-  @Get('templates')
-  @RequirePermissions(PERMISSIONS.programsView)
-  templates(@CurrentUser() user: AuthUser): Promise<ProgramTemplate[]> {
-    return this.programs.templates(user);
-  }
-
-  @Post('templates')
-  @RequirePermissions(PERMISSIONS.programsEdit)
-  createTemplate(@CurrentUser() user: AuthUser, @Body() body: ProgramTemplateDto): Promise<ProgramTemplate> {
-    return this.programs.saveTemplate(user, body);
-  }
-
-  @Patch('templates/:templateId')
-  @RequirePermissions(PERMISSIONS.programsEdit)
-  updateTemplate(@CurrentUser() user: AuthUser, @Param('templateId') templateId: string, @Body() body: ProgramTemplateDto): Promise<ProgramTemplate> {
-    return this.programs.saveTemplate(user, body, templateId);
-  }
-
-  @Post('templates/:templateId/copy')
-  @RequirePermissions(PERMISSIONS.programsEdit)
-  copy(@CurrentUser() user: AuthUser, @Param('templateId') templateId: string, @Body() body: CopyTemplateDto): Promise<ProgramDetail> {
-    return this.programs.copyTemplate(user, templateId, body.clientId);
-  }
 
   @Get()
   @RequirePermissions(PERMISSIONS.programsView)
@@ -59,6 +26,25 @@ export class ProgramsController {
   @RequirePermissions(PERMISSIONS.programsEdit)
   create(@CurrentUser() user: AuthUser, @Body() body: ProgramDto): Promise<ProgramDetail> {
     return this.programs.create(user, body);
+  }
+
+  // Declared before ':programId' so 'targets' is not read as a program id.
+  @Get('targets')
+  @RequirePermissions(PERMISSIONS.programsView)
+  listTargets(
+    @CurrentUser() user: AuthUser,
+    @Query('programId', new ParseUUIDPipe({ optional: true })) programId?: string,
+  ): Promise<TargetListItem[]> {
+    return this.programs.listTargets(user, programId);
+  }
+
+  @Get('targets/:targetId')
+  @RequirePermissions(PERMISSIONS.programsView)
+  getTarget(
+    @CurrentUser() user: AuthUser,
+    @Param('targetId', new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.NOT_FOUND })) targetId: string,
+  ): Promise<TargetListItem> {
+    return this.programs.getTarget(user, targetId);
   }
 
   @Get(':programId')
@@ -75,7 +61,7 @@ export class ProgramsController {
 
   @Post(':programId/documents')
   @RequirePermissions(PERMISSIONS.documentsUpload)
-  addDocument(@CurrentUser() user: AuthUser, @Param('programId') programId: string, @Body() body: DocumentBody): Promise<ProgramDetail> {
+  addDocument(@CurrentUser() user: AuthUser, @Param('programId') programId: string, @Body() body: DocumentUploadDto): Promise<ProgramDetail> {
     return this.programs.addDocument(user, programId, body);
   }
 
@@ -100,22 +86,6 @@ export class ProgramsController {
     @Body() body: TargetDto,
   ): Promise<ProgramDetail> {
     return this.programs.updateTarget(user, programId, targetId, body);
-  }
-
-  @Post(':programId/assignments')
-  @RequirePermissions(PERMISSIONS.assignmentsManage)
-  assign(@CurrentUser() user: AuthUser, @Param('programId') programId: string, @Body() body: AssignmentDto): Promise<ProgramDetail> {
-    return this.programs.assign(user, programId, body.userId);
-  }
-
-  @Post(':programId/assignments/:assignmentId/end')
-  @RequirePermissions(PERMISSIONS.assignmentsManage)
-  endAssignment(
-    @CurrentUser() user: AuthUser,
-    @Param('programId') programId: string,
-    @Param('assignmentId') assignmentId: string,
-  ): Promise<ProgramDetail> {
-    return this.programs.endAssignment(user, programId, assignmentId);
   }
 
   @Post(':programId/targets/:targetId/observations')

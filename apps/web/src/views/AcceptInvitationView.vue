@@ -5,6 +5,7 @@ import { acceptInvitationRequest } from '@/api/resources';
 import AppButton from '@/components/ui/AppButton.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { errorMessage } from '@/lib/loader';
 
 const route = useRoute();
 const router = useRouter();
@@ -28,7 +29,7 @@ async function accept(): Promise<void> {
     toast.push({ tone: 'success', title: 'Invitation accepted', message: auth.user.organization?.name });
     await router.push('/');
   } catch (acceptError) {
-    error.value = acceptError instanceof Error ? acceptError.message : 'This invitation could not be accepted.';
+    error.value = errorMessage(acceptError, 'This invitation could not be accepted.');
   } finally {
     saving.value = false;
   }

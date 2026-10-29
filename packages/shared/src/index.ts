@@ -7,3 +7,4 @@ export * from './features';
 export * from './auth';
 export * from './organization';
 export * from './dashboard';
+export * from './branding';

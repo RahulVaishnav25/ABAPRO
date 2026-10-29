@@ -14,7 +14,8 @@ import {
   type TrialResult,
 } from '@abapro/shared';
 import { recordAudit } from '../common/audit';
-import { asDate, asString } from '../common/http';
+import { recordChangeReason, requireReason } from '../common/clinical-change';
+import { asDate, asNullableNumber, asString } from '../common/http';
 import type { Queryable } from '../db/database';
 import { AuthorizationService } from '../access/authorization.service';
 
@@ -76,8 +77,7 @@ export class SessionCollectionService {
       const params: unknown[] = [organizationId];
       let clientClause = '';
       if (clientId) {
-        const client = await this.authorization.findClient(tx, organizationId, clientId);
-        await this.authorization.assertClientAccess(tx, user, client, 'view', PERMISSIONS.sessionsView);
+        const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', PERMISSIONS.sessionsView);
         params.push(client.id);
         clientClause = `AND s.client_id = $${params.length}`;
       }
@@ -122,8 +122,7 @@ export class SessionCollectionService {
   async graph(user: AuthUser, clientId: string): Promise<SessionGraphPoint[]> {
     if (!clientId) throw new BadRequestException('Choose a client.');
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'view', PERMISSIONS.graphsView);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', PERMISSIONS.graphsView);
       const rows = await tx.query<{
         id: string;
         session_id: string;
@@ -164,9 +163,9 @@ export class SessionCollectionService {
           measurementMethod: method,
           recordedOn: asString(row.recorded_on),
           percentCorrect: (method === 'trial' || method === 'probe') && trials > 0 ? Math.round((correct / trials) * 1000) / 10 : null,
-          frequencyCount: row.frequency_count == null ? null : Number(row.frequency_count),
-          durationSeconds: row.duration_seconds == null ? null : Number(row.duration_seconds),
-          ratePerMinute: row.rate_per_minute == null ? null : Number(row.rate_per_minute),
+          frequencyCount: asNullableNumber(row.frequency_count),
+          durationSeconds: asNullableNumber(row.duration_seconds),
+          ratePerMinute: asNullableNumber(row.rate_per_minute),
         };
       });
     });
@@ -177,8 +176,7 @@ export class SessionCollectionService {
     input: { clientId: string; therapistId?: string; startedAt?: string; setting?: string; location?: string; note?: string },
   ): Promise<TherapySessionDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, input.clientId);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, input.clientId, 'write', PERMISSIONS.observationsRecord);
       const open = await tx.query<{ id: string }>(
         `SELECT id FROM therapy_sessions WHERE client_id = $1 AND organization_id = $2 AND status = 'in_progress' LIMIT 1`,
         [client.id, organizationId],
@@ -219,8 +217,7 @@ export class SessionCollectionService {
   ): Promise<TherapySessionDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const session = await this.lockOpen(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
       if (input.therapistId) await assertCollector(tx, organizationId, input.therapistId);
       await tx.query(
         `UPDATE therapy_sessions
@@ -235,8 +232,7 @@ export class SessionCollectionService {
   async interrupt(user: AuthUser, sessionId: string): Promise<TherapySessionDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const session = await this.lockOpen(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
       await tx.query(`UPDATE therapy_sessions SET interrupted_at = now(), updated_at = now() WHERE id = $1`, [sessionId]);
       await recordAudit(tx, {
         organizationId, actorUserId: user.id, action: 'session.interrupted', targetType: 'session', targetId: sessionId,
@@ -249,8 +245,7 @@ export class SessionCollectionService {
   async resume(user: AuthUser, sessionId: string): Promise<TherapySessionDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const session = await this.lockOpen(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
       await tx.query(`UPDATE therapy_sessions SET interrupted_at = NULL, updated_at = now() WHERE id = $1`, [sessionId]);
       await recordAudit(tx, {
         organizationId, actorUserId: user.id, action: 'session.resumed', targetType: 'session', targetId: sessionId,
@@ -263,8 +258,7 @@ export class SessionCollectionService {
   async complete(user: AuthUser, sessionId: string, note?: string): Promise<TherapySessionDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const session = await this.lockOpen(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
       const detail = await this.load(tx, user, organizationId, sessionId);
       if (!detail.summary.canComplete) {
         throw new BadRequestException('Finish or remove incomplete trial sets before completing the session. Targets with no data can stay unrecorded.');
@@ -287,12 +281,8 @@ export class SessionCollectionService {
     const text = requireReason(reason);
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const session = await this.lockOpen(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
-      await tx.query(
-        `INSERT INTO clinical_change_reasons (organization_id, record_type, record_id, reason, created_by) VALUES ($1, 'session', $2, $3, $4)`,
-        [organizationId, sessionId, text, user.id],
-      );
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
+      await recordChangeReason(tx, { organizationId, recordType: 'session', recordId: sessionId, reason: text, userId: user.id });
       await tx.query(`UPDATE therapy_sessions SET status = 'cancelled', ended_at = now(), updated_at = now() WHERE id = $1`, [sessionId]);
       await recordAudit(tx, {
         organizationId, actorUserId: user.id, action: 'session.cancelled', targetType: 'session', targetId: sessionId,
@@ -309,8 +299,7 @@ export class SessionCollectionService {
       const existing = await findByKey(tx, organizationId, key);
       if (existing) return replay(tx, existing, print);
       const session = await this.lockOpen(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
       const target = await activeTarget(tx, client.id, input.targetId);
       const version = await configuration(tx, target.id, target.configuration_version);
       const prepared = prepareObservation(version.measurement_method, version.expected_trial_count, input);
@@ -343,8 +332,7 @@ export class SessionCollectionService {
         return loadObservation(tx, observationId);
       }
       const session = await this.lockOpen(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
       const observation = await observationRow(tx, sessionId, observationId);
       if (observation.status !== 'draft') {
         throw new BadRequestException('This trial set is already complete. Undo a trial or amend the observation before adding another.');
@@ -353,7 +341,7 @@ export class SessionCollectionService {
         `SELECT measurement_method, expected_trial_count FROM target_configuration_versions WHERE id = $1`,
         [observation.configuration_version_id],
       );
-      const expected = version[0]?.expected_trial_count == null ? null : Number(version[0].expected_trial_count);
+      const expected = asNullableNumber(version[0]?.expected_trial_count);
       assertTrial(input, expected);
       const taken = await tx.query(
         `SELECT 1 AS present FROM observation_trials WHERE observation_id = $1 AND trial_number = $2 AND voided_at IS NULL`,
@@ -375,8 +363,7 @@ export class SessionCollectionService {
     const text = requireReason(reason);
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const session = await this.lockOpen(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
       const observation = await observationRow(tx, sessionId, observationId);
       if (observation.status === 'amended' || observation.status === 'voided') {
         throw new BadRequestException('This observation can no longer be changed in place.');
@@ -391,12 +378,9 @@ export class SessionCollectionService {
         `SELECT expected_trial_count FROM target_configuration_versions WHERE id = $1`,
         [observation.configuration_version_id],
       );
-      const expected = version[0]?.expected_trial_count == null ? null : Number(version[0].expected_trial_count);
+      const expected = asNullableNumber(version[0]?.expected_trial_count);
       await refreshTrialStatus(tx, observationId, expected);
-      await tx.query(
-        `INSERT INTO clinical_change_reasons (organization_id, record_type, record_id, reason, created_by) VALUES ($1, 'observation', $2, $3, $4)`,
-        [organizationId, observationId, text, user.id],
-      );
+      await recordChangeReason(tx, { organizationId, recordType: 'observation', recordId: observationId, reason: text, userId: user.id });
       await recordAudit(tx, {
         organizationId, actorUserId: user.id, action: 'session_observation.trial_removed', targetType: 'observation', targetId: observationId,
         metadata: { clientId: client.id, sessionId, trialId },
@@ -409,17 +393,13 @@ export class SessionCollectionService {
     const text = requireReason(reason);
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const session = await this.lockOpen(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
       const observation = await observationRow(tx, sessionId, observationId);
       if (observation.status === 'amended' || observation.status === 'voided') {
         throw new BadRequestException('This observation can no longer be changed in place.');
       }
       await tx.query(`UPDATE session_observations SET status = 'voided', amendment_reason = $2 WHERE id = $1`, [observationId, text]);
-      await tx.query(
-        `INSERT INTO clinical_change_reasons (organization_id, record_type, record_id, reason, created_by) VALUES ($1, 'observation', $2, $3, $4)`,
-        [organizationId, observationId, text, user.id],
-      );
+      await recordChangeReason(tx, { organizationId, recordType: 'observation', recordId: observationId, reason: text, userId: user.id });
       await recordAudit(tx, {
         organizationId, actorUserId: user.id, action: 'session_observation.voided', targetType: 'observation', targetId: observationId,
         metadata: { clientId: client.id, sessionId },
@@ -436,8 +416,7 @@ export class SessionCollectionService {
       const existing = await findByKey(tx, organizationId, key);
       if (existing) return replay(tx, existing, print);
       const session = await lockSession(tx, organizationId, sessionId);
-      const client = await this.authorization.findClient(tx, organizationId, session.client_id);
-      await this.authorization.assertClientAccess(tx, user, client, 'write', PERMISSIONS.observationsRecord);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, session.client_id, 'write', PERMISSIONS.observationsRecord);
       const canAmend = user.permissions.includes(PERMISSIONS.observationsAmend) || session.status === 'in_progress';
       if (!canAmend) {
         throw new ForbiddenException('Amending a completed session requires permission to amend observations.');
@@ -454,7 +433,7 @@ export class SessionCollectionService {
       );
       const snapshot = version[0];
       if (!snapshot) throw new BadRequestException('The original measurement configuration is missing.');
-      const prepared = prepareObservation(snapshot.measurement_method, snapshot.expected_trial_count == null ? null : Number(snapshot.expected_trial_count), input);
+      const prepared = prepareObservation(snapshot.measurement_method, asNullableNumber(snapshot.expected_trial_count), input);
       if (prepared.status !== 'recorded') {
         throw new BadRequestException('An amendment must be a complete observation.');
       }
@@ -465,10 +444,7 @@ export class SessionCollectionService {
       });
       await insertTrials(tx, organizationId, id, prepared.trials);
       await tx.query(`UPDATE session_observations SET status = 'amended' WHERE id = $1`, [observationId]);
-      await tx.query(
-        `INSERT INTO clinical_change_reasons (organization_id, record_type, record_id, reason, created_by) VALUES ($1, 'observation', $2, $3, $4)`,
-        [organizationId, observationId, text, user.id],
-      );
+      await recordChangeReason(tx, { organizationId, recordType: 'observation', recordId: observationId, reason: text, userId: user.id });
       await recordAudit(tx, {
         organizationId, actorUserId: user.id, action: 'session_observation.amended', targetType: 'observation', targetId: id,
         metadata: { clientId: client.id, sessionId, amendedFromId: observationId },
@@ -518,8 +494,7 @@ export class SessionCollectionService {
     );
     const row = rows[0];
     if (!row) throw new NotFoundException('That session was not found.');
-    const client = await this.authorization.findClient(tx, organizationId, asString(row.client_id));
-    await this.authorization.assertClientAccess(tx, user, client, 'view', PERMISSIONS.sessionsView);
+    const client = await this.authorization.findAccessibleClient(tx, user, organizationId, asString(row.client_id), 'view', PERMISSIONS.sessionsView);
     const targets = await tx.query<{
       id: string; program_id: string; program_title: string; name: string; phase: string; measurement_method: MeasurementMethod;
       expected_trial_count: number | null; operational_definition: string; teaching_instructions: string; prompt_hierarchy: string;
@@ -546,7 +521,7 @@ export class SessionCollectionService {
       title: asString(target.name),
       phase: asString(target.phase),
       measurementMethod: target.measurement_method,
-      expectedTrialCount: target.expected_trial_count == null ? null : Number(target.expected_trial_count),
+      expectedTrialCount: asNullableNumber(target.expected_trial_count),
       operationalDefinition: asString(target.operational_definition),
       teachingInstructions: asString(target.teaching_instructions),
       promptHierarchy: asString(target.prompt_hierarchy),
@@ -687,7 +662,7 @@ async function configuration(tx: Queryable, targetId: string, version: number): 
   );
   const row = rows[0];
   if (!row) throw new BadRequestException('This target has no saved measurement configuration.');
-  return { id: asString(row.id), measurement_method: row.measurement_method, expected_trial_count: row.expected_trial_count == null ? null : Number(row.expected_trial_count) };
+  return { id: asString(row.id), measurement_method: row.measurement_method, expected_trial_count: asNullableNumber(row.expected_trial_count) };
 }
 
 async function observationRow(tx: Queryable, sessionId: string, observationId: string): Promise<{
@@ -804,8 +779,8 @@ async function loadObservation(tx: Queryable, observationId: string): Promise<Co
     status: row.status,
     entryMode: row.entry_mode,
     note: asString(row.note),
-    frequencyCount: row.frequency_count == null ? null : Number(row.frequency_count),
-    durationSeconds: row.duration_seconds == null ? null : Number(row.duration_seconds),
+    frequencyCount: asNullableNumber(row.frequency_count),
+    durationSeconds: asNullableNumber(row.duration_seconds),
     durationUnit: row.duration_unit,
     windowStartedAt: row.window_started_at ? asDate(row.window_started_at).toISOString() : null,
     windowEndedAt: row.window_ended_at ? asDate(row.window_ended_at).toISOString() : null,
@@ -816,7 +791,7 @@ async function loadObservation(tx: Queryable, observationId: string): Promise<Co
     behaviorNote: row.behavior_note ? asString(row.behavior_note) : null,
     consequence: row.consequence ? asString(row.consequence) : null,
     contextNote: asString(row.context_note),
-    ratePerMinute: row.rate_per_minute == null ? null : Number(row.rate_per_minute),
+    ratePerMinute: asNullableNumber(row.rate_per_minute),
     amendedFromId: row.amended_from_id ? asString(row.amended_from_id) : null,
     trials: trials.map((trial) => ({
       id: asString(trial.id),
@@ -993,11 +968,6 @@ function requireKey(value: string | undefined): string {
   return key;
 }
 
-function requireReason(reason: string | undefined): string {
-  const text = reason?.trim() ?? '';
-  if (text.length < 12) throw new BadRequestException('Enter a reason of at least 12 characters for this clinical change.');
-  return text;
-}
 
 function fingerprint(value: unknown): string {
   return createHash('sha256').update(stable(value)).digest('hex');

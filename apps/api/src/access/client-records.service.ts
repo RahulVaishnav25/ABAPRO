@@ -374,9 +374,8 @@ export class ClientRecordsService {
 
   async documents(user: AuthUser, clientId: string): Promise<ClientDocumentView[]> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findClient(tx, organizationId, clientId);
       const permission = user.permissions.includes(PERMISSIONS.documentsDownload) ? PERMISSIONS.documentsDownload : PERMISSIONS.documentsUpload;
-      await this.authorization.assertClientAccess(tx, user, client, 'view', permission);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', permission);
       const sharedOnly = user.role === 'parent';
       const rows = await tx.query<{
         id: string;
@@ -495,8 +494,7 @@ export class ClientRecordsService {
   }
 
   private async requireView(tx: Queryable, user: AuthUser, organizationId: string, clientId: string, permission: Permission) {
-    const client = await this.authorization.findClient(tx, organizationId, clientId);
-    await this.authorization.assertClientAccess(tx, user, client, 'view', permission);
+    const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', permission);
     return client;
   }
 
@@ -507,8 +505,7 @@ export class ClientRecordsService {
     clientId: string,
     permission: Permission,
   ) {
-    const client = await this.authorization.findClient(tx, organizationId, clientId);
-    await this.authorization.assertClientAccess(tx, user, client, 'write', permission);
+    const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', permission);
     return client;
   }
 

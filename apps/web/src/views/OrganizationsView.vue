@@ -12,10 +12,9 @@ import FilterBar from '@/components/ui/FilterBar.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import { useLoader } from '@/lib/loader';
 
 const router = useRouter();
-const loading = ref(true);
-const error = ref('');
 const search = ref('');
 const country = ref('');
 const page = ref(1);
@@ -34,26 +33,18 @@ const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize + 1));
 const rangeEnd = computed(() => Math.min(page.value * pageSize, total.value));
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
-  try {
-    const params = new URLSearchParams();
-    if (search.value.trim()) params.set('q', search.value.trim());
-    if (country.value) params.set('country', country.value);
-    params.set('page', String(page.value));
-    params.set('pageSize', String(pageSize));
-    const directory = await apiRequest<OrganizationDirectoryPage>(`/organizations?${params.toString()}`);
-    items.value = directory.items;
-    total.value = directory.total;
-    page.value = directory.page;
-    countries.value = directory.countries;
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'Organisations could not be loaded.';
-  } finally {
-    loading.value = false;
-  }
-}
+const { loading, error, load } = useLoader(async () => {
+  const params = new URLSearchParams();
+  if (search.value.trim()) params.set('q', search.value.trim());
+  if (country.value) params.set('country', country.value);
+  params.set('page', String(page.value));
+  params.set('pageSize', String(pageSize));
+  const directory = await apiRequest<OrganizationDirectoryPage>(`/organizations?${params.toString()}`);
+  items.value = directory.items;
+  total.value = directory.total;
+  page.value = directory.page;
+  countries.value = directory.countries;
+}, 'Organisations could not be loaded.');
 
 function clinicSummary(item: OrganizationDirectoryItem): string {
   if (item.clinics.length === 0) return 'No clinics yet';

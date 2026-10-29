@@ -14,30 +14,21 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { useLoader } from '@/lib/loader';
 
 const auth = useAuthStore();
 const toast = useToastStore();
 const router = useRouter();
-const loading = ref(true);
-const error = ref('');
 const items = ref<AssessmentSummary[]>([]);
 const templates = ref<AssessmentTemplate[]>([]);
 const templateName = ref('');
 const templateType = ref('');
 const itemLabel = ref('');
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
-  try {
-    items.value = await assessmentsRequest();
-    templates.value = await assessmentTemplatesRequest();
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'Assessments could not be loaded.';
-  } finally {
-    loading.value = false;
-  }
-}
+const { loading, error, load } = useLoader(async () => {
+  items.value = await assessmentsRequest();
+  templates.value = await assessmentTemplatesRequest();
+}, 'Assessments could not be loaded.');
 
 async function saveTemplate(): Promise<void> {
   try {

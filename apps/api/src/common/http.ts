@@ -110,6 +110,10 @@ export function asNullableString(value: unknown): string | null {
   return value == null ? null : asString(value);
 }
 
+export function asNullableNumber(value: unknown): number | null {
+  return value == null ? null : Number(value);
+}
+
 export function asBoolean(value: unknown): boolean {
   return value === true || value === 't' || value === 'true';
 }

@@ -49,7 +49,7 @@ export const APP_FEATURES = [
     route: '/programs',
     apiPath: 'programs',
     permission: PERMISSIONS.programsView,
-    nav: false,
+    nav: true,
     implemented: true,
   },
   {
@@ -130,7 +130,7 @@ export const APP_FEATURES = [
     apiPath: 'organization/settings',
     permission: PERMISSIONS.settingsView,
     nav: true,
-    implemented: false,
+    implemented: true,
   },
 ] as const satisfies readonly AppFeature[];
 
@@ -146,16 +146,17 @@ export function featureByKey(key: string): FeatureDefinition {
 }
 
 export interface PrimaryNavigationItem {
-  key: 'home' | 'children' | 'sessions' | 'progress' | 'settings' | 'organisations' | 'clinics' | 'platform';
+  key: 'home' | 'children' | 'programs' | 'sessions' | 'progress' | 'settings' | 'organisations' | 'clinics' | 'platform';
   title: string;
   route: string;
-  icon: 'home' | 'children' | 'sessions' | 'progress' | 'settings' | 'organisations' | 'clinics' | 'dashboard';
+  icon: 'home' | 'children' | 'programs' | 'sessions' | 'progress' | 'settings' | 'organisations' | 'clinics' | 'dashboard';
   matches: readonly string[];
 }
 
 export const PRIMARY_NAVIGATION = [
   { key: 'home', title: 'Dashboard', route: '/', icon: 'dashboard', matches: [] },
   { key: 'children', title: 'Clients', route: '/clients', icon: 'children', matches: ['/clients'] },
+  { key: 'programs', title: 'Programs', route: '/programs', icon: 'programs', matches: ['/programs'] },
   { key: 'sessions', title: 'Sessions', route: '/sessions', icon: 'sessions', matches: ['/sessions'] },
   { key: 'progress', title: 'Progress', route: '/progress', icon: 'progress', matches: ['/progress'] },
   { key: 'settings', title: 'Settings', route: '/settings', icon: 'settings', matches: ['/settings', '/team'] },
@@ -192,6 +193,7 @@ export function navigationFor(
   const items: PrimaryNavigationItem[] = PRIMARY_NAVIGATION.filter((item) => {
     if (item.key === 'home') return !options.platformAdmin && permissions.includes(PERMISSIONS.dashboardView);
     if (item.key === 'children') return permissions.includes(PERMISSIONS.clientsView);
+    if (item.key === 'programs') return permissions.includes(PERMISSIONS.programsView);
     if (item.key === 'sessions') return permissions.includes(PERMISSIONS.sessionsView);
     if (item.key === 'progress') return permissions.includes(PERMISSIONS.progressView);
     return permissions.includes(PERMISSIONS.settingsView) || permissions.includes(PERMISSIONS.teamView) || options.platformAdmin === true;

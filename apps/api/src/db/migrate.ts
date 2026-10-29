@@ -12,6 +12,10 @@ const MIGRATIONS = [
   '007_clinics',
   '008_platform_roles',
   '009_organization_identity',
+  '010_update_programs',
+  '011_branding',
+  '012_target_task_fields',
+  '013_merge_program_fields',
 ];
 
 export async function migrate(db: Database): Promise<void> {

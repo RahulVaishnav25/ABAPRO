@@ -17,12 +17,11 @@ import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { formatDateTime } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { useLoader } from '@/lib/loader';
 
 const auth = useAuthStore();
 const toast = useToastStore();
 const router = useRouter();
-const loading = ref(true);
-const error = ref('');
 const items = ref<ClientDirectoryItem[]>([]);
 const total = ref(0);
 const page = ref(1);
@@ -54,29 +53,21 @@ const supervisorOptions = computed(() => [
   ...staff.value.filter((person) => person.role === 'clinical_supervisor').map((person) => ({ value: person.id, label: person.name })),
 ]);
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
-  try {
-    const directory = await clientDirectoryRequest({
-      q: search.value.trim(),
-      status: status.value,
-      therapistId: therapistId.value,
-      supervisorId: supervisorId.value,
-      programStatus: programStatus.value,
-      sort: sort.value,
-      direction: direction.value,
-      page: page.value,
-      pageSize,
-    });
-    items.value = directory.items;
-    total.value = directory.total;
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'The client directory could not be loaded.';
-  } finally {
-    loading.value = false;
-  }
-}
+const { loading, error, load } = useLoader(async () => {
+  const directory = await clientDirectoryRequest({
+    q: search.value.trim(),
+    status: status.value,
+    therapistId: therapistId.value,
+    supervisorId: supervisorId.value,
+    programStatus: programStatus.value,
+    sort: sort.value,
+    direction: direction.value,
+    page: page.value,
+    pageSize,
+  });
+  items.value = directory.items;
+  total.value = directory.total;
+}, 'The client directory could not be loaded.');
 
 function names(people: Array<{ name: string }>): string {
   return people.length ? people.map((person) => person.name).join(', ') : 'None';

@@ -1,8 +1,23 @@
 import { IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import type { AssessmentStatus, MeasurementMethod, ResponseKind, TargetStatus, TrialResult } from '@abapro/shared';
+import type {
+  AssessmentItemWrite,
+  AssessmentStatus,
+  AssessmentTemplateWrite,
+  AssessmentWrite,
+  DocumentUpload,
+  MeasurementMethod,
+  MeasurementProcedure,
+  ObservationWrite,
+  ProgramWrite,
+  ResponseKind,
+  TargetStatus,
+  TargetWrite,
+  TrialEntry,
+  TrialResult,
+} from '@abapro/shared';
 
-export class ItemDto {
+export class ItemDto implements AssessmentItemWrite {
   @IsString()
   @MinLength(2)
   @MaxLength(240)
@@ -22,7 +37,7 @@ export class ItemDto {
   responseText?: string;
 }
 
-export class AssessmentDto {
+export class AssessmentDto implements AssessmentWrite {
   @IsUUID()
   clientId!: string;
 
@@ -78,7 +93,7 @@ export class AssessmentDto {
   items?: ItemDto[];
 }
 
-export class TemplateDto {
+export class TemplateDto implements AssessmentTemplateWrite {
   @IsString()
   @MinLength(2)
   @MaxLength(180)
@@ -105,14 +120,62 @@ export class TemplateDto {
   items?: ItemDto[];
 }
 
-export class ProgramDto {
+export class ProgramDto implements ProgramWrite {
   @IsUUID()
   clientId!: string;
 
   @IsString()
-  @MinLength(2)
+  @MinLength(1)
   @MaxLength(160)
   title!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  domain?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateImplemented?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateMastered?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  assessmentType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  sd?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  masterySteps?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  errorCorrectionProcedure?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  teachingMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  netTeachingIdea?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  measurementProcedure?: MeasurementProcedure;
 
   @IsOptional()
   @IsString()
@@ -145,27 +208,15 @@ export class ProgramDto {
 
   @IsOptional()
   @IsDateString()
-  startedOn?: string;
-
-  @IsOptional()
-  @IsDateString()
   reviewOn?: string;
-
-  @IsOptional()
-  @IsUUID()
-  responsibleClinicianId?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsUUID(undefined, { each: true })
-  therapistIds?: string[];
 
   @IsOptional()
   @IsIn(['active', 'paused', 'completed', 'discontinued'])
   status?: 'active' | 'paused' | 'completed' | 'discontinued';
 
+  @IsOptional()
   @IsIn(['trial', 'probe', 'frequency', 'duration', 'abc'])
-  measurementType!: MeasurementMethod;
+  measurementType?: MeasurementMethod;
 
   @IsOptional()
   @Type(() => Number)
@@ -242,7 +293,7 @@ export class ProgramTemplateDto {
   targets?: TargetDto[];
 }
 
-export class TargetDto {
+export class TargetDto implements TargetWrite {
   @IsString()
   @MinLength(2)
   @MaxLength(160)
@@ -310,6 +361,39 @@ export class TargetDto {
   clinicalNotes?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  sd?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  masterySessions?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  masteryProbe?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  baselineSessions?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  baselineProbe?: number | null;
+
+  @IsOptional()
   @IsArray()
   @IsUUID(undefined, { each: true })
   staffIds?: string[];
@@ -346,7 +430,7 @@ export class CopyTemplateDto {
   clientId!: string;
 }
 
-export class TrialDto {
+export class TrialDto implements TrialEntry {
   @IsInt()
   @Min(1)
   @Max(30)
@@ -361,7 +445,7 @@ export class TrialDto {
   promptLevel?: string;
 }
 
-export class ObservationDto {
+export class ObservationDto implements ObservationWrite {
   @IsOptional()
   @IsString()
   @MaxLength(2000)
@@ -401,5 +485,17 @@ export class ObservationDto {
   trials?: TrialDto[];
 }
 
-export type AssessmentWrite = AssessmentDto;
-export type TemplateWrite = TemplateDto;
+export class DocumentUploadDto implements DocumentUpload {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(180)
+  fileName!: string;
+
+  @IsIn(['application/pdf', 'image/png', 'image/jpeg', 'image/webp'])
+  contentType!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(700_000)
+  contentBase64!: string;
+}

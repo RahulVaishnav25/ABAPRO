@@ -1,11 +1,29 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { navigationFor, navigationItemIsActive } from '@abapro/shared';
+import { navigationFor, PERMISSIONS } from '@abapro/shared';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useBrandingStore } from '@/stores/branding';
+import appIconUrl from '@/assets/brand/app-icon.png';
 import AppIcon from './AppIcon.vue';
 
-const props = withDefaults(
+interface SidebarNavItem {
+  key: string;
+  title: string;
+  route: string;
+  icon: string;
+  matches: readonly string[];
+}
+
+const TASKS_NAV_ITEM: SidebarNavItem = {
+  key: 'tasks',
+  title: 'Tasks',
+  route: '/programs/tasks',
+  icon: 'tasks',
+  matches: ['/programs/tasks', '/tasks'],
+};
+
+withDefaults(
   defineProps<{
     collapsed?: boolean;
     collapsible?: boolean;
@@ -21,10 +39,66 @@ const emit = defineEmits<{
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
-const items = computed(() => navigationFor(auth.user?.permissions ?? [], {
-  platformAdmin: auth.user?.platformAdmin,
-  organizationId: auth.user?.platformAdmin ? undefined : auth.user?.organization?.id,
-}));
+const branding = useBrandingStore();
+
+const brandName = computed(() => branding.effectiveBranding.portalName || 'ABAPro');
+const brandLogo = computed(() => branding.effectiveBranding.logoUrl || appIconUrl);
+
+const items = computed<SidebarNavItem[]>(() => {
+  const isPlatformAdmin = Boolean(auth.user?.platformAdmin);
+  const isOrgAdmin = auth.user?.role === 'organization_admin' || auth.can('settings.manage');
+
+  const navItems: SidebarNavItem[] = navigationFor(auth.user?.permissions ?? [], {
+    platformAdmin: isPlatformAdmin,
+    organizationId: auth.user?.organization?.id,
+  }).filter((item) => {
+    if (item.key === 'organisations') {
+      return isPlatformAdmin || isOrgAdmin;
+    }
+    return true;
+  });
+
+  if (isPlatformAdmin && !navItems.some((item) => item.key === 'programs')) {
+    navItems.splice(1, 0, {
+      key: 'programs',
+      title: 'Programs',
+      route: '/programs',
+      icon: 'programs',
+      matches: ['/programs'],
+    });
+  }
+
+  const programsIdx = navItems.findIndex((item) => item.key === 'programs');
+  if (programsIdx !== -1) {
+    navItems.splice(programsIdx + 1, 0, TASKS_NAV_ITEM);
+  } else if (isPlatformAdmin || auth.user?.permissions?.includes(PERMISSIONS.programsView)) {
+    const settingsIdx = navItems.findIndex((item) => item.key === 'settings');
+    if (settingsIdx !== -1) {
+      navItems.splice(settingsIdx, 0, TASKS_NAV_ITEM);
+    } else {
+      navItems.push(TASKS_NAV_ITEM);
+    }
+  }
+
+  return navItems;
+});
+
+function isItemActive(item: SidebarNavItem, path: string): boolean {
+  if (item.key === 'home') return path === '/';
+  if (item.key === 'platform') return path === '/platform';
+  if (item.key === 'programs') {
+    if (path === '/programs/tasks' || path.startsWith('/programs/tasks/') || path === '/tasks') {
+      return false;
+    }
+  }
+  if (item.key === 'organisations') {
+    if (auth.user?.platformAdmin) {
+      return path === '/organizations' || path === '/organizations/new' || path.startsWith('/organizations/');
+    }
+    return path === item.route || path.startsWith(`${item.route}/`);
+  }
+  return item.matches.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
 
 function follow(event: MouseEvent, path: string): void {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
@@ -39,9 +113,9 @@ function follow(event: MouseEvent, path: string): void {
 <template>
   <div class="sidebar" :class="{ 'is-collapsed': collapsed }">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true">A</span>
-      <span v-if="!collapsed">
-        <span class="brand-name">ABAPro</span>
+      <img :src="brandLogo" :alt="brandName" class="brand-mark-img" />
+      <span v-if="!collapsed" class="brand-text">
+        <span class="brand-name">{{ brandName }}</span>
         <span class="brand-sub">Therapy management</span>
       </span>
     </div>
@@ -51,8 +125,8 @@ function follow(event: MouseEvent, path: string): void {
           <a
             :href="item.route"
             class="nav-link"
-            :class="{ 'is-active': navigationItemIsActive(item, route.path) }"
-            :aria-current="navigationItemIsActive(item, route.path) ? 'page' : undefined"
+            :class="{ 'is-active': isItemActive(item, route.path) }"
+            :aria-current="isItemActive(item, route.path) ? 'page' : undefined"
             :title="collapsed ? item.title : undefined"
             @click="follow($event, item.route)"
           >
@@ -93,15 +167,12 @@ nav {
   padding: 4px 8px 16px;
 }
 
-.brand-mark {
+.brand-mark-img {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  background: var(--color-primary);
-  color: white;
-  font-weight: 700;
+  border-radius: 8px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .brand-name,

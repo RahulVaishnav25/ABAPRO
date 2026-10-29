@@ -26,12 +26,11 @@ import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { formatDateTime } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { errorMessage, useLoader } from '@/lib/loader';
 
 const auth = useAuthStore();
 const toast = useToastStore();
-const loading = ref(true);
 const saving = ref(false);
-const error = ref('');
 const directory = ref<TeamDirectory | null>(null);
 const inviteEmail = ref('');
 const inviteRole = ref<InvitableRole>('therapist');
@@ -43,22 +42,14 @@ const canManage = computed(() => auth.can('team.membership.manage'));
 const roleOptions = INVITABLE_ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }));
 const timeZone = computed(() => auth.user?.organization?.timezone ?? 'UTC');
 
-async function load(): Promise<void> {
-  loading.value = true;
-  error.value = '';
-  try {
-    directory.value = await teamDirectoryRequest();
-    pendingRoles.value = Object.fromEntries(
-      directory.value.members
-        .filter((member) => member.role !== 'platform_admin')
-        .map((member) => [member.membershipId, member.role as InvitableRole]),
-    );
-  } catch (loadError) {
-    error.value = loadError instanceof Error ? loadError.message : 'The team directory could not be loaded.';
-  } finally {
-    loading.value = false;
-  }
-}
+const { loading, error, load } = useLoader(async () => {
+  directory.value = await teamDirectoryRequest();
+  pendingRoles.value = Object.fromEntries(
+    directory.value.members
+      .filter((member) => member.role !== 'platform_admin')
+      .map((member) => [member.membershipId, member.role as InvitableRole]),
+  );
+}, 'The team directory could not be loaded.');
 
 function ask(title: string, message: string, tone: 'primary' | 'danger', action: () => Promise<void>): void {
   confirm.value = { title, message, tone, action };
@@ -75,7 +66,7 @@ async function runConfirm(): Promise<void> {
     toast.push({
       tone: 'danger',
       title: 'Change not saved',
-      message: actionError instanceof Error ? actionError.message : 'The change could not be saved.',
+      message: errorMessage(actionError, 'The change could not be saved.'),
     });
   } finally {
     saving.value = false;
@@ -121,7 +112,7 @@ async function invite(): Promise<void> {
     });
     await load();
   } catch (inviteFailure) {
-    inviteError.value = inviteFailure instanceof Error ? inviteFailure.message : 'The invitation could not be sent.';
+    inviteError.value = errorMessage(inviteFailure, 'The invitation could not be sent.');
   } finally {
     saving.value = false;
   }

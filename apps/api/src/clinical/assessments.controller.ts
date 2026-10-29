@@ -1,25 +1,9 @@
 import { Body, Controller, Get, Inject, Param, Patch, Post, Query } from '@nestjs/common';
-import { IsIn, IsString, MaxLength, MinLength } from 'class-validator';
 import { PERMISSIONS, type AssessmentDetail, type AssessmentSummary, type AssessmentTemplate, type AuthUser } from '@abapro/shared';
 import { RequirePermissions } from '../common/auth.decorators';
 import { CurrentUser } from '../common/current-user.decorator';
 import { AssessmentService } from './assessment.service';
-import { AssessmentDto, TemplateDto } from './clinical.dto';
-
-class DocumentBody {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(180)
-  fileName!: string;
-
-  @IsIn(['application/pdf', 'image/png', 'image/jpeg', 'image/webp'])
-  contentType!: string;
-
-  @IsString()
-  @MinLength(1)
-  @MaxLength(700_000)
-  contentBase64!: string;
-}
+import { AssessmentDto, DocumentUploadDto, TemplateDto } from './clinical.dto';
 
 @Controller('v1/assessments')
 export class AssessmentsController {
@@ -80,7 +64,7 @@ export class AssessmentsController {
   addDocument(
     @CurrentUser() user: AuthUser,
     @Param('assessmentId') assessmentId: string,
-    @Body() body: DocumentBody,
+    @Body() body: DocumentUploadDto,
   ): Promise<{ id: string }> {
     return this.assessments.addDocument(user, assessmentId, body);
   }

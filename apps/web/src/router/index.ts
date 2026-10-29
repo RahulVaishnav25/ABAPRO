@@ -20,6 +20,9 @@ const ClientProfileView = () => import('@/views/clients/ClientProfileView.vue');
 const AssessmentsView = () => import('@/views/programs/AssessmentsView.vue');
 const AssessmentFormView = () => import('@/views/programs/AssessmentFormView.vue');
 const ProgramsView = () => import('@/views/programs/ProgramsView.vue');
+const TasksView = () => import('@/views/programs/TasksView.vue');
+const TaskDetailView = () => import('@/views/programs/TaskDetailView.vue');
+const TaskEditView = () => import('@/views/programs/TaskEditView.vue');
 const ProgramFormView = () => import('@/views/programs/ProgramFormView.vue');
 const ProgramDetailView = () => import('@/views/programs/ProgramDetailView.vue');
 const SessionsView = () => import('@/views/sessions/SessionWorkspaceView.vue');
@@ -124,16 +127,40 @@ export const router = createRouter({
           meta: { title: 'Assessment', breadcrumb: 'Assessment', permission: PERMISSIONS.assessmentsView },
         },
         {
+          path: 'programs/tasks',
+          name: 'tasks',
+          component: TasksView,
+          meta: { title: 'Tasks', breadcrumb: 'Tasks', permission: PERMISSIONS.programsView },
+        },
+        {
+          path: 'tasks',
+          redirect: '/programs/tasks',
+        },
+        {
+          path: 'programs/tasks/:taskId',
+          name: 'task-detail',
+          component: TaskDetailView,
+          meta: { title: 'Task preview', breadcrumb: 'Task preview', permission: PERMISSIONS.programsView },
+        },
+        {
+          path: 'tasks/:taskId',
+          redirect: (to) => `/programs/tasks/${String(to.params.taskId)}`,
+        },
+        {
+          path: 'programs/tasks/:taskId/edit',
+          name: 'task-edit',
+          component: TaskEditView,
+          meta: { title: 'Edit task', breadcrumb: 'Edit task', permission: PERMISSIONS.programsView },
+        },
+        {
+          path: 'tasks/:taskId/edit',
+          redirect: (to) => `/programs/tasks/${String(to.params.taskId)}/edit`,
+        },
+        {
           path: 'programs/new',
           name: 'program-new',
           component: ProgramFormView,
           meta: { title: 'New program', breadcrumb: 'New program', permission: PERMISSIONS.programsEdit },
-        },
-        {
-          path: 'programs/templates/new',
-          name: 'program-template-new',
-          component: ProgramFormView,
-          meta: { title: 'Program template', breadcrumb: 'Program template', permission: PERMISSIONS.programsEdit },
         },
         {
           path: 'programs/:programId/edit',
@@ -294,6 +321,19 @@ router.beforeEach(async (to) => {
     return { name: 'platform-dashboard' };
   }
   if (auth.isAuthenticated && !auth.user?.organization && !isPublic) {
+    const isClinicalRoute = to.path.startsWith('/programs') || to.path === '/tasks' || to.name === 'tasks';
+    if (auth.user?.platformAdmin && isClinicalRoute) {
+      try {
+        const { apiRequest } = await import('@/api/client');
+        const orgs = await apiRequest<{ items: Array<{ id: string }> }>('/organizations?pageSize=1');
+        if (orgs.items.length > 0) {
+          await auth.switchOrganization(orgs.items[0].id);
+          return true;
+        }
+      } catch {
+        return true;
+      }
+    }
     const directoryPage = to.name === 'settings' || to.name === 'organization-detail' || to.name === 'clinics' || to.name === 'clinic-detail';
     const platformPage = auth.user?.platformAdmin && (to.matched.some((record) => record.meta.platformAdmin) || directoryPage);
     const destination = auth.user?.platformAdmin ? 'platform-dashboard' : 'no-clinic';
@@ -309,9 +349,11 @@ router.beforeEach(async (to) => {
   }
   const allowed = to.meta.anyPermission;
   if (allowed?.length && auth.isAuthenticated && !allowed.some((permission) => auth.can(permission))) {
+    if (auth.user?.platformAdmin) return true;
     return { name: 'forbidden' };
   }
   if (!allowed?.length && to.meta.permission && auth.isAuthenticated && !auth.can(to.meta.permission)) {
+    if (auth.user?.platformAdmin) return true;
     return { name: 'forbidden' };
   }
   return true;

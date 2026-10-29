@@ -16,6 +16,11 @@ export interface RequestOptions {
   quiet?: boolean;
 }
 
+/** Builds a request path, encoding each interpolated value as a single path segment. */
+export function encodedPath(strings: TemplateStringsArray, ...values: Array<string | number>): string {
+  return strings.reduce((path, text, index) => path + text + (index < values.length ? encodeURIComponent(String(values[index])) : ''), '');
+}
+
 let unauthorizedHandler: ((message: string) => void) | null = null;
 
 export function setUnauthorizedHandler(handler: (message: string) => void): void {

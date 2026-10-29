@@ -14,8 +14,9 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import type { ClientWrite } from '@abapro/shared';
 
-export class CreateClientDto {
+export class CreateClientDto implements ClientWrite {
   @IsString()
   @MinLength(2)
   @MaxLength(120)
@@ -50,7 +51,7 @@ export class CreateClientDto {
   dateOfBirth?: string;
 }
 
-export class UpdateClientDto extends CreateClientDto {
+export class UpdateClientDto extends CreateClientDto implements ClientWrite {
   @IsIn(['active', 'inactive'])
   status!: 'active' | 'inactive';
 

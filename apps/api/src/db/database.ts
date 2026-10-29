@@ -130,8 +130,8 @@ export function splitSql(sql: string): string[] {
       continue;
     }
     if (sql[index] === ';') {
-      const statement = current.trim();
-      if (statement && !statement.startsWith('--')) {
+      const statement = cleanStatement(current);
+      if (statement) {
         statements.push(statement);
       }
       current = '';
@@ -141,11 +141,19 @@ export function splitSql(sql: string): string[] {
     current += sql[index];
     index += 1;
   }
-  const tail = current.trim();
-  if (tail && !tail.startsWith('--')) {
+  const tail = cleanStatement(current);
+  if (tail) {
     statements.push(tail);
   }
   return statements;
+}
+
+function cleanStatement(stmt: string): string {
+  return stmt
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('--'))
+    .join('\n')
+    .trim();
 }
 
 function toEmbeddedParam(value: unknown): unknown {
