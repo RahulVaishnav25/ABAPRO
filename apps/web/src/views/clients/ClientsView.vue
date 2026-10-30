@@ -43,7 +43,7 @@ const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pa
 const rangeEnd = computed(() => Math.min(page.value * pageSize, total.value));
 const therapistOptions = computed(() => [
   { value: '', label: 'Any therapist' },
-  ...staff.value.filter((person) => person.role === 'therapist' || person.role === 'clinical_supervisor').map((person) => ({
+  ...staff.value.filter((person) => person.role === 'therapist').map((person) => ({
     value: person.id,
     label: person.name,
   })),
@@ -171,7 +171,7 @@ onMounted(async () => {
             <th>Organisation</th>
             <th>Clinic</th>
             <th>Therapist</th>
-            <th>Supervisor</th>
+            <th>Supervisors</th>
             <th><button type="button" @click="toggleSort('status')">Status</button></th>
             <th><button type="button" @click="toggleSort('programs')">Active programs</button></th>
             <th><button type="button" @click="toggleSort('created')">Created</button></th>
@@ -192,7 +192,7 @@ onMounted(async () => {
             <td>{{ client.organizationName }}</td>
             <td>{{ client.clinicName || 'Not recorded' }}</td>
             <td>{{ names(client.therapists) }}</td>
-            <td>{{ client.supervisor?.name ?? 'None' }}</td>
+            <td>{{ names(client.supervisors) }}</td>
             <td><StatusBadge :tone="client.status === 'active' ? 'success' : 'neutral'" :label="client.status === 'active' ? 'Active' : 'Inactive'" /></td>
             <td>{{ client.activeProgramCount }}</td>
             <td>{{ when(client.createdAt) }}</td>

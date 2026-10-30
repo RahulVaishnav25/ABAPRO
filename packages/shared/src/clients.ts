@@ -39,7 +39,7 @@ export interface ClientDirectoryItem {
   hasAvatar: boolean;
   dateOfBirth?: string | null;
   therapists: PersonRef[];
-  supervisor: PersonRef | null;
+  supervisors: PersonRef[];
   status: ClientStatus;
   activeProgramCount: number;
   createdAt: string;
@@ -106,7 +106,7 @@ export interface ClientProfile {
   createdAt: string;
   updatedAt: string;
   therapists: PersonRef[];
-  supervisor: PersonRef | null;
+  supervisors: PersonRef[];
   assignments: ClientAssignmentView[];
   guardians: ClientGuardian[];
   activeProgramCount: number;

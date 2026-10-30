@@ -517,6 +517,20 @@ async function deactivate(): Promise<void> {
   await loadProfile();
 }
 
+/** Team members with the matching role who are not already on this client's care team in that role. */
+function assignOptions(relationship: 'therapist' | 'supervisor'): Array<{ value: string; label: string }> {
+  const role = relationship === 'therapist' ? 'therapist' : 'clinical_supervisor';
+  const assigned = new Set(
+    (relationship === 'therapist' ? profile.value?.therapists : profile.value?.supervisors)?.map((person) => person.id) ?? [],
+  );
+  return [
+    { value: '', label: 'Select' },
+    ...staff.value
+      .filter((person) => person.role === role && !assigned.has(person.id))
+      .map((person) => ({ value: person.id, label: person.name })),
+  ];
+}
+
 async function assign(relationship: 'therapist' | 'supervisor'): Promise<void> {
   const userId = relationship === 'therapist' ? therapistId.value : supervisorId.value;
   if (!userId || !profile.value) return;
@@ -645,15 +659,15 @@ onMounted(async () => {
             <dd>{{ profile.therapists.map((person) => person.name).join(', ') || 'None' }}</dd>
           </div>
           <div>
-            <dt>Supervisor</dt>
-            <dd>{{ profile.supervisor?.name ?? 'None' }}</dd>
+            <dt>Clinical supervisors</dt>
+            <dd>{{ profile.supervisors.map((person) => person.name).join(', ') || 'None' }}</dd>
           </div>
         </dl>
         <div v-if="auth.can('assignments.manage')" class="assign">
-          <AppSelect v-model="therapistId" label="Add therapist" :options="[{ value: '', label: 'Select' }, ...staff.filter((person) => person.role === 'therapist' || person.role === 'clinical_supervisor').map((person) => ({ value: person.id, label: person.name }))]" />
+          <AppSelect v-model="therapistId" label="Add Therapist" :options="assignOptions('therapist')" />
           <AppButton type="button" :disabled="!therapistId" @click="assign('therapist')">Assign therapist</AppButton>
-          <AppSelect v-model="supervisorId" label="Add supervisor" :options="[{ value: '', label: 'Select' }, ...staff.filter((person) => person.role === 'clinical_supervisor').map((person) => ({ value: person.id, label: person.name }))]" />
-          <AppButton type="button" :disabled="!supervisorId" @click="assign('supervisor')">Assign supervisor</AppButton>
+          <AppSelect v-model="supervisorId" label="Add Clinical Supervisor" :options="assignOptions('supervisor')" />
+          <AppButton type="button" :disabled="!supervisorId" @click="assign('supervisor')">Assign clinical supervisor</AppButton>
         </div>
         <ul v-if="profile.assignments.length" class="records">
           <li v-for="assignment in profile.assignments" :key="assignment.id">

@@ -13,7 +13,7 @@ import { recordAudit } from '../common/audit';
 import { recordChangeReason, requireReason } from '../common/clinical-change';
 import { asDate, asString } from '../common/http';
 import type { Queryable } from '../db/database';
-import { AuthorizationService } from '../access/authorization.service';
+import { AuthorizationService, assignmentScope } from '../access/authorization.service';
 
 const DOCUMENT_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
 const MAX_DOCUMENT_BYTES = 512 * 1024;
@@ -25,7 +25,7 @@ export class AssessmentService {
   async list(user: AuthUser, clientId?: string): Promise<AssessmentSummary[]> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const params: unknown[] = [organizationId];
-      const scope = clientScope(user, params);
+      const scope = assignmentScope(user, 'a.client_id', params);
       if (clientId) {
         const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', PERMISSIONS.assessmentsView);
         params.push(client.id);
@@ -50,7 +50,7 @@ export class AssessmentService {
          FROM assessments a
          JOIN clients c ON c.id = a.client_id
          LEFT JOIN users u ON u.id = a.assigned_clinician_id
-         WHERE a.organization_id = $1 ${scope} ${clientId ? `AND a.client_id = $${params.length}` : ''}
+         WHERE a.organization_id = $1 ${scope && `AND ${scope}`} ${clientId ? `AND a.client_id = $${params.length}` : ''}
          ORDER BY a.assessed_on DESC NULLS LAST, a.created_at DESC`,
         params,
       );
@@ -353,19 +353,6 @@ export class AssessmentService {
       programs: programs.map((program) => ({ id: asString(program.id), title: asString(program.name), status: asString(program.status) })),
     };
   }
-}
-
-function clientScope(user: AuthUser, params: unknown[]): string {
-  if (user.role !== 'therapist' && user.role !== 'parent') {
-    return '';
-  }
-  params.push(user.id);
-  const relationship = user.role === 'parent' ? 'guardian' : 'therapist';
-  return `AND EXISTS (
-    SELECT 1 FROM client_assignments assigned
-    WHERE assigned.client_id = a.client_id AND assigned.user_id = $${params.length}
-      AND assigned.relationship = '${relationship}' AND assigned.ended_at IS NULL
-  )`;
 }
 
 async function templateItems(tx: Queryable, organizationId: string, templateId: string): Promise<AssessmentTemplateWrite['items']> {

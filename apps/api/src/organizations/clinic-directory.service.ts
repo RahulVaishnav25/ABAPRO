@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthUser, ClinicDetail, ClinicDirectoryChild, ClinicDirectoryItem, ClinicDirectoryPage } from '@abapro/shared';
+import { assignmentScope } from '../access/authorization.service';
 import { asNullableString, asString } from '../common/http';
 import { DATABASE } from '../db/database.module';
 import type { Database } from '../db/database';
@@ -98,21 +99,14 @@ export class ClinicDirectoryService {
     if (!user.platformAdmin) {
       await this.assertMemberClinic(user, asString(row.organization_id), clinicId);
     }
-    const restricted = user.role === 'therapist' || user.role === 'parent';
+    const params: unknown[] = [clinicId];
+    const scope = assignmentScope(user, 'clients.id', params);
     const children = await this.database.query(
       `SELECT id, display_name, client_code, status
        FROM clients
-       WHERE clinic_id = $1
-         AND (
-           $2::boolean = false
-           OR EXISTS (
-             SELECT 1 FROM client_assignments a
-             WHERE a.client_id = clients.id AND a.user_id = $3 AND a.ended_at IS NULL
-               AND a.relationship = CASE WHEN $4 = 'parent' THEN 'guardian' ELSE 'therapist' END
-           )
-         )
+       WHERE clinic_id = $1 ${scope && `AND ${scope}`}
        ORDER BY display_name`,
-      [clinicId, restricted, user.id, user.role],
+      params,
     );
     return {
       ...this.item(row),

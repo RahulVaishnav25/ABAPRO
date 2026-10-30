@@ -17,6 +17,7 @@ const MIGRATIONS = [
   '012_target_task_fields',
   '013_merge_program_fields',
   '014_remove_sessions_targets_progress',
+  '015_care_team_assignments',
 ];
 
 export async function migrate(db: Database): Promise<void> {

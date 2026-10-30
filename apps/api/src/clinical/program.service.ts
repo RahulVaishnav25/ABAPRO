@@ -17,7 +17,7 @@ import { recordAudit } from '../common/audit';
 import { recordChangeReason, requireReason } from '../common/clinical-change';
 import { asDate, asNullableNumber, asString } from '../common/http';
 import type { Queryable } from '../db/database';
-import { AuthorizationService } from '../access/authorization.service';
+import { AuthorizationService, assignmentScope } from '../access/authorization.service';
 
 @Injectable()
 export class ProgramService {
@@ -32,7 +32,7 @@ export class ProgramService {
         params.push(client.id);
         clientClause = `AND p.client_id = $${params.length}`;
       }
-      const scope = assignmentScope(user, params);
+      const scope = assignmentScope(user, 'p.client_id', params);
       const rows = await tx.query<{
         id: string;
         client_id: string;
@@ -55,7 +55,7 @@ export class ProgramService {
                 to_char(p.review_on, 'YYYY-MM-DD') AS review_on
          FROM client_programs p
          JOIN clients c ON c.id = p.client_id
-         WHERE p.organization_id = $1 ${clientClause} ${scope}
+         WHERE p.organization_id = $1 ${clientClause} ${scope && `AND ${scope}`}
          ORDER BY c.display_name, p.name`,
         params,
       );
@@ -90,8 +90,8 @@ export class ProgramService {
         params.push(programId);
         programClause = `AND t.program_id = $${params.length}`;
       }
-      const scope = assignmentScope(user, params);
-      return queryTargets(tx, `p.organization_id = $1 ${programClause} ${scope}`, params);
+      const scope = assignmentScope(user, 'p.client_id', params);
+      return queryTargets(tx, `p.organization_id = $1 ${programClause} ${scope && `AND ${scope}`}`, params);
     });
   }
 
@@ -459,17 +459,6 @@ interface ProgramRow {
 
 const DOCUMENT_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
 const MAX_DOCUMENT_BYTES = 512 * 1024;
-
-function assignmentScope(user: AuthUser, params: unknown[]): string {
-  if (user.role !== 'therapist' && user.role !== 'parent') return '';
-  params.push(user.id);
-  const relationship = user.role === 'parent' ? 'guardian' : 'therapist';
-  return `AND EXISTS (
-    SELECT 1 FROM client_assignments assigned
-    WHERE assigned.client_id = p.client_id AND assigned.user_id = $${params.length}
-      AND assigned.relationship = '${relationship}' AND assigned.ended_at IS NULL
-  )`;
-}
 
 function normalizeProgramMeasurement(
   method?: MeasurementMethod,

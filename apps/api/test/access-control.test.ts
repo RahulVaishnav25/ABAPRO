@@ -3,7 +3,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PERMISSIONS, type AuthUser } from '@abapro/shared';
+import { PERMISSIONS, type AuthUser, type ClientProfile } from '@abapro/shared';
 import { createApplication, type RunningApplication } from '../src/create-application';
 
 const password = 'correct-horse-battery';
@@ -290,6 +290,45 @@ describe.sequential('role and resource access', () => {
     const audit = await api(admin, '/api/v1/audit');
     expect(audit.response.status).toBe(200);
     expect(JSON.stringify(audit.body)).toContain('access.exception_granted');
+  });
+
+  it('assigns several therapists and clinical supervisors by role and limits supervisors to their clients', async () => {
+    const supervisor = new CookieJar();
+    const secondSupervisor = new CookieJar();
+    const secondTherapist = new CookieJar();
+    const supervisorUser = await inviteAndAccept(admin, supervisor, 'access-supervisor@example.com', 'Sam Supervisor', 'clinical_supervisor');
+    const secondSupervisorUser = await inviteAndAccept(admin, secondSupervisor, 'access-supervisor-2@example.com', 'Sky Supervisor', 'clinical_supervisor');
+    const secondTherapistUser = await inviteAndAccept(admin, secondTherapist, 'access-therapist-2@example.com', 'Toni Therapist', 'therapist');
+    const assign = (userId: string, relationship: string) =>
+      api(admin, `/api/v1/clients/${clientA}/assignments`, { method: 'POST', body: JSON.stringify({ userId, relationship }) });
+
+    expect((await assign(supervisorUser.id, 'therapist')).response.status).toBe(400);
+    expect((await assign(therapistUser.id, 'supervisor')).response.status).toBe(400);
+    for (const [userId, relationship] of [
+      [secondTherapistUser.id, 'therapist'],
+      [supervisorUser.id, 'supervisor'],
+      [secondSupervisorUser.id, 'supervisor'],
+    ]) {
+      expect((await assign(userId, relationship)).response.status).toBe(201);
+    }
+    const profile = (await api(admin, `/api/v1/clients/${clientA}`)).body as ClientProfile;
+    expect(profile.therapists.map((person) => person.id).sort()).toEqual([therapistUser.id, secondTherapistUser.id].sort());
+    expect(profile.supervisors.map((person) => person.id).sort()).toEqual([supervisorUser.id, secondSupervisorUser.id].sort());
+
+    const listed = await api(supervisor, '/api/v1/clients');
+    expect((listed.body as { items: Array<{ id: string }> }).items.map((item) => item.id)).toEqual([clientA]);
+    expect((await api(supervisor, `/api/v1/clients/${clientA}`)).response.status).toBe(200);
+    expect((await api(supervisor, `/api/v1/clients/${clientB}`)).response.status).toBe(403);
+    const otherProgram = await api(admin, '/api/v1/programs', { method: 'POST', body: JSON.stringify({ clientId: clientB, title: 'Unassigned program' }) });
+    expect(otherProgram.response.status).toBe(201);
+    const programs = await api(supervisor, '/api/v1/programs');
+    expect((programs.body as Array<{ clientId: string }>).some((program) => program.clientId === clientB)).toBe(false);
+
+    const created = await api(supervisor, '/api/v1/clients', { method: 'POST', body: JSON.stringify({ displayName: 'Supervisor Client' }) });
+    expect(created.response.status).toBe(201);
+    const createdId = (created.body as { id: string }).id;
+    expect((await api(supervisor, `/api/v1/clients/${createdId}`)).response.status).toBe(200);
+    expect((await api(secondSupervisor, `/api/v1/clients/${createdId}`)).response.status).toBe(403);
   });
 
   it('removes access when a membership is revoked', async () => {

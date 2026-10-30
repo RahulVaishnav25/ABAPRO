@@ -132,8 +132,8 @@ export class AuthorizationService {
       }
       return;
     }
-    if (user.role === 'therapist') {
-      const assigned = await this.hasRelationship(tx, client.id, user.id, 'therapist');
+    if (user.role === 'therapist' || user.role === 'clinical_supervisor') {
+      const assigned = await this.hasRelationship(tx, client.id, user.id, user.role === 'therapist' ? 'therapist' : 'supervisor');
       if (!assigned) {
         throw new ForbiddenException('You are not authorized to access that client.');
       }
@@ -162,7 +162,7 @@ export class AuthorizationService {
       }
       return;
     }
-    if (user.role === 'organization_admin' || user.role === 'clinical_supervisor' || user.role === 'reviewer') {
+    if (user.role === 'organization_admin' || user.role === 'reviewer') {
       return;
     }
     throw new ForbiddenException('You do not have access to this resource.');
@@ -184,7 +184,7 @@ export class AuthorizationService {
     tx: Queryable,
     clientId: string,
     userId: string,
-    relationship: 'therapist' | 'guardian',
+    relationship: CareRelationship,
   ): Promise<boolean> {
     const rows = await tx.query(
       `SELECT 1 AS present FROM client_assignments
@@ -266,4 +266,26 @@ function recordTypeFor(permission: Permission): string {
   if (permission === PERMISSIONS.documentsDownload) return 'document';
   if (permission === PERMISSIONS.reportsView) return 'report';
   return 'record';
+}
+
+export type CareRelationship = 'therapist' | 'supervisor' | 'guardian';
+
+/** The assignment that gives a role access to a client, or null when the role is not limited to assigned clients. */
+export function assignedRelationship(role: AuthUser['role']): CareRelationship | null {
+  if (role === 'therapist') return 'therapist';
+  if (role === 'clinical_supervisor') return 'supervisor';
+  if (role === 'parent') return 'guardian';
+  return null;
+}
+
+/** A SQL condition limiting `clientColumn` to clients assigned to the user, or '' when the role sees every client. */
+export function assignmentScope(user: AuthUser, clientColumn: string, params: unknown[]): string {
+  const relationship = assignedRelationship(user.role);
+  if (!relationship) return '';
+  params.push(user.id, relationship);
+  return `EXISTS (
+    SELECT 1 FROM client_assignments assigned
+    WHERE assigned.client_id = ${clientColumn} AND assigned.user_id = $${params.length - 1}
+      AND assigned.relationship = $${params.length} AND assigned.ended_at IS NULL
+  )`;
 }

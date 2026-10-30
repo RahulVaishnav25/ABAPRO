@@ -23,7 +23,7 @@ import { recordAudit } from '../common/audit';
 import { asBytes, asDate, asString } from '../common/http';
 import { DATABASE } from '../db/database.module';
 import type { Database, Queryable } from '../db/database';
-import { AuthorizationService } from './authorization.service';
+import { AuthorizationService, assignmentScope } from './authorization.service';
 import { seedDemoClients } from './client-demo';
 import type {
   AssignmentDto,
@@ -159,6 +159,14 @@ export class ClientsService {
   async create(user: AuthUser, input: CreateClientDto): Promise<ClientSummary> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const id = await insertClient(tx, organizationId, user, input);
+      if (user.role === 'clinical_supervisor') {
+        // Supervisors only reach clients they are assigned to, so the creator supervises the new client.
+        await tx.query(
+          `INSERT INTO client_assignments (organization_id, client_id, user_id, relationship, created_by)
+           VALUES ($1, $2, $3, 'supervisor', $3)`,
+          [organizationId, id, user.id],
+        );
+      }
       await recordAudit(tx, {
         organizationId,
         actorUserId: user.id,
@@ -550,8 +558,8 @@ export class ClientsService {
     if (relationship === 'supervisor' && role !== 'clinical_supervisor') {
       throw new BadRequestException('A clinical supervisor assignment requires a supervisor membership.');
     }
-    if (relationship === 'therapist' && role !== 'therapist' && role !== 'clinical_supervisor') {
-      throw new BadRequestException('Treatment access can only be linked to a therapist or supervisor.');
+    if (relationship === 'therapist' && role !== 'therapist') {
+      throw new BadRequestException('A therapist assignment requires a therapist membership.');
     }
   }
 
@@ -596,7 +604,9 @@ export class ClientsService {
     const therapists = active
       .filter((item) => item.relationship === 'therapist')
       .map((item) => ({ id: asString(item.user_id), name: asString(item.name) }));
-    const supervisorRow = active.find((item) => item.relationship === 'supervisor');
+    const supervisors = active
+      .filter((item) => item.relationship === 'supervisor')
+      .map((item) => ({ id: asString(item.user_id), name: asString(item.name) }));
     const profile: ClientProfile = {
       id: asString(row.id),
       organizationId: asString(row.organization_id),
@@ -614,7 +624,7 @@ export class ClientsService {
       createdAt: asDate(row.created_at).toISOString(),
       updatedAt: asDate(row.updated_at).toISOString(),
       therapists,
-      supervisor: supervisorRow ? { id: asString(supervisorRow.user_id), name: asString(supervisorRow.name) } : null,
+      supervisors,
       assignments: assignments.map((item) => ({
         id: asString(item.id),
         userId: asString(item.user_id),
@@ -691,27 +701,17 @@ interface GuardianRow {
 function directoryFilters(user: AuthUser, organizationId: string, query: ClientListQuery): { where: string; params: unknown[] } {
   const params: unknown[] = [organizationId];
   const clauses = ['c.organization_id = $1'];
-  if (user.role === 'therapist' || user.role === 'parent' || user.role === 'platform_admin') {
+  if (user.role === 'platform_admin') {
     params.push(user.id);
-    const userParam = `$${params.length}`;
-    if (user.role === 'therapist') {
-      clauses.push(`EXISTS (
-        SELECT 1 FROM client_assignments a
-        WHERE a.client_id = c.id AND a.user_id = ${userParam} AND a.relationship = 'therapist' AND a.ended_at IS NULL
-      )`);
-    } else if (user.role === 'parent') {
-      clauses.push(`EXISTS (
-        SELECT 1 FROM client_assignments a
-        WHERE a.client_id = c.id AND a.user_id = ${userParam} AND a.relationship = 'guardian' AND a.ended_at IS NULL
-      )`);
-    } else {
-      clauses.push(`EXISTS (
-        SELECT 1 FROM exceptional_access_grants g
-        WHERE g.client_id = c.id AND g.grantee_user_id = ${userParam}
-          AND g.revoked_at IS NULL AND g.expires_at > now()
-          AND g.permissions @> '["clients.view"]'::jsonb
-      )`);
-    }
+    clauses.push(`EXISTS (
+      SELECT 1 FROM exceptional_access_grants g
+      WHERE g.client_id = c.id AND g.grantee_user_id = $${params.length}
+        AND g.revoked_at IS NULL AND g.expires_at > now()
+        AND g.permissions @> '["clients.view"]'::jsonb
+    )`);
+  } else {
+    const scope = assignmentScope(user, 'c.id', params);
+    if (scope) clauses.push(scope);
   }
   if (query.status) {
     params.push(query.status);
@@ -759,10 +759,10 @@ function sortClause(sort: ClientListQuery['sort'], direction: ClientListQuery['d
   return `${column} ${order} NULLS LAST, c.display_name ASC`;
 }
 
-async function assignmentPeople(tx: Queryable, clientIds: string[]): Promise<Map<string, { therapists: Array<{ id: string; name: string }>; supervisor: { id: string; name: string } | null }>> {
-  const grouped = new Map<string, { therapists: Array<{ id: string; name: string }>; supervisor: { id: string; name: string } | null }>();
+async function assignmentPeople(tx: Queryable, clientIds: string[]): Promise<Map<string, { therapists: Array<{ id: string; name: string }>; supervisors: Array<{ id: string; name: string }> }>> {
+  const grouped = new Map<string, { therapists: Array<{ id: string; name: string }>; supervisors: Array<{ id: string; name: string }> }>();
   for (const id of clientIds) {
-    grouped.set(id, { therapists: [], supervisor: null });
+    grouped.set(id, { therapists: [], supervisors: [] });
   }
   if (clientIds.length === 0) {
     return grouped;
@@ -779,8 +779,8 @@ async function assignmentPeople(tx: Queryable, clientIds: string[]): Promise<Map
     const bucket = grouped.get(asString(row.client_id));
     if (!bucket) continue;
     const person = { id: asString(row.user_id), name: asString(row.name) };
-    if (row.relationship === 'supervisor' && !bucket.supervisor) {
-      bucket.supervisor = person;
+    if (row.relationship === 'supervisor') {
+      bucket.supervisors.push(person);
     }
     if (row.relationship === 'therapist') {
       bucket.therapists.push(person);
@@ -791,10 +791,10 @@ async function assignmentPeople(tx: Queryable, clientIds: string[]): Promise<Map
 
 function toDirectoryItem(
   row: DirectoryRow,
-  people: Map<string, { therapists: Array<{ id: string; name: string }>; supervisor: { id: string; name: string } | null }>,
+  people: Map<string, { therapists: Array<{ id: string; name: string }>; supervisors: Array<{ id: string; name: string }> }>,
   canSeeDob: boolean,
 ): ClientDirectoryPage['items'][number] {
-  const assigned = people.get(asString(row.id)) ?? { therapists: [], supervisor: null };
+  const assigned = people.get(asString(row.id)) ?? { therapists: [], supervisors: [] };
   const item: ClientDirectoryPage['items'][number] = {
     id: asString(row.id),
     displayName: asString(row.display_name),
@@ -807,7 +807,7 @@ function toDirectoryItem(
     initials: initials(row.preferred_name ? asString(row.preferred_name) : asString(row.display_name)),
     hasAvatar: Boolean(row.has_avatar),
     therapists: assigned.therapists,
-    supervisor: assigned.supervisor,
+    supervisors: assigned.supervisors,
     status: row.status,
     activeProgramCount: Number(row.active_programs ?? 0),
     createdAt: asDate(row.created_at).toISOString(),
