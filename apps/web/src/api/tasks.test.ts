@@ -34,7 +34,6 @@ function target(overrides: Partial<TargetListItem> = {}): TargetListItem {
     baselineProbe: null,
     sortOrder: 0,
     configurationVersion: 1,
-    staff: [],
     programId: 'program-1',
     programTitle: 'Requesting',
     clientId: 'client-1',

@@ -97,8 +97,8 @@ export class ClientListQuery {
   programStatus?: 'active' | 'paused' | 'completed' | 'discontinued';
 
   @IsOptional()
-  @IsIn(['name', 'code', 'status', 'created', 'session', 'programs'])
-  sort?: 'name' | 'code' | 'status' | 'created' | 'session' | 'programs';
+  @IsIn(['name', 'code', 'status', 'created', 'programs'])
+  sort?: 'name' | 'code' | 'status' | 'created' | 'programs';
 
   @IsOptional()
   @IsIn(['asc', 'desc'])
@@ -157,8 +157,8 @@ export class ShareRecordDto {
   @IsUUID()
   recordId!: string;
 
-  @IsIn(['document', 'graph', 'report'])
-  recordType!: 'document' | 'graph' | 'report';
+  @IsIn(['document', 'report'])
+  recordType!: 'document' | 'report';
 
   @IsUUID()
   sharedWithUserId!: string;
@@ -181,20 +181,6 @@ export class CreateDocumentDto {
   @MinLength(1)
   @MaxLength(700_000)
   contentBase64!: string;
-}
-
-export class CreateObservationDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(4000)
-  note!: string;
-}
-
-export class AmendObservationDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(4000)
-  note!: string;
 }
 
 export class CreateProgramDto {
@@ -325,21 +311,6 @@ export class AvatarDto {
   @MinLength(1)
   @MaxLength(700_000)
   contentBase64!: string;
-}
-
-export class CreateTargetDto {
-  @IsUUID()
-  programId!: string;
-
-  @IsString()
-  @MinLength(2)
-  @MaxLength(160)
-  name!: string;
-}
-
-export class ApprovePhaseDto {
-  @IsIn(['baseline', 'intervention', 'maintenance', 'mastered'])
-  phase!: 'baseline' | 'intervention' | 'maintenance' | 'mastered';
 }
 
 export class GrantExceptionDto {

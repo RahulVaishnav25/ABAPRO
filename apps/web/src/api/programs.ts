@@ -5,11 +5,9 @@ import type {
   AssessmentTemplateWrite,
   AssessmentWrite,
   DocumentUpload,
-  ObservationWrite,
   ProgramDetail,
   ProgramSummary,
   ProgramWrite,
-  SessionObservationView,
   TargetListItem,
   TargetWrite,
 } from '@abapro/shared';
@@ -60,14 +58,6 @@ export function targetsRequest(programId?: string): Promise<TargetListItem[]> {
 
 export function targetRequest(id: string): Promise<TargetListItem> {
   return apiRequest(encodedPath`/programs/targets/${id}`);
-}
-
-export function reorderTargetsRequest(programId: string, targetIds: string[]): Promise<ProgramDetail> {
-  return apiRequest(encodedPath`/programs/${programId}/targets/reorder`, { method: 'PATCH', body: { targetIds } });
-}
-
-export function recordObservationRequest(programId: string, targetId: string, body: ObservationWrite): Promise<SessionObservationView> {
-  return apiRequest(encodedPath`/programs/${programId}/targets/${targetId}/observations`, { method: 'POST', body });
 }
 
 export function uploadProgramDocumentRequest(programId: string, file: DocumentUpload): Promise<ProgramDetail> {

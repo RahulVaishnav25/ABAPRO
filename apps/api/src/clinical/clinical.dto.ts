@@ -8,13 +8,10 @@ import type {
   DocumentUpload,
   MeasurementMethod,
   MeasurementProcedure,
-  ObservationWrite,
   ProgramWrite,
   ResponseKind,
   TargetStatus,
   TargetWrite,
-  TrialEntry,
-  TrialResult,
 } from '@abapro/shared';
 
 export class ItemDto implements AssessmentItemWrite {
@@ -285,12 +282,6 @@ export class ProgramTemplateDto {
   @IsOptional()
   @IsIn(['active', 'retired'])
   status?: 'active' | 'retired';
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => TargetDto)
-  targets?: TargetDto[];
 }
 
 export class TargetDto implements TargetWrite {
@@ -394,20 +385,9 @@ export class TargetDto implements TargetWrite {
   baselineProbe?: number | null;
 
   @IsOptional()
-  @IsArray()
-  @IsUUID(undefined, { each: true })
-  staffIds?: string[];
-
-  @IsOptional()
   @IsString()
   @MaxLength(1000)
   changeReason?: string;
-}
-
-export class ReorderDto {
-  @IsArray()
-  @IsUUID(undefined, { each: true })
-  targetIds!: string[];
 }
 
 export class StatusDto {
@@ -428,61 +408,6 @@ export class AssignmentDto {
 export class CopyTemplateDto {
   @IsUUID()
   clientId!: string;
-}
-
-export class TrialDto implements TrialEntry {
-  @IsInt()
-  @Min(1)
-  @Max(30)
-  trialNumber!: number;
-
-  @IsIn(['correct', 'incorrect', 'prompted', 'no_response'])
-  result!: TrialResult;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  promptLevel?: string;
-}
-
-export class ObservationDto implements ObservationWrite {
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  note?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(10000)
-  frequencyCount?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(86400)
-  durationSeconds?: number;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(1000)
-  antecedent?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(1000)
-  behaviorNote?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(1000)
-  consequence?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => TrialDto)
-  trials?: TrialDto[];
 }
 
 export class DocumentUploadDto implements DocumentUpload {

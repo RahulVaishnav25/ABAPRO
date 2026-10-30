@@ -26,15 +26,11 @@ import type { Database, Queryable } from '../db/database';
 import { AuthorizationService } from './authorization.service';
 import { seedDemoClients } from './client-demo';
 import type {
-  AmendObservationDto,
-  ApprovePhaseDto,
   AssignmentDto,
   ClientListQuery,
   CreateClientDto,
   CreateDocumentDto,
-  CreateObservationDto,
   CreateProgramDto,
-  CreateTargetDto,
   SensitiveProfileDto,
   ShareRecordDto,
   UpdateClientDto,
@@ -61,8 +57,7 @@ export class ClientsService {
                 c.organization_id, o.name AS organization_name, c.clinic_id, clinic.name AS clinic_name,
                 c.avatar_object_id IS NOT NULL AS has_avatar,
                 ${canSeeDob ? "to_char(c.date_of_birth, 'YYYY-MM-DD')" : 'NULL::text'} AS date_of_birth,
-                (SELECT count(*) FROM client_programs p WHERE p.client_id = c.id AND p.status = 'active') AS active_programs,
-                (SELECT max(s.started_at) FROM therapy_sessions s WHERE s.client_id = c.id AND s.status = 'completed') AS last_session_at
+                (SELECT count(*) FROM client_programs p WHERE p.client_id = c.id AND p.status = 'active') AS active_programs
          FROM clients c
          JOIN organizations o ON o.id = c.organization_id
          LEFT JOIN clinics clinic ON clinic.id = c.clinic_id
@@ -515,52 +510,6 @@ export class ClientsService {
     });
   }
 
-  async addObservation(user: AuthUser, clientId: string, input: CreateObservationDto): Promise<{ id: string }> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.observationsRecord);
-      const rows = await tx.query<{ id: string }>(
-        `INSERT INTO clinical_observations (organization_id, client_id, note, recorded_by)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [organizationId, client.id, input.note.trim(), user.id],
-      );
-      const id = asString(rows[0]?.id);
-      await recordAudit(tx, {
-        organizationId,
-        actorUserId: user.id,
-        action: 'observation.recorded',
-        targetType: 'observation',
-        targetId: id,
-        metadata: { clientId: client.id },
-      });
-      return { id };
-    });
-  }
-
-  async amendObservation(user: AuthUser, clientId: string, observationId: string, input: AmendObservationDto): Promise<{ id: string }> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.observationsAmend);
-      const rows = await tx.query<{ id: string }>(
-        `UPDATE clinical_observations
-         SET note = $3, amended_by = $4, amended_at = now()
-         WHERE id = $1 AND client_id = $2
-         RETURNING id`,
-        [observationId, client.id, input.note.trim(), user.id],
-      );
-      if (rows.length === 0) {
-        throw new BadRequestException('That observation was not found.');
-      }
-      await recordAudit(tx, {
-        organizationId,
-        actorUserId: user.id,
-        action: 'observation.amended',
-        targetType: 'observation',
-        targetId: observationId,
-        metadata: { clientId: client.id },
-      });
-      return { id: observationId };
-    });
-  }
-
   async addProgram(user: AuthUser, clientId: string, input: CreateProgramDto): Promise<{ id: string }> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.programsEdit);
@@ -577,54 +526,6 @@ export class ClientsService {
         [organizationId, id, user.id],
       );
       return { id };
-    });
-  }
-
-  async addTarget(user: AuthUser, clientId: string, input: CreateTargetDto): Promise<{ id: string }> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.targetsEdit);
-      const program = await tx.query(
-        `SELECT 1 AS present FROM client_programs WHERE id = $1 AND client_id = $2`,
-        [input.programId, client.id],
-      );
-      if (program.length === 0) {
-        throw new BadRequestException('That program was not found.');
-      }
-      const rows = await tx.query<{ id: string }>(
-        `INSERT INTO client_targets (organization_id, client_id, program_id, name, created_by)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [organizationId, client.id, input.programId, input.name.trim(), user.id],
-      );
-      const id = asString(rows[0]?.id);
-      await tx.query(
-        `INSERT INTO target_configuration_versions (
-           organization_id, target_id, version, measurement_method, mastery_criteria, baseline_note, prompt_hierarchy, teaching_instructions, reason, created_by
-         ) VALUES ($1, $2, 1, 'frequency', '', '', '', '', 'Initial configuration', $3)`,
-        [organizationId, id, user.id],
-      );
-      return { id };
-    });
-  }
-
-  async approvePhase(user: AuthUser, clientId: string, targetId: string, input: ApprovePhaseDto): Promise<{ id: string; phase: string }> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.phasesApprove);
-      const rows = await tx.query<{ id: string }>(
-        `UPDATE client_targets SET phase = $3 WHERE id = $1 AND client_id = $2 RETURNING id`,
-        [targetId, client.id, input.phase],
-      );
-      if (rows.length === 0) {
-        throw new BadRequestException('That target was not found.');
-      }
-      await recordAudit(tx, {
-        organizationId,
-        actorUserId: user.id,
-        action: 'target.phase_approved',
-        targetType: 'target',
-        targetId,
-        metadata: { clientId: client.id, phase: input.phase },
-      });
-      return { id: targetId, phase: input.phase };
     });
   }
 
@@ -661,8 +562,7 @@ export class ClientsService {
               clients.avatar_object_id IS NOT NULL AS has_avatar,
               ${canSeeDob ? "to_char(clients.date_of_birth, 'YYYY-MM-DD')" : 'NULL::text'} AS date_of_birth,
               clients.created_at, clients.updated_at,
-              (SELECT count(*) FROM client_programs p WHERE p.client_id = clients.id AND p.status = 'active') AS active_programs,
-              (SELECT max(started_at) FROM therapy_sessions s WHERE s.client_id = clients.id AND s.status = 'completed') AS last_session_at
+              (SELECT count(*) FROM client_programs p WHERE p.client_id = clients.id AND p.status = 'active') AS active_programs
        FROM clients
        JOIN organizations o ON o.id = clients.organization_id
        LEFT JOIN clinics clinic ON clinic.id = clients.clinic_id
@@ -735,7 +635,6 @@ export class ClientsService {
         endedAt: item.ended_at ? asDate(item.ended_at).toISOString() : null,
       })),
       activeProgramCount: Number(row.active_programs ?? 0),
-      lastSessionAt: row.last_session_at ? asDate(row.last_session_at).toISOString() : null,
     };
     if (canSeeDob) {
       profile.dateOfBirth = row.date_of_birth ? asString(row.date_of_birth) : null;
@@ -763,7 +662,6 @@ interface DirectoryRow {
   has_avatar: boolean;
   date_of_birth: string | null;
   active_programs: number | string;
-  last_session_at: Date | string | null;
 }
 
 interface ProfileRow extends DirectoryRow {
@@ -854,7 +752,6 @@ function sortClause(sort: ClientListQuery['sort'], direction: ClientListQuery['d
     code: 'c.client_code',
     status: 'c.status',
     created: 'c.created_at',
-    session: 'last_session_at',
     programs: 'active_programs',
   };
   const column = columns[sort ?? 'name'];
@@ -913,7 +810,6 @@ function toDirectoryItem(
     supervisor: assigned.supervisor,
     status: row.status,
     activeProgramCount: Number(row.active_programs ?? 0),
-    lastSessionAt: row.last_session_at ? asDate(row.last_session_at).toISOString() : null,
     createdAt: asDate(row.created_at).toISOString(),
   };
   if (canSeeDob) {

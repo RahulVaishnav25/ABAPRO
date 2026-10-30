@@ -1,7 +1,6 @@
 export * from './permissions';
 export * from './clients';
 export * from './programs';
-export * from './sessions';
 export * from './access';
 export * from './features';
 export * from './auth';

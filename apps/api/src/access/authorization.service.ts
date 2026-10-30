@@ -264,7 +264,6 @@ function permissionForMode(mode: AccessMode, permission?: Permission): Permissio
 
 function recordTypeFor(permission: Permission): string {
   if (permission === PERMISSIONS.documentsDownload) return 'document';
-  if (permission === PERMISSIONS.graphsView || permission === PERMISSIONS.graphsExport) return 'graph';
   if (permission === PERMISSIONS.reportsView) return 'report';
   return 'record';
 }

@@ -11,8 +11,6 @@ import type { Response } from 'express';
 import { RequireAnyPermissions, RequirePermissions } from '../common/auth.decorators';
 import { CurrentUser } from '../common/current-user.decorator';
 import {
-  AmendObservationDto,
-  ApprovePhaseDto,
   AssessmentReferenceDto,
   AssignmentDto,
   AvatarDto,
@@ -21,9 +19,7 @@ import {
   ClientListQuery,
   CreateClientDto,
   CreateDocumentDto,
-  CreateObservationDto,
   CreateProgramDto,
-  CreateTargetDto,
   GoalDto,
   GuardianDto,
   SensitiveProfileDto,
@@ -243,12 +239,6 @@ export class ClientsController {
     return this.records.updateProgram(user, clientId, programId, body);
   }
 
-  @Get(':clientId/sessions')
-  @RequirePermissions(PERMISSIONS.sessionsView)
-  sessions(@CurrentUser() user: AuthUser, @Param('clientId') clientId: string) {
-    return this.records.sessions(user, clientId);
-  }
-
   @Get(':clientId/documents')
   @RequireAnyPermissions(PERMISSIONS.documentsDownload, PERMISSIONS.documentsUpload)
   documents(@CurrentUser() user: AuthUser, @Param('clientId') clientId: string) {
@@ -313,47 +303,9 @@ export class ClientsController {
       .send(file.content);
   }
 
-  @Post(':clientId/observations')
-  @RequirePermissions(PERMISSIONS.observationsRecord)
-  addObservation(
-    @CurrentUser() user: AuthUser,
-    @Param('clientId') clientId: string,
-    @Body() body: CreateObservationDto,
-  ) {
-    return this.clients.addObservation(user, clientId, body);
-  }
-
-  @Patch(':clientId/observations/:observationId')
-  @RequirePermissions(PERMISSIONS.observationsAmend)
-  amendObservation(
-    @CurrentUser() user: AuthUser,
-    @Param('clientId') clientId: string,
-    @Param('observationId') observationId: string,
-    @Body() body: AmendObservationDto,
-  ) {
-    return this.clients.amendObservation(user, clientId, observationId, body);
-  }
-
   @Post(':clientId/programs')
   @RequirePermissions(PERMISSIONS.programsEdit)
   addProgram(@CurrentUser() user: AuthUser, @Param('clientId') clientId: string, @Body() body: CreateProgramDto) {
     return this.clients.addProgram(user, clientId, body);
-  }
-
-  @Post(':clientId/targets')
-  @RequirePermissions(PERMISSIONS.targetsEdit)
-  addTarget(@CurrentUser() user: AuthUser, @Param('clientId') clientId: string, @Body() body: CreateTargetDto) {
-    return this.clients.addTarget(user, clientId, body);
-  }
-
-  @Post(':clientId/targets/:targetId/phase')
-  @RequirePermissions(PERMISSIONS.phasesApprove)
-  approvePhase(
-    @CurrentUser() user: AuthUser,
-    @Param('clientId') clientId: string,
-    @Param('targetId') targetId: string,
-    @Body() body: ApprovePhaseDto,
-  ) {
-    return this.clients.approvePhase(user, clientId, targetId, body);
   }
 }

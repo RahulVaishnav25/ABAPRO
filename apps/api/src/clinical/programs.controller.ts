@@ -4,12 +4,11 @@ import {
   type AuthUser,
   type ProgramDetail,
   type ProgramSummary,
-  type SessionObservationView,
   type TargetListItem,
 } from '@abapro/shared';
 import { RequirePermissions } from '../common/auth.decorators';
 import { CurrentUser } from '../common/current-user.decorator';
-import { DocumentUploadDto, ObservationDto, ProgramDto, ReorderDto, TargetDto } from './clinical.dto';
+import { DocumentUploadDto, ProgramDto, TargetDto } from './clinical.dto';
 import { ProgramService } from './program.service';
 
 @Controller('v1/programs')
@@ -66,19 +65,13 @@ export class ProgramsController {
   }
 
   @Post(':programId/targets')
-  @RequirePermissions(PERMISSIONS.targetsEdit)
+  @RequirePermissions(PERMISSIONS.programsEdit)
   addTarget(@CurrentUser() user: AuthUser, @Param('programId') programId: string, @Body() body: TargetDto): Promise<ProgramDetail> {
     return this.programs.addTarget(user, programId, body);
   }
 
-  @Patch(':programId/targets/reorder')
-  @RequirePermissions(PERMISSIONS.targetsEdit)
-  reorder(@CurrentUser() user: AuthUser, @Param('programId') programId: string, @Body() body: ReorderDto): Promise<ProgramDetail> {
-    return this.programs.reorder(user, programId, body.targetIds);
-  }
-
   @Patch(':programId/targets/:targetId')
-  @RequirePermissions(PERMISSIONS.targetsEdit)
+  @RequirePermissions(PERMISSIONS.programsEdit)
   updateTarget(
     @CurrentUser() user: AuthUser,
     @Param('programId') programId: string,
@@ -86,16 +79,5 @@ export class ProgramsController {
     @Body() body: TargetDto,
   ): Promise<ProgramDetail> {
     return this.programs.updateTarget(user, programId, targetId, body);
-  }
-
-  @Post(':programId/targets/:targetId/observations')
-  @RequirePermissions(PERMISSIONS.observationsRecord)
-  observe(
-    @CurrentUser() user: AuthUser,
-    @Param('programId') programId: string,
-    @Param('targetId') targetId: string,
-    @Body() body: ObservationDto,
-  ): Promise<SessionObservationView> {
-    return this.programs.recordObservation(user, programId, targetId, body);
   }
 }

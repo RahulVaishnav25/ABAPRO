@@ -102,12 +102,6 @@ export async function seedDemoClients(tx: Queryable, organizationId: string, use
     );
   }
 
-  await tx.query(
-    `INSERT INTO therapy_sessions (organization_id, client_id, started_at, ended_at, status, created_by)
-     VALUES ($1, $2, '2026-10-12T15:00:00Z', '2026-10-12T16:00:00Z', 'completed', $3)`,
-    [organizationId, rowan, userId],
-  );
-
   for (const id of [rowan, quinn, sloane]) {
     await recordAudit(tx, {
       organizationId,

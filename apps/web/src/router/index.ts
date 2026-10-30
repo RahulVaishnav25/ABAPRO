@@ -25,7 +25,6 @@ const TaskDetailView = () => import('@/views/programs/TaskDetailView.vue');
 const TaskEditView = () => import('@/views/programs/TaskEditView.vue');
 const ProgramFormView = () => import('@/views/programs/ProgramFormView.vue');
 const ProgramDetailView = () => import('@/views/programs/ProgramDetailView.vue');
-const SessionsView = () => import('@/views/sessions/SessionWorkspaceView.vue');
 const OrganizationsView = () => import('@/views/OrganizationsView.vue');
 const ClinicsView = () => import('@/views/ClinicsView.vue');
 const ClinicDetailView = () => import('@/views/ClinicDetailView.vue');
@@ -37,8 +36,6 @@ const PlaceholderView = () => import('@/views/PlaceholderView.vue');
 const shellTitles: Partial<Record<string, string>> = {
   dashboard: 'Dashboard',
   clients: 'Clients',
-  sessions: 'Sessions',
-  progress: 'Progress',
   settings: 'Settings',
 };
 
@@ -56,8 +53,6 @@ const featureRoutes: RouteRecordRaw[] = APP_FEATURES.map((feature) => ({
             ? AssessmentsView
             : feature.key === 'programs'
               ? ProgramsView
-              : feature.key === 'sessions'
-                ? SessionsView
               : feature.implemented
                 ? DashboardView
                 : PlaceholderView,
@@ -215,12 +210,6 @@ export const router = createRouter({
           name: 'no-clinic',
           component: NoClinicView,
           meta: { title: 'No clinic yet', breadcrumb: 'No clinic yet' },
-        },
-        {
-          path: 'sessions/:sessionId',
-          name: 'session-detail',
-          component: SessionsView,
-          meta: { title: 'Session', breadcrumb: 'Session', permission: PERMISSIONS.sessionsView },
         },
         ...featureRoutes,
         {

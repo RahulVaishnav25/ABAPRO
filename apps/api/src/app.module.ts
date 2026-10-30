@@ -9,7 +9,6 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { ClinicalAccessModule } from './access/clinical-access.module';
 import { ClinicalProgramsModule } from './clinical/clinical.module';
-import { SessionsModule } from './modules/sessions/sessions.module';
 import { UnimplementedFeaturesModule } from './modules/unimplemented-features.module';
 import { BrandingModule } from './branding/branding.module';
 
@@ -22,7 +21,6 @@ import { BrandingModule } from './branding/branding.module';
     DashboardModule,
     ClinicalAccessModule,
     ClinicalProgramsModule,
-    SessionsModule,
     UnimplementedFeaturesModule,
     BrandingModule,
   ],

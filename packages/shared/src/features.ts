@@ -53,26 +53,6 @@ export const APP_FEATURES = [
     implemented: true,
   },
   {
-    key: 'sessions',
-    title: 'Sessions / Data Collection',
-    description: 'Live session data collection.',
-    route: '/sessions',
-    apiPath: 'sessions',
-    permission: PERMISSIONS.sessionsView,
-    nav: true,
-    implemented: true,
-  },
-  {
-    key: 'progress',
-    title: 'Progress & Graphs',
-    description: 'Target and program progress visualization.',
-    route: '/progress',
-    apiPath: 'progress',
-    permission: PERMISSIONS.progressView,
-    nav: true,
-    implemented: false,
-  },
-  {
     key: 'reports',
     title: 'Reports',
     description: 'Clinical and operational reports.',
@@ -146,10 +126,10 @@ export function featureByKey(key: string): FeatureDefinition {
 }
 
 export interface PrimaryNavigationItem {
-  key: 'home' | 'children' | 'programs' | 'sessions' | 'progress' | 'settings' | 'organisations' | 'clinics' | 'platform';
+  key: 'home' | 'children' | 'programs' | 'settings' | 'organisations' | 'clinics' | 'platform';
   title: string;
   route: string;
-  icon: 'home' | 'children' | 'programs' | 'sessions' | 'progress' | 'settings' | 'organisations' | 'clinics' | 'dashboard';
+  icon: 'home' | 'children' | 'programs' | 'settings' | 'organisations' | 'clinics' | 'dashboard';
   matches: readonly string[];
 }
 
@@ -157,8 +137,6 @@ export const PRIMARY_NAVIGATION = [
   { key: 'home', title: 'Dashboard', route: '/', icon: 'dashboard', matches: [] },
   { key: 'children', title: 'Clients', route: '/clients', icon: 'children', matches: ['/clients'] },
   { key: 'programs', title: 'Programs', route: '/programs', icon: 'programs', matches: ['/programs'] },
-  { key: 'sessions', title: 'Sessions', route: '/sessions', icon: 'sessions', matches: ['/sessions'] },
-  { key: 'progress', title: 'Progress', route: '/progress', icon: 'progress', matches: ['/progress'] },
   { key: 'settings', title: 'Settings', route: '/settings', icon: 'settings', matches: ['/settings', '/team'] },
 ] as const satisfies readonly PrimaryNavigationItem[];
 
@@ -194,8 +172,6 @@ export function navigationFor(
     if (item.key === 'home') return !options.platformAdmin && permissions.includes(PERMISSIONS.dashboardView);
     if (item.key === 'children') return permissions.includes(PERMISSIONS.clientsView);
     if (item.key === 'programs') return permissions.includes(PERMISSIONS.programsView);
-    if (item.key === 'sessions') return permissions.includes(PERMISSIONS.sessionsView);
-    if (item.key === 'progress') return permissions.includes(PERMISSIONS.progressView);
     return permissions.includes(PERMISSIONS.settingsView) || permissions.includes(PERMISSIONS.teamView) || options.platformAdmin === true;
   });
   if (options.platformAdmin) {

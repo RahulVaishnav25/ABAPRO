@@ -1,21 +1,10 @@
 export type DashboardScope = 'organization' | 'caseload' | 'family';
 
-export type SessionStatus = 'scheduled' | 'in_progress' | 'completed';
-
 export interface DashboardMetric {
   key: string;
   label: string;
   value: number;
   detail: string;
-}
-
-export interface DashboardSession {
-  id: string;
-  clientCode: string;
-  therapistName: string;
-  service: string;
-  startTime: string;
-  status: SessionStatus;
 }
 
 export interface DashboardActivity {
@@ -25,22 +14,9 @@ export interface DashboardActivity {
   summary: string;
 }
 
-export interface DashboardTrendPoint {
-  date: string;
-  completed: number;
-  scheduled: number;
-}
-
 export interface PlatformClinicCountry {
   country: string;
   clinics: number;
-}
-
-export interface PlatformSessionTrendPoint {
-  date: string;
-  completed: number;
-  scheduled: number;
-  inProgress: number;
 }
 
 export interface PlatformDashboard {
@@ -51,7 +27,6 @@ export interface PlatformDashboard {
   clients: number;
   activeClients: number;
   clinicsByCountry: PlatformClinicCountry[];
-  sessionTrend: PlatformSessionTrendPoint[];
 }
 
 export interface DashboardResponse {
@@ -64,7 +39,5 @@ export interface DashboardResponse {
   timezone: string;
   generatedAt: string;
   metrics: DashboardMetric[];
-  recentSessions: DashboardSession[];
   recentActivity: DashboardActivity[];
-  sessionTrend: DashboardTrendPoint[];
 }

@@ -183,7 +183,7 @@ onMounted(() => void load());
       </RouterLink>
     </nav>
 
-    <PageHeader title="Programs" description="Search and manage clinical programs and target mastery.">
+    <PageHeader title="Programs" description="Search and manage clinical programs and task mastery.">
       <template #actions>
         <AppButton variant="secondary" @click="router.push('/programs/tasks')">View Tasks</AppButton>
         <AppButton v-if="canEdit" @click="router.push('/programs/new')">New program</AppButton>
@@ -222,7 +222,7 @@ onMounted(() => void load());
             <th><button type="button" @click="toggleSort('client')">Client</button></th>
             <th><button type="button" @click="toggleSort('domain')">Domain</button></th>
             <th><button type="button" @click="toggleSort('procedure')">Measurement procedure</button></th>
-            <th><button type="button" @click="toggleSort('targets')">Targets</button></th>
+            <th><button type="button" @click="toggleSort('targets')">Tasks</button></th>
             <th><button type="button" @click="toggleSort('status')">Status</button></th>
             <th><button type="button" @click="toggleSort('implemented')">Date implemented</button></th>
             <th><button type="button" @click="toggleSort('mastered')">Date mastered</button></th>

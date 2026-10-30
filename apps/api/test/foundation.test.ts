@@ -6,7 +6,7 @@ import { readAppConfig } from '../src/config/app-config';
 import { PERMISSIONS_KEY } from '../src/common/auth.decorators';
 import { consumeRateLimit, resetRateLimits } from '../src/common/http';
 import { PermissionsGuard } from '../src/common/permissions.guard';
-import { DashboardService, zonedDateTime } from '../src/dashboard/dashboard.service';
+import { DashboardService } from '../src/dashboard/dashboard.service';
 
 const productionSecrets = {
   NODE_ENV: 'production',
@@ -78,18 +78,6 @@ describe('synthetic dashboard', () => {
     expect(parentDashboard.scope).toBe('family');
     expect(parentDashboard.metrics.find((metric) => metric.key === 'activeClients')?.value).toBe(1);
     expect(adminDashboard.metrics.find((metric) => metric.key === 'activeClients')?.value).toBeGreaterThan(1);
-    expect(adminDashboard.recentSessions.every((session) => session.clientCode.startsWith('Sample Client'))).toBe(true);
-  });
-
-  it('places a zoned session time on the requested local hour', () => {
-    const iso = zonedDateTime('America/Chicago', 9, 30);
-    const hour = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Chicago',
-      hour: '2-digit',
-      hourCycle: 'h23',
-      minute: '2-digit',
-    }).format(new Date(iso));
-    expect(hour).toBe('09:30');
   });
 });
 

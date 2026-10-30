@@ -219,7 +219,7 @@ describe.sequential('organisation clinics', () => {
       activeClients: 1,
       clinicsByCountry: [{ country: 'US', clinics: 2 }],
     });
-    expect(summary.sessionTrend).toHaveLength(14);
+    expect(summary).not.toHaveProperty('sessionTrend');
 
     const roles = await api(admin, '/api/v1/platform/roles');
     expect(roles.response.status).toBe(200);

@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import type { MeasurementMethod, ProgramDetail, TargetSummary } from '@abapro/shared';
+import type { MeasurementMethod, ProgramDetail } from '@abapro/shared';
 import type { BadgeTone } from '@/components/ui/types';
 import { fileToBase64 } from '@/api/clients';
-import { programRequest, reorderTargetsRequest, uploadProgramDocumentRequest } from '@/api/programs';
+import { programRequest, uploadProgramDocumentRequest } from '@/api/programs';
 import { createTaskRequest, programTasks, updateTaskRequest, type CreateTaskInput, type TaskItem } from '@/api/tasks';
 import { ApiError } from '@/api/client';
 import CreateTaskModal from '@/components/programs/CreateTaskModal.vue';
-import ObservationEntry from '@/components/programs/ObservationEntry.vue';
-import TargetForm from '@/components/programs/TargetForm.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import FileUpload from '@/components/ui/FileUpload.vue';
@@ -52,24 +50,12 @@ function phaseTone(phase: string): BadgeTone {
   }
 }
 
-function targetStatusTone(status: string): BadgeTone {
-  switch (status) {
-    case 'active': return 'success';
-    case 'mastered': return 'info';
-    case 'discontinued': return 'danger';
-    default: return 'neutral';
-  }
-}
-
 const auth = useAuthStore();
 const toast = useToastStore();
 const route = useRoute();
 const router = useRouter();
 const programId = computed(() => String(route.params.programId ?? ''));
 const program = ref<ProgramDetail | null>(null);
-const showTarget = ref(false);
-const editingId = ref('');
-const sessionTargetId = ref('');
 const files = ref<File[]>([]);
 const tasks = computed(() => (program.value ? programTasks(program.value) : []));
 const isCreateTaskOpen = ref(false);
@@ -77,8 +63,6 @@ const taskModalMode = ref<'create' | 'edit' | 'preview'>('create');
 const selectedTask = ref<TaskItem | null>(null);
 const submittingTask = ref(false);
 
-const editingTarget = computed(() => program.value?.targets.find((item) => item.id === editingId.value) ?? null);
-const sessionTarget = computed(() => program.value?.targets.find((item) => item.id === sessionTargetId.value));
 
 function openCreateTaskModal(): void {
   taskModalMode.value = 'create';
@@ -134,32 +118,6 @@ async function handleTaskSubmit(input: CreateTaskInput): Promise<void> {
   }
 }
 
-function openTarget(existing?: TargetSummary): void {
-  editingId.value = existing?.id ?? '';
-  showTarget.value = true;
-}
-
-function onTargetSaved(updated: ProgramDetail): void {
-  program.value = updated;
-  showTarget.value = false;
-}
-
-async function move(index: number, direction: -1 | 1): Promise<void> {
-  if (!program.value) return;
-  const ids = program.value.targets.map((item) => item.id);
-  const next = index + direction;
-  const current = ids[index];
-  const swap = ids[next];
-  if (!current || !swap) return;
-  ids[index] = swap;
-  ids[next] = current;
-  program.value = await reorderTargetsRequest(program.value.id, ids);
-}
-
-function startSession(item: TargetSummary): void {
-  sessionTargetId.value = item.id;
-}
-
 async function upload(): Promise<void> {
   if (!program.value || !files.value[0]) return;
   const file = files.value[0];
@@ -210,8 +168,8 @@ onMounted(() => void load());
           </div>
           <div class="metric-divider" aria-hidden="true"></div>
           <div class="metric-item">
-            <span class="metric-label">Targets</span>
-            <span class="metric-value">{{ program.targets.length }} target{{ program.targets.length === 1 ? '' : 's' }}</span>
+            <span class="metric-label">Tasks</span>
+            <span class="metric-value">{{ program.targets.length }} task{{ program.targets.length === 1 ? '' : 's' }}</span>
           </div>
           <div class="metric-divider" aria-hidden="true"></div>
           <div class="metric-item">
@@ -328,117 +286,9 @@ onMounted(() => void load());
           <div class="protocol-card criteria-card">
             <span class="protocol-tag">Mastery Criteria</span>
             <p class="protocol-text">{{ program.masteryCriteria || 'Not recorded.' }}</p>
-            <span class="criteria-hint">Recorded for clinical reference. The clinician decides target mastery and phase transitions.</span>
+            <span class="criteria-hint">Recorded for clinical reference. The clinician decides task mastery and phase transitions.</span>
           </div>
         </div>
-      </section>
-
-      <!-- Section: Targets -->
-      <section class="detail-section">
-        <div class="section-header targets-header">
-          <div>
-            <h2 class="section-title">
-              Targets
-              <span class="count-badge">{{ program.targets.length }}</span>
-            </h2>
-            <p class="section-desc">Skill breakdown and individual target observation protocols</p>
-          </div>
-          <AppButton v-if="auth.can('targets.edit')" type="button" @click="openTarget()">Add target</AppButton>
-        </div>
-
-        <div v-if="program.targets.length === 0" class="empty-targets">
-          <p>No targets added to this program yet.</p>
-          <AppButton v-if="auth.can('targets.edit')" type="button" variant="secondary" @click="openTarget()">Add first target</AppButton>
-        </div>
-
-        <div v-else class="targets-container">
-          <article v-for="(item, index) in program.targets" :key="item.id" class="target-card">
-            <div class="target-header">
-              <div class="target-title-wrap">
-                <span class="target-order">#{{ index + 1 }}</span>
-                <h3 class="target-title">{{ item.title }}</h3>
-              </div>
-              <div class="target-badges">
-                <StatusBadge :tone="phaseTone(item.phase)" :label="item.phase" />
-                <StatusBadge :tone="targetStatusTone(item.status)" :label="item.status" />
-                <span class="method-tag">
-                  {{ measurementLabel(item.measurementMethod) }}
-                  <template v-if="item.expectedTrialCount"> ({{ item.expectedTrialCount }} trials)</template>
-                </span>
-              </div>
-            </div>
-
-            <p class="target-definition">{{ item.operationalDefinition || item.description || 'No operational definition recorded.' }}</p>
-
-            <dl v-if="item.promptHierarchy || item.teachingInstructions || item.baselineNote || item.masteryCriteria || item.clinicalNotes" class="target-meta-grid">
-              <div v-if="item.promptHierarchy">
-                <dt>Prompt Hierarchy</dt>
-                <dd>{{ item.promptHierarchy }}</dd>
-              </div>
-              <div v-if="item.teachingInstructions">
-                <dt>Teaching Instructions</dt>
-                <dd>{{ item.teachingInstructions }}</dd>
-              </div>
-              <div v-if="item.baselineNote">
-                <dt>Baseline Note</dt>
-                <dd>{{ item.baselineNote }}</dd>
-              </div>
-              <div v-if="item.masteryCriteria">
-                <dt>Mastery Criteria</dt>
-                <dd>{{ item.masteryCriteria }}</dd>
-              </div>
-              <div v-if="item.clinicalNotes">
-                <dt>Clinical Notes</dt>
-                <dd>{{ item.clinicalNotes }}</dd>
-              </div>
-            </dl>
-
-            <div class="target-actions">
-              <div class="order-actions">
-                <AppButton v-if="auth.can('targets.edit')" type="button" variant="ghost" size="sm" :disabled="index === 0" @click="move(index, -1)">↑ Move up</AppButton>
-                <AppButton v-if="auth.can('targets.edit')" type="button" variant="ghost" size="sm" :disabled="index === program.targets.length - 1" @click="move(index, 1)">↓ Move down</AppButton>
-              </div>
-              <div class="record-actions">
-                <AppButton v-if="auth.can('targets.edit')" type="button" variant="secondary" size="sm" @click="openTarget(item)">Edit</AppButton>
-                <AppButton v-if="auth.can('observations.record') && item.status === 'active'" type="button" size="sm" @click="startSession(item)">Record Observation</AppButton>
-              </div>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <!-- Target Form Card -->
-      <section v-if="showTarget" class="detail-section form-card">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">{{ editingId ? 'Edit Target' : 'New Target' }}</h2>
-            <p class="section-desc">Define the target title, phase, and observation criteria</p>
-          </div>
-        </div>
-        <TargetForm
-          :key="editingId || 'new'"
-          :program-id="program.id"
-          :existing="editingTarget"
-          @saved="onTargetSaved"
-          @cancel="showTarget = false"
-        />
-      </section>
-
-      <!-- Session Entry Card -->
-      <section v-if="sessionTarget" class="detail-section observation-card">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">Session Entry · {{ sessionTarget.title }}</h2>
-            <p class="section-desc">Records one observation against configuration version {{ sessionTarget.configurationVersion }}. Does not change phase or status.</p>
-          </div>
-        </div>
-        <ObservationEntry
-          :key="sessionTarget.id"
-          :program-id="program.id"
-          :target="sessionTarget"
-          @recorded="sessionTargetId = ''"
-          @cancel="sessionTargetId = ''"
-        />
       </section>
 
       <!-- Section: Tasks -->
@@ -449,7 +299,7 @@ onMounted(() => void load());
               Tasks
               <span class="count-badge">{{ tasks.length }}</span>
             </h2>
-            <p class="section-desc">Clinical tasks and target criteria configured for this program</p>
+            <p class="section-desc">Clinical tasks and their criteria configured for this program</p>
           </div>
           <AppButton type="button" @click="openCreateTaskModal">Add Task</AppButton>
         </div>
@@ -654,10 +504,6 @@ onMounted(() => void load());
   padding-bottom: 14px;
 }
 
-.targets-header {
-  align-items: center;
-}
-
 .section-title {
   margin: 0;
   font-size: 1.12rem;
@@ -813,106 +659,6 @@ dd {
   margin-top: 6px;
 }
 
-.targets-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.target-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.target-card:hover {
-  border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-sm);
-}
-
-.target-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.target-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.target-order {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-
-.target-title {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.target-badges {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.method-tag {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  background: var(--color-surface-muted, #f7f9fa);
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-}
-
-.target-definition {
-  margin: 0;
-  font-size: 0.92rem;
-  color: var(--color-text-muted);
-  line-height: 1.45;
-}
-
-.target-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px 18px;
-  background: var(--color-surface-muted, #f7f9fa);
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  margin: 0;
-}
-
-.target-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-top: 8px;
-  border-top: 1px solid var(--color-border);
-}
-
-.order-actions,
-.record-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.empty-targets,
 .empty-docs {
   text-align: center;
   padding: 32px 20px;
@@ -924,15 +670,6 @@ dd {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-}
-
-.form-card {
-  border: 2px solid var(--color-primary-soft, #e7f4f2);
-}
-
-.observation-card {
-  border: 2px solid var(--color-primary-soft, #e7f4f2);
-  background: #fafcfb;
 }
 
 .notes-content {
@@ -1141,21 +878,6 @@ dd {
   .details-grid {
     grid-template-columns: 1fr;
     gap: 14px;
-  }
-
-  .target-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .target-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .order-actions,
-  .record-actions {
-    justify-content: space-between;
   }
 }
 </style>

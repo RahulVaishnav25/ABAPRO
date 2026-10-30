@@ -1,15 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   PERMISSIONS,
   type AuthUser,
   type MeasurementMethod,
   type MeasurementProcedure,
-  type ObservationWrite,
   type ProgramDetail,
   type ProgramSummary,
   type ProgramWrite,
-  type SessionObservationView,
   type TargetListItem,
   type TargetStatus,
   type TargetSummary,
@@ -222,7 +220,7 @@ export class ProgramService {
   async addTarget(user: AuthUser, programId: string, input: TargetWrite): Promise<ProgramDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.targetsEdit);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.programsEdit);
       const orderRows = await tx.query<{ next_order: number | string }>(`SELECT COALESCE(max(sort_order), -1) + 1 AS next_order FROM client_targets WHERE program_id = $1`, [programId]);
       await insertTarget(tx, organizationId, client.id, programId, input, user.id, Number(orderRows[0]?.next_order ?? 0));
       return this.load(tx, user, organizationId, programId);
@@ -232,12 +230,9 @@ export class ProgramService {
   async updateTarget(user: AuthUser, programId: string, targetId: string, input: TargetWrite): Promise<ProgramDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.targetsEdit);
+      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.programsEdit);
       const current = await targetRow(tx, programId, targetId);
       const nextPhase = input.phase ?? current.phase;
-      if (nextPhase !== current.phase && !user.permissions.includes(PERMISSIONS.phasesApprove)) {
-        throw new ForbiddenException('Approving a phase change requires the phase approval permission.');
-      }
       const measurement = normalizeMeasurement(input.measurementMethod, input.expectedTrialCount);
       // Task criteria are optional on this endpoint; an omitted field keeps its stored value.
       const criteria = {
@@ -283,101 +278,11 @@ export class ProgramService {
           criteria.sd, criteria.masterySessions, criteria.masteryProbe, criteria.baselineSessions, criteria.baselineProbe,
         ],
       );
-      if (input.staffIds) {
-        await tx.query(`UPDATE target_assignments SET ended_at = now() WHERE target_id = $1 AND ended_at IS NULL`, [targetId]);
-        for (const staffId of input.staffIds) {
-          await assertTherapist(tx, organizationId, staffId);
-          await tx.query(
-            `INSERT INTO target_assignments (organization_id, target_id, user_id, created_by) VALUES ($1, $2, $3, $4)`,
-            [organizationId, targetId, staffId, user.id],
-          );
-        }
-      }
       await recordAudit(tx, {
         organizationId, actorUserId: user.id, action: configChanged ? 'target.configuration_changed' : 'target.updated',
         targetType: 'target', targetId, metadata: { clientId: client.id, programId, status },
       });
       return this.load(tx, user, organizationId, programId);
-    });
-  }
-
-  async reorder(user: AuthUser, programId: string, targetIds: string[]): Promise<ProgramDetail> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.targetsEdit);
-      const existing = await tx.query<{ id: string }>(`SELECT id FROM client_targets WHERE program_id = $1`, [programId]);
-      const known = new Set(existing.map((row) => asString(row.id)));
-      if (targetIds.length !== known.size || targetIds.some((id) => !known.has(id))) {
-        throw new BadRequestException('Include every target for this program when reordering.');
-      }
-      for (let index = 0; index < targetIds.length; index += 1) {
-        await tx.query(`UPDATE client_targets SET sort_order = $2 WHERE id = $1`, [targetIds[index], index]);
-      }
-      await recordAudit(tx, { organizationId, actorUserId: user.id, action: 'target.reordered', targetType: 'program', targetId: programId, metadata: { clientId: client.id } });
-      return this.load(tx, user, organizationId, programId);
-    });
-  }
-
-  async recordObservation(user: AuthUser, programId: string, targetId: string, input: ObservationWrite): Promise<SessionObservationView> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.observationsRecord);
-      const target = await targetRow(tx, programId, targetId);
-      if (target.status !== 'active') {
-        throw new BadRequestException('Record data on an active target.');
-      }
-      const version = await tx.query<{ id: string; measurement_method: MeasurementMethod; expected_trial_count: number | null }>(
-        `SELECT id, measurement_method, expected_trial_count FROM target_configuration_versions
-         WHERE target_id = $1 AND version = $2`,
-        [targetId, target.configuration_version],
-      );
-      const snapshot = version[0];
-      if (!snapshot) throw new BadRequestException('This target has no saved measurement configuration.');
-      validateObservation(snapshot.measurement_method, snapshot.expected_trial_count, input);
-      const sessionRows = await tx.query<{ id: string }>(
-        `INSERT INTO therapy_sessions (organization_id, client_id, started_at, ended_at, status, created_by)
-         VALUES ($1, $2, now(), now(), 'completed', $3) RETURNING id`,
-        [organizationId, client.id, user.id],
-      );
-      const sessionId = asString(sessionRows[0]?.id);
-      const observationId = randomUUID();
-      await tx.query(
-        `INSERT INTO session_observations (
-           id, organization_id, client_id, session_id, target_id, configuration_version_id, measurement_method,
-           note, frequency_count, duration_seconds, antecedent, behavior_note, consequence, recorded_by
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-        [
-          observationId, organizationId, client.id, sessionId, targetId, snapshot.id, snapshot.measurement_method,
-          input.note?.trim() ?? '', input.frequencyCount ?? null, input.durationSeconds ?? null,
-          input.antecedent?.trim() || null, input.behaviorNote?.trim() || null, input.consequence?.trim() || null, user.id,
-        ],
-      );
-      for (const trial of input.trials ?? []) {
-        await tx.query(
-          `INSERT INTO observation_trials (organization_id, observation_id, trial_number, result, prompt_level)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [organizationId, observationId, trial.trialNumber, trial.result, trial.promptLevel?.trim() || null],
-        );
-      }
-      await recordAudit(tx, {
-        organizationId, actorUserId: user.id, action: 'session_observation.recorded', targetType: 'observation', targetId: observationId,
-        metadata: { clientId: client.id, targetId, sessionId },
-      });
-      return {
-        id: observationId,
-        sessionId,
-        targetId,
-        configurationVersion: target.configuration_version,
-        measurementMethod: snapshot.measurement_method,
-        note: input.note?.trim() ?? '',
-        frequencyCount: input.frequencyCount ?? null,
-        durationSeconds: input.durationSeconds ?? null,
-        antecedent: input.antecedent?.trim() || null,
-        behaviorNote: input.behaviorNote?.trim() || null,
-        consequence: input.consequence?.trim() || null,
-        trials: (input.trials ?? []).map((trial) => ({ trialNumber: trial.trialNumber, result: trial.result, promptLevel: trial.promptLevel })),
-        recordedAt: new Date().toISOString(),
-      };
     });
   }
 
@@ -476,7 +381,6 @@ export class ProgramService {
       `SELECT ${TARGET_COLUMNS} FROM client_targets t WHERE t.program_id = $1 ORDER BY t.sort_order, t.created_at`,
       [programId],
     );
-    const staff = await targetStaff(tx, 't.program_id = $1', [programId]);
     const documents = await tx.query<{ id: string; file_name: string; content_type: string; byte_size: number | string; scan_status: string }>(
       `SELECT d.id, d.file_name, d.content_type, d.byte_size, d.scan_status
        FROM program_documents link
@@ -530,7 +434,7 @@ export class ProgramService {
         byteSize: Number(document.byte_size),
         scanStatus: document.scan_status === 'rejected' ? 'rejected' : 'not_configured',
       })),
-      targets: targets.map((target) => mapTarget(target, staff)),
+      targets: targets.map(mapTarget),
       versions: versions.map((version) => ({
         id: asString(version.id), version: Number(version.version), measurementMethod: version.measurement_type,
         expectedTrialCount: asNullableNumber(version.expected_trial_count),
@@ -588,32 +492,6 @@ function normalizeMeasurement(method: MeasurementMethod, count: number | undefin
   return { method, trials: null };
 }
 
-
-function validateObservation(method: MeasurementMethod, expected: number | null, input: ObservationWrite): void {
-  if (method === 'trial' || method === 'probe') {
-    const trials = input.trials ?? [];
-    if (trials.length !== expected) {
-      throw new BadRequestException(`Record all ${expected} configured trials. Do not leave a trial blank.`);
-    }
-    const numbers = new Set(trials.map((trial) => trial.trialNumber));
-    if (numbers.size !== trials.length || [...numbers].some((number) => number < 1 || number > (expected ?? 0))) {
-      throw new BadRequestException('Number each configured trial once.');
-    }
-    return;
-  }
-  if ((input.trials?.length ?? 0) > 0) {
-    throw new BadRequestException('This measurement method does not use trials.');
-  }
-  if (method === 'frequency' && input.frequencyCount == null) {
-    throw new BadRequestException('Enter the frequency count.');
-  }
-  if (method === 'duration' && input.durationSeconds == null) {
-    throw new BadRequestException('Enter the duration in seconds.');
-  }
-  if (method === 'abc' && (!input.antecedent?.trim() || !input.behaviorNote?.trim() || !input.consequence?.trim())) {
-    throw new BadRequestException('Enter the antecedent, behavior, and consequence.');
-  }
-}
 
 async function insertProgramVersion(
   tx: Queryable,
@@ -745,26 +623,6 @@ interface TargetSelectRow {
   baseline_sessions: number | null; baseline_probe: number | null; sort_order: number; configuration_version: number;
 }
 
-/** Loads active staff for the targets matched by `where`, which may refer to `t` (target) and `p` (program). */
-async function targetStaff(tx: Queryable, where: string, params: unknown[]): Promise<Map<string, TargetSummary['staff']>> {
-  const staff = new Map<string, TargetSummary['staff']>();
-  const rows = await tx.query<{ id: string; target_id: string; user_id: string; name: string }>(
-    `SELECT a.id, a.target_id, a.user_id, u.name
-     FROM target_assignments a JOIN users u ON u.id = a.user_id
-     WHERE a.ended_at IS NULL AND a.target_id IN (
-       SELECT t.id FROM client_targets t JOIN client_programs p ON p.id = t.program_id WHERE ${where}
-     )`,
-    params,
-  );
-  for (const row of rows) {
-    const targetId = asString(row.target_id);
-    const list = staff.get(targetId) ?? [];
-    list.push({ id: asString(row.id), userId: asString(row.user_id), name: asString(row.name) });
-    staff.set(targetId, list);
-  }
-  return staff;
-}
-
 /** Lists targets with their program and client. `where` may refer to `t` (target) and `p` (program). */
 async function queryTargets(tx: Queryable, where: string, params: unknown[]): Promise<TargetListItem[]> {
   const rows = await tx.query<TargetSelectRow & { program_id: string; program_title: string; client_id: string; client_name: string }>(
@@ -776,9 +634,8 @@ async function queryTargets(tx: Queryable, where: string, params: unknown[]): Pr
      ORDER BY c.display_name, p.name, t.sort_order, t.created_at`,
     params,
   );
-  const staff = await targetStaff(tx, where, params);
   return rows.map((row) => ({
-    ...mapTarget(row, staff),
+    ...mapTarget(row),
     programId: asString(row.program_id),
     programTitle: asString(row.program_title),
     clientId: asString(row.client_id),
@@ -786,7 +643,7 @@ async function queryTargets(tx: Queryable, where: string, params: unknown[]): Pr
   }));
 }
 
-function mapTarget(target: TargetSelectRow, staff: Map<string, TargetSummary['staff']>): TargetSummary {
+function mapTarget(target: TargetSelectRow): TargetSummary {
   const id = asString(target.id);
   return {
     id, title: asString(target.name), description: asString(target.description),
@@ -805,17 +662,7 @@ function mapTarget(target: TargetSelectRow, staff: Map<string, TargetSummary['st
     baselineProbe: asNullableNumber(target.baseline_probe),
     sortOrder: Number(target.sort_order),
     configurationVersion: Number(target.configuration_version),
-    staff: staff.get(id) ?? [],
   };
-}
-
-async function assertTherapist(tx: Queryable, organizationId: string, userId: string): Promise<void> {
-  const rows = await tx.query(
-    `SELECT 1 AS present FROM organization_memberships
-     WHERE organization_id = $1 AND user_id = $2 AND status = 'active' AND role IN ('therapist', 'clinical_supervisor')`,
-    [organizationId, userId],
-  );
-  if (rows.length === 0) throw new BadRequestException('Assign an active therapist or supervisor.');
 }
 
 async function assertAssessment(tx: Queryable, organizationId: string, clientId: string, assessmentId: string): Promise<void> {

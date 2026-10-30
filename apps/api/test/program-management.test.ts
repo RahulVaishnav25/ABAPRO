@@ -22,7 +22,6 @@ describe.sequential('program and target management', () => {
   let assessmentId = '';
   let programId = '';
   let trialTargetId = '';
-  let observationId = '';
   let taskTargetId = '';
 
   beforeAll(async () => {
@@ -192,27 +191,7 @@ describe.sequential('program and target management', () => {
     expect((viewed.body as ProgramDetail).title).toBe('Requesting program');
   });
 
-  it('versions measurement changes and keeps the observation on the earlier configuration', async () => {
-    const short = await api(admin, `/api/v1/programs/${programId}/targets/${trialTargetId}/observations`, {
-      method: 'POST',
-      body: JSON.stringify({ trials: [{ trialNumber: 1, result: 'correct' }, { trialNumber: 2, result: 'prompted' }] }),
-    });
-    expect(short.response.status).toBe(400);
-
-    const recorded = await api(therapist, `/api/v1/programs/${programId}/targets/${trialTargetId}/observations`, {
-      method: 'POST',
-      body: JSON.stringify({
-        trials: [
-          { trialNumber: 1, result: 'correct' },
-          { trialNumber: 2, result: 'prompted' },
-          { trialNumber: 3, result: 'incorrect' },
-        ],
-      }),
-    });
-    expect(recorded.response.status).toBe(201);
-    observationId = (recorded.body as { id: string; configurationVersion: number }).id;
-    expect((recorded.body as { configurationVersion: number }).configurationVersion).toBe(1);
-
+  it('versions measurement changes and requires a reason', async () => {
     const noReason = await api(admin, `/api/v1/programs/${programId}/targets/${trialTargetId}`, {
       method: 'PATCH',
       body: JSON.stringify({ title: 'Spoken request', measurementMethod: 'frequency', status: 'active' }),
@@ -232,15 +211,6 @@ describe.sequential('program and target management', () => {
     const target = (updated.body as ProgramDetail).targets.find((item) => item.id === trialTargetId);
     expect(target?.configurationVersion).toBe(2);
     expect(target?.phase).toBe('baseline');
-
-    const history = await running.database.query<{ version: number }>(
-      `SELECT v.version
-       FROM session_observations observation
-       JOIN target_configuration_versions v ON v.id = observation.configuration_version_id
-       WHERE observation.id = $1`,
-      [observationId],
-    );
-    expect(history[0]?.version).toBe(1);
 
     const inactive = await api(admin, `/api/v1/programs/${programId}/targets/${trialTargetId}`, {
       method: 'PATCH',

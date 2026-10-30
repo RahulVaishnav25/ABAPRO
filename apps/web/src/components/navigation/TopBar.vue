@@ -126,22 +126,7 @@ async function signOut(): Promise<void> {
         </button>
         <div v-if="userOpen" class="dropdown" role="menu">
           <p>{{ auth.user?.email }}</p>
-          <div class="dropdown-actions">
-            <AppButton
-              variant="secondary"
-              block
-              @click="userOpen = false; router.push('/programs/tasks')"
-            >
-              Clinical Tasks
-            </AppButton>
-            <AppButton
-              v-if="isPlatformAdmin"
-              variant="secondary"
-              block
-              @click="userOpen = false; router.push('/platform')"
-            >
-              Platform Admin
-            </AppButton>
+          <div class="dropdown-actions">                       
             <AppButton
               v-if="!isPlatformAdmin && auth.user?.organization?.id"
               variant="secondary"

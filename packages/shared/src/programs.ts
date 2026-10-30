@@ -4,7 +4,6 @@ export type ResponseKind = 'text' | 'yes_no' | 'rating' | 'count';
 export type MeasurementMethod = 'trial' | 'probe' | 'frequency' | 'duration' | 'abc';
 export type MeasurementProcedure = 'Probe' | 'Step by Step' | (string & {});
 export type TargetStatus = 'active' | 'inactive' | 'mastered' | 'discontinued';
-export type TrialResult = 'correct' | 'incorrect' | 'prompted' | 'no_response';
 
 export interface AssessmentGroup {
   group: string;
@@ -98,20 +97,6 @@ export interface AssessmentDetail extends AssessmentSummary {
   programs: Array<{ id: string; title: string; status: string }>;
 }
 
-export interface ProgramTemplateTarget {
-  id: string;
-  title: string;
-  description: string;
-  operationalDefinition: string;
-  measurementMethod: MeasurementMethod;
-  expectedTrialCount: number | null;
-  baselineNote: string;
-  teachingInstructions: string;
-  promptHierarchy: string;
-  masteryCriteria: string;
-  sortOrder: number;
-}
-
 export interface ProgramTemplate {
   id: string;
   title: string;
@@ -123,7 +108,6 @@ export interface ProgramTemplate {
   masteryCriteria: string;
   notes: string;
   status: 'active' | 'retired';
-  targets: ProgramTemplateTarget[];
   updatedAt: string;
 }
 
@@ -167,7 +151,6 @@ export interface TargetSummary {
   baselineProbe: number | null;
   sortOrder: number;
   configurationVersion: number;
-  staff: Array<{ id: string; userId: string; name: string }>;
 }
 
 /** A target listed outside its program, with the program and client it belongs to. */
@@ -235,12 +218,6 @@ export interface ProgramDetail {
   targets: TargetSummary[];
   versions: ConfigurationVersion[];
   documents: AssessmentDocumentLink[];
-}
-
-export interface TrialEntry {
-  trialNumber: number;
-  result: TrialResult;
-  promptLevel?: string;
 }
 
 // Request bodies. The API validates each one with a DTO class that implements it.
@@ -324,18 +301,7 @@ export interface TargetWrite {
   masteryProbe?: number | null;
   baselineSessions?: number | null;
   baselineProbe?: number | null;
-  staffIds?: string[];
   changeReason?: string;
-}
-
-export interface ObservationWrite {
-  note?: string;
-  frequencyCount?: number;
-  durationSeconds?: number;
-  antecedent?: string;
-  behaviorNote?: string;
-  consequence?: string;
-  trials?: TrialEntry[];
 }
 
 export interface DocumentUpload {
@@ -344,18 +310,3 @@ export interface DocumentUpload {
   contentBase64: string;
 }
 
-export interface SessionObservationView {
-  id: string;
-  sessionId: string;
-  targetId: string;
-  configurationVersion: number;
-  measurementMethod: MeasurementMethod;
-  note: string;
-  frequencyCount: number | null;
-  durationSeconds: number | null;
-  antecedent: string | null;
-  behaviorNote: string | null;
-  consequence: string | null;
-  trials: TrialEntry[];
-  recordedAt: string;
-}

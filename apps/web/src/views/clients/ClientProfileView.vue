@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import type { EChartsCoreOption } from 'echarts/core';
 import type {
   AssessmentReference,
   AssessmentSummary,
@@ -11,11 +10,9 @@ import type {
   ClientGoal,
   ClientGuardian,
   ClientProfile,
-  ClientSessionView,
   ClinicalProfile,
   ContactChannel,
   ProgramSummary,
-  SessionGraphPoint,
   StaffOption,
 } from '@abapro/shared';
 import { ApiError } from '@/api/client';
@@ -39,7 +36,6 @@ import {
   saveClinicalProfileRequest,
   saveGoalRequest,
   saveGuardianRequest,
-  sessionsRequest,
   updateClientRequest,
   uploadDocumentRequest,
 } from '@/api/clients';
@@ -54,13 +50,11 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import FileUpload from '@/components/ui/FileUpload.vue';
-import GraphContainer from '@/components/ui/GraphContainer.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { formatDateTime } from '@/lib/format';
-import { sessionGraphRequest } from '@/api/sessions';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import { useLoader } from '@/lib/loader';
@@ -97,8 +91,6 @@ const goals = ref<ClientGoal[]>([]);
 const assessments = ref<AssessmentReference[]>([]);
 const clinicalAssessments = ref<AssessmentSummary[]>([]);
 const programs = ref<ProgramSummary[]>([]);
-const sessions = ref<ClientSessionView[]>([]);
-const graphPoints = ref<SessionGraphPoint[]>([]);
 const documents = ref<ClientDocumentView[]>([]);
 const activity = ref<ClientActivity[]>([]);
 const staff = ref<StaffOption[]>([]);
@@ -211,48 +203,11 @@ const tabs = computed(() => {
   if (auth.can('clients.sensitive.view')) items.push({ id: 'medical', label: 'Medical Information' });
   if (auth.can('assessments.view')) items.push({ id: 'assessments', label: 'Assessments' });
   if (auth.can('programs.view')) items.push({ id: 'programs', label: 'Programs & Goals' });
-  if (auth.can('sessions.view')) items.push({ id: 'sessions', label: 'Sessions' });
-  if (auth.can('progress.view') || auth.can('graphs.view')) items.push({ id: 'progress', label: 'Progress & Graphs' });
   if (auth.can('documents.download') || auth.can('documents.upload')) items.push({ id: 'documents', label: 'Documents' });
   if (auth.can('reports.view')) items.push({ id: 'reports', label: 'Reports' });
   if (auth.can('audit.view')) items.push({ id: 'activity', label: 'Activity History' });
   return items;
 });
-const chart = computed<EChartsCoreOption | null>(() => {
-  const trialPoints = graphPoints.value.filter((point) => point.measurementMethod === 'trial' && point.percentCorrect != null);
-  const probePoints = graphPoints.value.filter((point) => point.measurementMethod === 'probe' && point.percentCorrect != null);
-  if (trialPoints.length > 0 || probePoints.length > 0) {
-    const dates = [...new Set([...trialPoints, ...probePoints].map((point) => point.recordedOn))];
-    const average = (points: SessionGraphPoint[], date: string) => {
-      const matching = points.filter((point) => point.recordedOn === date && point.percentCorrect != null);
-      if (matching.length === 0) return null;
-      return Math.round(matching.reduce((sum, point) => sum + (point.percentCorrect ?? 0), 0) / matching.length);
-    };
-    return {
-      tooltip: { trigger: 'axis' },
-      legend: { data: ['Teaching trials', 'Probes'] },
-      xAxis: { type: 'category', data: dates },
-      yAxis: { type: 'value', min: 0, max: 100, name: 'Percent correct' },
-      series: [
-        { name: 'Teaching trials', type: 'line', data: dates.map((date) => average(trialPoints, date)), itemStyle: { color: '#0e6b62' } },
-        { name: 'Probes', type: 'line', data: dates.map((date) => average(probePoints, date)), itemStyle: { color: '#8a5a00' } },
-      ],
-    };
-  }
-  if (sessions.value.length === 0) return null;
-  const counts = new Map<string, number>();
-  for (const item of sessions.value.filter((item) => item.status === 'completed')) {
-    const month = formatDateTime(item.startedAt, timeZone.value).slice(0, 8);
-    counts.set(month, (counts.get(month) ?? 0) + 1);
-  }
-  return {
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: [...counts.keys()] },
-    yAxis: { type: 'value', minInterval: 1 },
-    series: [{ type: 'bar', data: [...counts.values()], itemStyle: { color: '#0e6b62' } }],
-  };
-});
-
 function when(value: string | null | undefined): string {
   return value ? formatDateTime(value, timeZone.value) : 'None';
 }
@@ -541,13 +496,10 @@ async function loadTab(id: string): Promise<void> {
     clinicalAssessments.value = await assessmentsRequest(clientId.value);
     assessments.value = await referenceAssessmentsRequest(clientId.value);
   }
-  if (id === 'programs' || id === 'progress') {
+  if (id === 'programs') {
     if (auth.can('programs.view')) programs.value = await programsRequest(clientId.value);
     if (auth.can('programs.view')) goals.value = await goalsRequest(clientId.value);
-    if (auth.can('sessions.view')) sessions.value = await sessionsRequest(clientId.value);
-    if (auth.can('graphs.view') || auth.can('reports.view') || auth.can('progress.view')) graphPoints.value = await sessionGraphRequest(clientId.value);
   }
-  if (id === 'sessions') sessions.value = await sessionsRequest(clientId.value);
   if (id === 'documents') documents.value = await documentsRequest(clientId.value);
   if (id === 'activity') activity.value = await activityRequest(clientId.value);
   loaded.value.add(id);
@@ -625,7 +577,6 @@ onMounted(async () => {
         <span class="code-chip" :title="profile.clientCode">{{ profile.clientCode }}</span>
         <StatusBadge :tone="profile.status === 'active' ? 'success' : 'neutral'" :label="profile.status === 'active' ? 'Active' : 'Inactive'" />
         <span>{{ profile.activeProgramCount }} active programs</span>
-        <span>Latest session {{ when(profile.lastSessionAt) }}</span>
       </div>
       <AppTabs v-model="tab" :tabs="tabs" label="Client profile" />
 
@@ -888,7 +839,7 @@ onMounted(async () => {
         <EmptyState v-if="programs.length === 0" title="No programs" description="Programs created for this client stay on the record when their status changes." />
         <article v-for="program in programs" :key="program.id" class="record">
           <RouterLink :to="`/programs/${program.id}`"><strong>{{ program.title }}</strong></RouterLink>
-          · {{ program.status }} · {{ program.measurementType }} · {{ program.targetCount }} targets
+          · {{ program.status }} · {{ program.measurementType }} · {{ program.targetCount }} tasks
         </article>
         <div class="heading">
           <h2>Client goals</h2>
@@ -933,24 +884,6 @@ onMounted(async () => {
         </article>
       </section>
 
-      <section v-else-if="tab === 'sessions'" class="panel stack">
-        <div class="heading">
-          <h2>Sessions</h2>
-          <AppButton v-if="auth.can('observations.record')" type="button" @click="router.push({ path: '/sessions', query: { clientId: profile.id } })">Collect data</AppButton>
-        </div>
-        <EmptyState v-if="sessions.length === 0" title="No sessions" description="Sessions started for this client stay here, including a session that was interrupted before it was completed." />
-        <ul class="records">
-          <li v-for="session in sessions" :key="session.id">
-            <RouterLink :to="`/sessions/${session.id}`">{{ when(session.startedAt) }}</RouterLink>
-            · {{ session.status }} · {{ session.observationCount }} observations · {{ session.therapistName || 'No therapist' }}
-          </li>
-        </ul>
-      </section>
-
-      <section v-else-if="tab === 'progress'" class="stack">
-        <GraphContainer title="Session results" description="Teaching trials and probes from completed sessions. The two are not combined." :option="chart" source-label="Recorded observations" />
-      </section>
-
       <section v-else-if="tab === 'documents'" class="panel stack">
         <p class="note">Downloads are authorized on the server. Upload scanning is not connected, so files are marked not scanned.</p>
         <FileUpload v-if="auth.can('documents.upload')" v-model="files" label="Upload" accept="application/pdf,image/png,image/jpeg,image/webp" multiple :max-size-mb="0.5" />
@@ -966,7 +899,7 @@ onMounted(async () => {
       </section>
 
       <section v-else-if="tab === 'reports'" class="panel">
-        <EmptyState title="Report writing is not available yet" description="Completed session observations are saved and can be graphed. Creating and approving a report document is a later workflow." />
+        <EmptyState title="Report writing is not available yet" description="Creating and approving a report document is a later workflow." />
       </section>
 
       <section v-else-if="tab === 'activity'" class="panel">

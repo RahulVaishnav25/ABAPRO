@@ -21,7 +21,6 @@ describe.sequential('role and resource access', () => {
   let otherOrganizationId = '';
   let clientA = '';
   let clientB = '';
-  let observationId = '';
   let documentId = '';
   let therapistUser: AuthUser;
   let parentUser: AuthUser;
@@ -86,11 +85,6 @@ describe.sequential('role and resource access', () => {
     expect(first.response.status).toBe(201);
     clientA = (first.body as { id: string }).id;
     clientB = (next.body as { id: string }).id;
-    const observation = await api(admin, `/api/v1/clients/${clientA}/observations`, {
-      method: 'POST',
-      body: JSON.stringify({ note: 'Baseline note' }),
-    });
-    observationId = (observation.body as { id: string }).id;
     const document = await api(admin, `/api/v1/clients/${clientA}/documents`, {
       method: 'POST',
       body: JSON.stringify({
@@ -131,9 +125,9 @@ describe.sequential('role and resource access', () => {
     });
     const allowed = await api(therapist, `/api/v1/clients/${clientA}`);
     const denied = await api(therapist, `/api/v1/clients/${clientB}`);
-    const amend = await api(therapist, `/api/v1/clients/${clientA}/observations/${observationId}`, {
+    const amend = await api(therapist, `/api/v1/clients/${clientA}`, {
       method: 'PATCH',
-      body: JSON.stringify({ note: 'Changed by therapist' }),
+      body: JSON.stringify({ displayName: 'Changed by therapist', status: 'active' }),
     });
     expect(allowed.response.status).toBe(200);
     expect(denied.response.status).toBe(403);
@@ -173,9 +167,9 @@ describe.sequential('role and resource access', () => {
       method: 'PATCH',
       body: JSON.stringify({ displayName: 'Renamed', status: 'active' }),
     });
-    const amended = await api(reviewer, `/api/v1/clients/${clientA}/observations/${observationId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ note: 'Reviewer rewrite' }),
+    const amended = await api(reviewer, `/api/v1/clients/${clientA}/behaviors`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Reviewer behavior', operationalDefinition: 'Added by a reviewer', measurementType: 'frequency' }),
     });
     expect(viewed.response.status).toBe(200);
     expect(edited.response.status).toBe(403);

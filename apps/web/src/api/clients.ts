@@ -9,7 +9,6 @@ import type {
   ClientGuardian,
   ClientProfile,
   ClientProgramView,
-  ClientSessionView,
   ClientSummary,
   ClientWrite,
   ClinicalProfile,
@@ -53,7 +52,8 @@ export function clientPlacementRequest(): Promise<ClientPlacement> {
 }
 
 export function clientDirectoryRequest(query: DirectoryQuery = {}): Promise<ClientDirectoryPage> {
-  return apiRequest(encodedPath`/clients${queryString(query)}`);
+  // queryString() encodes its own values; the whole query must not be encoded as a path segment.
+  return apiRequest(`/clients${queryString(query)}`);
 }
 
 export function clientAssigneesRequest(): Promise<StaffOption[]> {
@@ -139,10 +139,6 @@ export function saveAssessmentRequest(clientId: string, body: unknown): Promise<
 
 export function programsRequest(clientId: string): Promise<ClientProgramView[]> {
   return apiRequest(encodedPath`/clients/${clientId}/programs`);
-}
-
-export function sessionsRequest(clientId: string): Promise<ClientSessionView[]> {
-  return apiRequest(encodedPath`/clients/${clientId}/sessions`);
 }
 
 export function documentsRequest(clientId: string): Promise<ClientDocumentView[]> {

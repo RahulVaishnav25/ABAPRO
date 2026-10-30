@@ -11,7 +11,6 @@ import {
   type ClientGoal,
   type ClientGuardian,
   type ClientProgramView,
-  type ClientSessionView,
   type ContactChannel,
   type MeasurementType,
 } from '@abapro/shared';
@@ -311,17 +310,10 @@ export class ClientRecordsService {
         `SELECT id, name, status FROM client_programs WHERE client_id = $1 ORDER BY created_at`,
         [client.id],
       );
-      const targets = await tx.query<{ id: string; program_id: string; name: string; phase: string }>(
-        `SELECT id, program_id, name, phase FROM client_targets WHERE client_id = $1 ORDER BY created_at`,
-        [client.id],
-      );
       return programs.map((program) => ({
         id: asString(program.id),
         name: asString(program.name),
         status: program.status,
-        targets: targets
-          .filter((target) => asString(target.program_id) === asString(program.id))
-          .map((target) => ({ id: asString(target.id), name: asString(target.name), phase: asString(target.phase) })),
       }));
     });
   }
@@ -345,30 +337,6 @@ export class ClientRecordsService {
         metadata: { clientId: client.id, status: input.status },
       });
       return { id: programId, status: input.status };
-    });
-  }
-
-  async sessions(user: AuthUser, clientId: string): Promise<ClientSessionView[]> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.requireView(tx, user, organizationId, clientId, PERMISSIONS.sessionsView);
-      const rows = await tx.query<{ id: string; started_at: Date | string; ended_at: Date | string | null; status: ClientSessionView['status']; observation_count: number | string; therapist_name: string | null }>(
-        `SELECT s.id, s.started_at, s.ended_at, s.status,
-                (SELECT count(*) FROM session_observations o WHERE o.session_id = s.id AND o.status = 'recorded') AS observation_count,
-                therapist.name AS therapist_name
-         FROM therapy_sessions s
-         LEFT JOIN users therapist ON therapist.id = s.therapist_id
-         WHERE s.client_id = $1
-         ORDER BY s.started_at DESC`,
-        [client.id],
-      );
-      return rows.map((row) => ({
-        id: asString(row.id),
-        startedAt: asDate(row.started_at).toISOString(),
-        endedAt: row.ended_at ? asDate(row.ended_at).toISOString() : null,
-        status: row.status,
-        observationCount: Number(row.observation_count),
-        therapistName: row.therapist_name ? asString(row.therapist_name) : null,
-      }));
     });
   }
 

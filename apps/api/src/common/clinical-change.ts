@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import type { Queryable } from '../db/database';
 
-export type ChangeRecordType = 'assessment' | 'program' | 'target' | 'session' | 'observation';
+export type ChangeRecordType = 'assessment' | 'program' | 'target';
 
 export interface ChangeReason {
   organizationId: string;

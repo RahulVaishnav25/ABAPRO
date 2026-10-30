@@ -20,7 +20,6 @@ export type BehaviorStatus = 'active' | 'discontinued';
 export type GoalStatus = 'active' | 'met' | 'discontinued';
 export type DocumentCategory = 'record' | 'assessment' | 'care' | 'supporting' | 'avatar';
 export type AssignmentRelationship = 'therapist' | 'supervisor' | 'guardian';
-export type TherapySessionStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface PersonRef {
   id: string;
@@ -43,7 +42,6 @@ export interface ClientDirectoryItem {
   supervisor: PersonRef | null;
   status: ClientStatus;
   activeProgramCount: number;
-  lastSessionAt: string | null;
   createdAt: string;
 }
 
@@ -112,7 +110,6 @@ export interface ClientProfile {
   assignments: ClientAssignmentView[];
   guardians: ClientGuardian[];
   activeProgramCount: number;
-  lastSessionAt: string | null;
 }
 
 export interface ClinicalProfile {
@@ -153,16 +150,6 @@ export interface ClientProgramView {
   id: string;
   name: string;
   status: ProgramStatus;
-  targets: Array<{ id: string; name: string; phase: string }>;
-}
-
-export interface ClientSessionView {
-  id: string;
-  startedAt: string;
-  endedAt: string | null;
-  status: TherapySessionStatus;
-  observationCount: number;
-  therapistName: string | null;
 }
 
 export interface ClientDocumentView {

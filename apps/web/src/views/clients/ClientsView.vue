@@ -82,7 +82,7 @@ function toggleSort(key: string): void {
     direction.value = direction.value === 'asc' ? 'desc' : 'asc';
   } else {
     sort.value = key;
-    direction.value = key === 'created' || key === 'session' ? 'desc' : 'asc';
+    direction.value = key === 'created' ? 'desc' : 'asc';
   }
   page.value = 1;
   void load();
@@ -174,7 +174,6 @@ onMounted(async () => {
             <th>Supervisor</th>
             <th><button type="button" @click="toggleSort('status')">Status</button></th>
             <th><button type="button" @click="toggleSort('programs')">Active programs</button></th>
-            <th><button type="button" @click="toggleSort('session')">Latest session</button></th>
             <th><button type="button" @click="toggleSort('created')">Created</button></th>
           </tr>
         </thead>
@@ -196,7 +195,6 @@ onMounted(async () => {
             <td>{{ client.supervisor?.name ?? 'None' }}</td>
             <td><StatusBadge :tone="client.status === 'active' ? 'success' : 'neutral'" :label="client.status === 'active' ? 'Active' : 'Inactive'" /></td>
             <td>{{ client.activeProgramCount }}</td>
-            <td>{{ when(client.lastSessionAt) }}</td>
             <td>{{ when(client.createdAt) }}</td>
           </tr>
         </tbody>
