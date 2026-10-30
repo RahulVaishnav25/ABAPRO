@@ -88,8 +88,8 @@ export async function seedDemoClients(tx: Queryable, organizationId: string, use
 
   const programs = await tx.query<{ id: string; client_id: string }>(
     `INSERT INTO client_programs (organization_id, client_id, name, status, created_by) VALUES
-     ($1, $2, 'Functional communication', 'active', $4),
-     ($1, $3, 'Listener responding', 'paused', $4)
+     ($1, $2, 'Functional communication', 'in_treatment', $4),
+     ($1, $3, 'Listener responding', 'on_hold', $4)
      RETURNING id, client_id`,
     [organizationId, rowan, sloane, userId],
   );

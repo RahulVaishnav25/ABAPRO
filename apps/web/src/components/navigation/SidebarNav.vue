@@ -15,6 +15,14 @@ interface SidebarNavItem {
   matches: readonly string[];
 }
 
+const THERAPY_NAV_ITEM: SidebarNavItem = {
+  key: 'therapy',
+  title: 'Therapy Workspace',
+  route: '/therapy',
+  icon: 'workspace',
+  matches: ['/therapy'],
+};
+
 const TASKS_NAV_ITEM: SidebarNavItem = {
   key: 'tasks',
   title: 'Tasks',
@@ -24,7 +32,7 @@ const TASKS_NAV_ITEM: SidebarNavItem = {
 };
 
 /** Every role sees its items in this order; a role only shows the items it has access to. */
-const NAV_ORDER = ['platform', 'home', 'organisations', 'clinics', 'children', 'programs', 'tasks', 'settings'];
+const NAV_ORDER = ['platform', 'home', 'therapy', 'organisations', 'clinics', 'children', 'programs', 'tasks', 'settings'];
 
 withDefaults(
   defineProps<{
@@ -56,7 +64,10 @@ const items = computed<SidebarNavItem[]>(() => {
   const navItems: SidebarNavItem[] = navigationFor(isPlatformAdmin ? [] : auth.user?.permissions ?? [], {
     platformAdmin: isPlatformAdmin,
     organizationId: auth.user?.organization?.id,
-  }).filter((item) => item.key !== 'organisations' || isPlatformAdmin);
+  })
+    .filter((item) => item.key !== 'organisations' || isPlatformAdmin)
+    // Therapists do not manage clinics.
+    .filter((item) => item.key !== 'clinics' || auth.user?.role !== 'therapist');
 
   if (isPlatformAdmin && !navItems.some((item) => item.key === 'programs')) {
     navItems.push({
@@ -70,6 +81,10 @@ const items = computed<SidebarNavItem[]>(() => {
 
   if (navItems.some((item) => item.key === 'programs')) {
     navItems.push(TASKS_NAV_ITEM);
+  }
+
+  if (auth.user?.role === 'therapist') {
+    navItems.push(THERAPY_NAV_ITEM);
   }
 
   return navItems.sort((a, b) => NAV_ORDER.indexOf(a.key) - NAV_ORDER.indexOf(b.key));

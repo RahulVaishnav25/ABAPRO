@@ -57,7 +57,7 @@ export class ClientsService {
                 c.organization_id, o.name AS organization_name, c.clinic_id, clinic.name AS clinic_name,
                 c.avatar_object_id IS NOT NULL AS has_avatar,
                 ${canSeeDob ? "to_char(c.date_of_birth, 'YYYY-MM-DD')" : 'NULL::text'} AS date_of_birth,
-                (SELECT count(*) FROM client_programs p WHERE p.client_id = c.id AND p.status = 'active') AS active_programs
+                (SELECT count(*) FROM client_programs p WHERE p.client_id = c.id AND p.status IN ('in_treatment', 'maintenance')) AS active_programs
          FROM clients c
          JOIN organizations o ON o.id = c.organization_id
          LEFT JOIN clinics clinic ON clinic.id = c.clinic_id
@@ -523,8 +523,8 @@ export class ClientsService {
       const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.programsEdit);
       const rows = await tx.query<{ id: string }>(
         `INSERT INTO client_programs (organization_id, client_id, name, status, created_by)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [organizationId, client.id, input.name.trim(), input.status ?? 'active', user.id],
+         VALUES ($1, $2, $3, 'in_treatment', $4) RETURNING id`,
+        [organizationId, client.id, input.name.trim(), user.id],
       );
       const id = asString(rows[0]?.id);
       await tx.query(
@@ -570,7 +570,7 @@ export class ClientsService {
               clients.avatar_object_id IS NOT NULL AS has_avatar,
               ${canSeeDob ? "to_char(clients.date_of_birth, 'YYYY-MM-DD')" : 'NULL::text'} AS date_of_birth,
               clients.created_at, clients.updated_at,
-              (SELECT count(*) FROM client_programs p WHERE p.client_id = clients.id AND p.status = 'active') AS active_programs
+              (SELECT count(*) FROM client_programs p WHERE p.client_id = clients.id AND p.status IN ('in_treatment', 'maintenance')) AS active_programs
        FROM clients
        JOIN organizations o ON o.id = clients.organization_id
        LEFT JOIN clinics clinic ON clinic.id = clients.clinic_id

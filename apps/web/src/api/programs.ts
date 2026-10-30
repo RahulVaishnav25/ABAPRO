@@ -8,6 +8,7 @@ import type {
   ProgramDetail,
   ProgramSummary,
   ProgramWrite,
+  StatusChange,
   TargetListItem,
   TargetWrite,
 } from '@abapro/shared';
@@ -50,6 +51,14 @@ export function saveTargetRequest(programId: string, body: TargetWrite, targetId
     method: targetId ? 'PATCH' : 'POST',
     body,
   });
+}
+
+export function setProgramStatusRequest(programId: string, body: StatusChange): Promise<ProgramDetail> {
+  return apiRequest(encodedPath`/programs/${programId}/status`, { method: 'PATCH', body });
+}
+
+export function setTaskStatusRequest(programId: string, taskId: string, body: StatusChange): Promise<ProgramDetail> {
+  return apiRequest(encodedPath`/programs/${programId}/targets/${taskId}/status`, { method: 'PATCH', body });
 }
 
 export function targetsRequest(programId?: string): Promise<TargetListItem[]> {

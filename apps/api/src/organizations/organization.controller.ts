@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import { PERMISSIONS, type AuthUser, type ClinicDetail, type ClinicDirectoryPage, type InvitationCreated, type OrganizationDirectoryItem, type OrganizationSettingsView } from '@abapro/shared';
 import type { Response } from 'express';
 import { RequireAnyPermissions, RequirePermissions } from '../common/auth.decorators';
@@ -25,11 +25,13 @@ export class OrganizationController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ): Promise<ClinicDirectoryPage> {
+    refuseTherapist(user);
     return this.clinics.list(user, search ?? '', organizationId ?? '', country ?? '', page, pageSize);
   }
 
   @Get('clinics/:clinicId')
   clinicDetail(@CurrentUser() user: AuthUser, @Param('clinicId', ParseUUIDPipe) clinicId: string): Promise<ClinicDetail> {
+    refuseTherapist(user);
     return this.clinics.detail(user, clinicId);
   }
 
@@ -51,11 +53,13 @@ export class OrganizationController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
+    refuseTherapist(user);
     return this.organizations.list(user, search ?? '', country ?? '', page, pageSize);
   }
 
   @Get('organizations/:organizationId')
   detail(@CurrentUser() user: AuthUser, @Param('organizationId', ParseUUIDPipe) organizationId: string): Promise<OrganizationDirectoryItem> {
+    refuseTherapist(user);
     return this.organizations.detail(user, organizationId);
   }
 
@@ -165,5 +169,12 @@ export class OrganizationController {
     @Body() body: AcceptInvitationDto,
   ): Promise<AuthUser> {
     return this.organizations.accept(user, sessionIdFrom(request), body.token);
+  }
+}
+
+/** Therapists work only with their assigned clients and do not see organisation or clinic records. */
+function refuseTherapist(user: AuthUser): void {
+  if (user.role === 'therapist') {
+    throw new ForbiddenException('You do not have access to this resource.');
   }
 }

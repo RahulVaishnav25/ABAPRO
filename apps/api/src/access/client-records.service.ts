@@ -23,7 +23,6 @@ import type {
   BehaviorDto,
   GoalDto,
   GuardianDto,
-  UpdateProgramStatusDto,
 } from './access.dto';
 import { AuthorizationService } from './authorization.service';
 
@@ -315,28 +314,6 @@ export class ClientRecordsService {
         name: asString(program.name),
         status: program.status,
       }));
-    });
-  }
-
-  async updateProgram(user: AuthUser, clientId: string, programId: string, input: UpdateProgramStatusDto): Promise<{ id: string; status: string }> {
-    return this.authorization.withOrganization(user, async (tx, organizationId) => {
-      const client = await this.requireEditable(tx, user, organizationId, clientId, PERMISSIONS.programsEdit);
-      const rows = await tx.query<{ id: string }>(
-        `UPDATE client_programs SET status = $3, updated_at = now() WHERE id = $1 AND client_id = $2 RETURNING id`,
-        [programId, client.id, input.status],
-      );
-      if (rows.length === 0) {
-        throw new NotFoundException('That program was not found.');
-      }
-      await recordAudit(tx, {
-        organizationId,
-        actorUserId: user.id,
-        action: 'client.program_updated',
-        targetType: 'program',
-        targetId: programId,
-        metadata: { clientId: client.id, status: input.status },
-      });
-      return { id: programId, status: input.status };
     });
   }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import type { MeasurementMethod, ProgramDetail } from '@abapro/shared';
+import { careStatusLabel, type MeasurementMethod, type ProgramDetail } from '@abapro/shared';
 import type { BadgeTone } from '@/components/ui/types';
 import { fileToBase64 } from '@/api/clients';
 import { programRequest, uploadProgramDocumentRequest } from '@/api/programs';
@@ -15,22 +15,13 @@ import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
+import { careStatusTone } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import { errorMessage, useLoader } from '@/lib/loader';
 
 function measurementLabel(method: MeasurementMethod): string {
   return { trial: 'Trial by trial', probe: 'Probe', frequency: 'Frequency', duration: 'Duration', abc: 'ABC' }[method];
-}
-
-function statusTone(status: string): BadgeTone {
-  switch (status) {
-    case 'active': return 'success';
-    case 'paused': return 'warning';
-    case 'completed': return 'info';
-    case 'discontinued': return 'neutral';
-    default: return 'neutral';
-  }
 }
 
 function phaseTone(phase: string): BadgeTone {
@@ -153,7 +144,7 @@ onMounted(() => void load());
       <!-- Key Highlights Banner Card -->
       <section class="overview-banner">
         <div class="banner-badge-group">
-          <StatusBadge :tone="statusTone(program.status)" :label="program.status" />
+          <StatusBadge :tone="careStatusTone(program.status)" :label="careStatusLabel(program.status)" />
           <span class="version-tag">Version {{ program.configurationVersion }}</span>
         </div>
         <div class="banner-metrics">
@@ -352,7 +343,7 @@ onMounted(() => void load());
                   <span v-else class="text-muted">—</span>
                 </td>
                 <td>
-                  <StatusBadge :tone="statusTone(task.status)" :label="task.status" />
+                  <StatusBadge :tone="careStatusTone(task.status)" :label="careStatusLabel(task.status)" />
                 </td>
                 <td>
                   <div class="row-actions">

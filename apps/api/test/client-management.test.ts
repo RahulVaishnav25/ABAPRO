@@ -230,8 +230,8 @@ describe.sequential('client management', () => {
     const rowan = (found.body as ClientDirectoryPage).items[0];
     expect(rowan?.displayName).toBe('Rowan Ellis');
     expect(rowan?.activeProgramCount).toBe(1);
-    const paused = await api(admin, '/api/v1/clients?programStatus=paused');
-    expect((paused.body as ClientDirectoryPage).items.map((item) => item.displayName)).toContain('Sloane Brooks');
+    const onHold = await api(admin, '/api/v1/clients?programStatus=on_hold');
+    expect((onHold.body as ClientDirectoryPage).items.map((item) => item.displayName)).toContain('Sloane Brooks');
   });
 });
 

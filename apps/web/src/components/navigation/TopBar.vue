@@ -128,7 +128,7 @@ async function signOut(): Promise<void> {
           <p>{{ auth.user?.email }}</p>
           <div class="dropdown-actions">                       
             <AppButton
-              v-if="!isPlatformAdmin && auth.user?.organization?.id"
+              v-if="!isPlatformAdmin && auth.user?.role !== 'therapist' && auth.user?.organization?.id"
               variant="secondary"
               block
               @click="openMyOrganisation"

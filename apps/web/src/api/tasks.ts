@@ -1,4 +1,4 @@
-import type { MeasurementMethod, ProgramDetail, ProgramSummary, TargetListItem, TargetWrite } from '@abapro/shared';
+import type { CareStatus, MeasurementMethod, ProgramDetail, ProgramSummary, TargetListItem, TargetWrite } from '@abapro/shared';
 import { programsRequest, saveTargetRequest, targetRequest, targetsRequest } from './programs';
 
 /** A program target, shaped for the task screens. */
@@ -17,7 +17,7 @@ export interface TaskItem {
   programTitle: string;
   clientId: string;
   clientName: string;
-  status: 'active' | 'mastered' | 'inactive';
+  status: CareStatus;
 }
 
 export interface CreateTaskInput {
@@ -31,7 +31,9 @@ export interface CreateTaskInput {
   sd: string;
   /** Chosen in the modal when it is not opened from a program. */
   programId?: string;
-  /** The API requires a reason when trial count or mastery criteria change. */
+  /** Set only from the Edit form. New tasks always start In Treatment. */
+  status?: CareStatus;
+  /** The API requires a reason when trial count, mastery criteria or status change. */
   changeReason?: string;
 }
 
@@ -74,7 +76,7 @@ export function toTask(target: TargetListItem): TaskItem {
     programTitle: target.programTitle,
     clientId: target.clientId,
     clientName: target.clientName,
-    status: target.status === 'mastered' ? 'mastered' : target.status === 'active' ? 'active' : 'inactive',
+    status: target.status,
   };
 }
 
@@ -84,14 +86,15 @@ export function programTasks(program: ProgramDetail): TaskItem[] {
   );
 }
 
-/** Whether saving `input` changes criteria that the API versions and asks a reason for. */
+/** Whether saving `input` changes criteria or status, which the API asks a reason for. */
 export function taskCriteriaChanged(task: TaskItem, input: CreateTaskInput): boolean {
   const criteria = taskCriteria(input);
   return (usesTrials(task.measurementMethod) && input.desiredTrials !== task.desiredTrials)
     || criteria.masterySessions !== task.masterySessions
     || criteria.masteryProbe !== task.masteryProbe
     || criteria.baselineSessions !== (task.baselineSessions ?? null)
-    || criteria.baselineProbe !== (task.baselineProbe ?? null);
+    || criteria.baselineProbe !== (task.baselineProbe ?? null)
+    || (input.status !== undefined && input.status !== task.status);
 }
 
 function taskCriteria(input: CreateTaskInput) {
@@ -146,7 +149,7 @@ export async function updateTaskRequest(taskId: string, input: CreateTaskInput):
     promptHierarchy: target.promptHierarchy,
     masteryCriteria: target.masteryCriteria,
     phase: apiPhase(input.phase),
-    status: target.status,
+    status: input.status ?? target.status,
     startedOn: target.startedOn ?? undefined,
     reviewOn: target.reviewOn ?? undefined,
     clinicalNotes: target.clinicalNotes,

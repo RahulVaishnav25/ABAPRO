@@ -147,10 +147,10 @@ onMounted(async () => {
         label="Program status"
         :options="[
           { value: '', label: 'Any program status' },
-          { value: 'active', label: 'Active program' },
-          { value: 'paused', label: 'Paused program' },
-          { value: 'completed', label: 'Completed program' },
-          { value: 'discontinued', label: 'Discontinued program' },
+          { value: 'in_treatment', label: 'In Treatment program' },
+          { value: 'maintenance', label: 'Maintenance program' },
+          { value: 'on_hold', label: 'On Hold program' },
+          { value: 'mastered', label: 'Mastered program' },
         ]"
       />
     </div>

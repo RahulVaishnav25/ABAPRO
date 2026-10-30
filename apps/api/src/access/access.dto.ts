@@ -14,7 +14,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import type { ClientWrite } from '@abapro/shared';
+import { CARE_STATUSES, type CareStatus, type ClientWrite } from '@abapro/shared';
 
 export class CreateClientDto implements ClientWrite {
   @IsString()
@@ -93,8 +93,8 @@ export class ClientListQuery {
   supervisorId?: string;
 
   @IsOptional()
-  @IsIn(['active', 'paused', 'completed', 'discontinued'])
-  programStatus?: 'active' | 'paused' | 'completed' | 'discontinued';
+  @IsIn(CARE_STATUSES)
+  programStatus?: CareStatus;
 
   @IsOptional()
   @IsIn(['name', 'code', 'status', 'created', 'programs'])
@@ -188,15 +188,6 @@ export class CreateProgramDto {
   @MinLength(2)
   @MaxLength(160)
   name!: string;
-
-  @IsOptional()
-  @IsIn(['active', 'paused', 'completed', 'discontinued'])
-  status?: 'active' | 'paused' | 'completed' | 'discontinued';
-}
-
-export class UpdateProgramStatusDto {
-  @IsIn(['active', 'paused', 'completed', 'discontinued'])
-  status!: 'active' | 'paused' | 'completed' | 'discontinued';
 }
 
 export class GuardianDto {

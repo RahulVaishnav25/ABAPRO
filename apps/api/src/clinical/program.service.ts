@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   PERMISSIONS,
   type AuthUser,
+  type CareStatus,
   type MeasurementMethod,
   type MeasurementProcedure,
   type ProgramDetail,
@@ -17,7 +18,7 @@ import { recordAudit } from '../common/audit';
 import { recordChangeReason, requireReason } from '../common/clinical-change';
 import { asDate, asNullableNumber, asString } from '../common/http';
 import type { Queryable } from '../db/database';
-import { AuthorizationService, assignmentScope } from '../access/authorization.service';
+import { AuthorizationService, assignmentScope, type ClientRecord } from '../access/authorization.service';
 
 @Injectable()
 export class ProgramService {
@@ -134,7 +135,7 @@ export class ProgramService {
         [
           id, organizationId, client.id, input.title.trim(), input.description?.trim() ?? '', input.objective?.trim() ?? '',
           input.assessmentId ?? null, input.teachingProcedure?.trim() ?? '', dateImplemented, input.reviewOn || null,
-          input.status ?? 'active', measurement.method, measurement.trials,
+          'in_treatment', measurement.method, measurement.trials,
           masteryCriteria, input.notes?.trim() ?? '', user.id,
           domain, dateMastered, assessmentType, sd, masterySteps,
           errorCorrectionProcedure, teachingMethod, netTeachingIdea, measurement.procedure,
@@ -220,7 +221,7 @@ export class ProgramService {
   async addTarget(user: AuthUser, programId: string, input: TargetWrite): Promise<ProgramDetail> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       const program = await this.programRow(tx, organizationId, programId);
-      const client = await this.authorization.findAccessibleClient(tx, user, organizationId, program.client_id, 'write', PERMISSIONS.programsEdit);
+      const client = await this.clientForCareAction(tx, user, organizationId, program.client_id);
       const orderRows = await tx.query<{ next_order: number | string }>(`SELECT COALESCE(max(sort_order), -1) + 1 AS next_order FROM client_targets WHERE program_id = $1`, [programId]);
       await insertTarget(tx, organizationId, client.id, programId, input, user.id, Number(orderRows[0]?.next_order ?? 0));
       return this.load(tx, user, organizationId, programId);
@@ -323,6 +324,52 @@ export class ProgramService {
       });
       return this.load(tx, user, organizationId, programId);
     });
+  }
+
+  async setProgramStatus(user: AuthUser, programId: string, status: CareStatus, changeReason: string): Promise<ProgramDetail> {
+    return this.authorization.withOrganization(user, async (tx, organizationId) => {
+      const current = await this.programRow(tx, organizationId, programId);
+      const client = await this.clientForCareAction(tx, user, organizationId, current.client_id);
+      if (status !== current.status) {
+        const reason = requireReason(changeReason);
+        await recordChangeReason(tx, { organizationId, recordType: 'program', recordId: programId, reason, userId: user.id });
+        await tx.query(`UPDATE client_programs SET status = $2, updated_at = now() WHERE id = $1`, [programId, status]);
+        await recordAudit(tx, {
+          organizationId, actorUserId: user.id, action: 'program.status_changed',
+          targetType: 'program', targetId: programId, metadata: { clientId: client.id, status },
+        });
+      }
+      return this.load(tx, user, organizationId, programId);
+    });
+  }
+
+  async setTargetStatus(user: AuthUser, programId: string, targetId: string, status: CareStatus, changeReason: string): Promise<ProgramDetail> {
+    return this.authorization.withOrganization(user, async (tx, organizationId) => {
+      const program = await this.programRow(tx, organizationId, programId);
+      const client = await this.clientForCareAction(tx, user, organizationId, program.client_id);
+      const current = await targetRow(tx, programId, targetId);
+      if (status !== current.status) {
+        const reason = requireReason(changeReason);
+        await recordChangeReason(tx, { organizationId, recordType: 'target', recordId: targetId, reason, userId: user.id });
+        await tx.query(`UPDATE client_targets SET status = $2, updated_at = now() WHERE id = $1`, [targetId, status]);
+        await recordAudit(tx, {
+          organizationId, actorUserId: user.id, action: 'target.status_changed',
+          targetType: 'target', targetId, metadata: { clientId: client.id, programId, status },
+        });
+      }
+      return this.load(tx, user, organizationId, programId);
+    });
+  }
+
+  /** Program editors, and therapists assigned to the client, can add tasks and change program and task status. */
+  private async clientForCareAction(tx: Queryable, user: AuthUser, organizationId: string, clientId: string): Promise<ClientRecord> {
+    if (user.permissions.includes(PERMISSIONS.programsEdit)) {
+      return this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'write', PERMISSIONS.programsEdit);
+    }
+    if (user.role === 'therapist') {
+      return this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', PERMISSIONS.programsView);
+    }
+    throw new ForbiddenException('You do not have access to this resource.');
   }
 
   private async programRow(tx: Queryable, organizationId: string, programId: string): Promise<ProgramRow> {
@@ -518,7 +565,7 @@ async function insertTarget(
        expected_trial_count, baseline_note, teaching_instructions, prompt_hierarchy, mastery_criteria, phase, status,
        started_on, review_on, clinical_notes, sort_order, created_by,
        sd, mastery_sessions, mastery_probe, baseline_sessions, baseline_probe
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'active',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'in_treatment',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
     [
       id, organizationId, clientId, programId, input.title.trim(), input.description?.trim() ?? '', input.operationalDefinition?.trim() ?? '',
       measurement.method, measurement.trials, input.baselineNote?.trim() ?? '', input.teachingInstructions?.trim() ?? '',

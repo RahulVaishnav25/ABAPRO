@@ -19,6 +19,15 @@ const icons: Record<string, string[]> = {
   settings: ['M12 15.2a3.2 3.2 0 1 0-.01 0', 'M12 3.5v2.2', 'M12 18.3V20.5', 'M3.5 12h2.2', 'M18.3 12H20.5', 'M6.1 6.1l1.6 1.6', 'M16.3 16.3l1.6 1.6', 'M17.9 6.1l-1.6 1.6', 'M7.7 16.3l-1.6 1.6'],
   organisations: ['M4 20V9l8-5 8 5v11', 'M9 20v-6h6v6'],
   clinics: ['M4 20V9l6-4 6 4v11', 'M16 20V12h4v8', 'M8 12h2', 'M8 16h2'],
+  workspace: ['M4 5h4.5v14H4z', 'M10 5h4.5v9H10z', 'M16 5h4v6h-4z'],
+  'layout-horizontal': ['M3 8h6v8H3z', 'M11 12h2', 'M15 9h2.5v6H15z', 'M19.5 9H22v6h-2.5z'],
+  'layout-vertical': ['M5 3h10v5H5z', 'M8 8v12', 'M8 12h7', 'M8 16.5h7', 'M8 20h7'],
+  // Program and task statuses.
+  'status-all': ['M4 4h7v7H4z', 'M13 4h7v7h-7z', 'M4 13h7v7H4z', 'M13 13h7v7h-7z'],
+  'status-in_treatment': ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M10 8.5l5.5 3.5-5.5 3.5z'],
+  'status-maintenance': ['M20 12a8 8 0 0 1-14.3 4.9', 'M4 12a8 8 0 0 1 14.3-4.9', 'M18.5 3.5v3.6h-3.6', 'M5.5 20.5v-3.6h3.6'],
+  'status-on_hold': ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M10 9v6', 'M14 9v6'],
+  'status-mastered': ['M8 4h8v5a4 4 0 0 1-8 0z', 'M8 6H5a3 3 0 0 0 3 4', 'M16 6h3a3 3 0 0 1-3 4', 'M12 13v4', 'M9 20h6'],
   notification: ['M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9', 'M13.73 21a2 2 0 0 1-3.46 0'],
   bell: ['M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9', 'M13.73 21a2 2 0 0 1-3.46 0'],
 };

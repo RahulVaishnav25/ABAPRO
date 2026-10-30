@@ -6,6 +6,7 @@ import { safeRedirect } from '@/lib/redirect';
 const AppLayout = () => import('@/layouts/AppLayout.vue');
 const AuthLayout = () => import('@/layouts/AuthLayout.vue');
 const DashboardView = () => import('@/views/DashboardView.vue');
+const TherapyWorkspaceView = () => import('@/views/therapist/TherapyWorkspaceView.vue');
 const ForbiddenView = () => import('@/views/ForbiddenView.vue');
 const LoginView = () => import('@/views/LoginView.vue');
 const AccountHelpView = () => import('@/views/AccountHelpView.vue');
@@ -211,6 +212,12 @@ export const router = createRouter({
           component: NoClinicView,
           meta: { title: 'No clinic yet', breadcrumb: 'No clinic yet' },
         },
+        {
+          path: 'therapy',
+          name: 'therapy-workspace',
+          component: TherapyWorkspaceView,
+          meta: { title: 'Therapy Workspace', breadcrumb: 'Therapy Workspace', permission: PERMISSIONS.programsView },
+        },
         ...featureRoutes,
         {
           path: 'forbidden',
@@ -302,6 +309,14 @@ router.beforeEach(async (to) => {
   const isPublic = to.matched.some((record) => record.meta.public);
   if (!isPublic && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } };
+  }
+  // The therapy workspace is the therapist's view of their assigned clients.
+  if (to.name === 'therapy-workspace' && auth.isAuthenticated && auth.user?.role !== 'therapist') {
+    return { name: 'forbidden' };
+  }
+  // Therapists work only with their assigned clients, so organisation and clinic pages are closed to them.
+  if (auth.user?.role === 'therapist' && (to.path.startsWith('/organizations') || to.path.startsWith('/clinics'))) {
+    return { name: 'forbidden' };
   }
   if (to.meta.platformAdmin && auth.isAuthenticated && !auth.user?.platformAdmin) {
     return { name: 'forbidden' };

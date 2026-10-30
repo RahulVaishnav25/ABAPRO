@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
-import type { ProgramSummary } from '@abapro/shared';
+import { CARE_STATUS_OPTIONS, careStatusLabel, type CareStatus, type ProgramSummary } from '@abapro/shared';
 import { taskCriteriaChanged, type CreateTaskInput, type TaskItem } from '@/api/tasks';
 
 const props = withDefaults(
@@ -30,7 +30,7 @@ const emit = defineEmits<{
 
 const taskNameInput = ref<HTMLInputElement | null>(null);
 
-const form = reactive<CreateTaskInput & { programId: string; changeReason: string }>({
+const form = reactive<CreateTaskInput & { programId: string; changeReason: string; status: CareStatus }>({
   name: '',
   desiredTrials: 1,
   phase: 'Treatment',
@@ -41,6 +41,7 @@ const form = reactive<CreateTaskInput & { programId: string; changeReason: strin
   sd: '',
   programId: '',
   changeReason: '',
+  status: 'in_treatment',
 });
 
 const errors = reactive({
@@ -53,6 +54,11 @@ const errors = reactive({
   baselineSessions: '',
   baselineProbe: '',
 });
+
+// New tasks choose Treatment or Baseline. A task already in another phase keeps it when edited.
+const extraPhase = computed(() =>
+  props.mode === 'edit' && props.task && !['Treatment', 'Baseline'].includes(props.task.phase) ? props.task.phase : '',
+);
 
 const choosesProgram = computed(() => props.mode === 'create' && props.programs !== null);
 const needsReason = computed(() => props.mode === 'edit' && props.task !== null && taskCriteriaChanged(props.task, form));
@@ -78,6 +84,7 @@ function resetForm(): void {
   form.sd = '';
   form.programId = '';
   form.changeReason = '';
+  form.status = 'in_treatment';
   clearErrors();
 }
 
@@ -92,6 +99,7 @@ function populateFromTask(t: TaskItem): void {
   form.sd = t.sd || '';
   form.programId = t.programId;
   form.changeReason = '';
+  form.status = t.status;
   clearErrors();
 }
 
@@ -233,6 +241,7 @@ function handleSubmit(): void {
     sd: form.sd.trim(),
     programId: choosesProgram.value ? form.programId : undefined,
     changeReason: needsReason.value ? form.changeReason.trim() : undefined,
+    status: props.mode === 'edit' ? form.status : undefined,
   };
 
   if (form.phase === 'Baseline') {
@@ -390,8 +399,7 @@ function handleSubmit(): void {
               >
                 <option value="Treatment">Treatment</option>
                 <option value="Baseline">Baseline</option>
-                <option value="Maintenance">Maintenance</option>
-                <option value="Mastered">Mastered</option>
+                <option v-if="extraPhase" :value="extraPhase">{{ extraPhase }}</option>
               </select>
               <input
                 v-else
@@ -403,6 +411,32 @@ function handleSubmit(): void {
               />
             </div>
           </div>
+
+          <template v-if="mode !== 'create'">
+            <div class="field-divider" aria-hidden="true"></div>
+
+            <div class="field-group">
+              <div class="field">
+                <label class="field-label" for="task-status">Status</label>
+                <select
+                  v-if="mode === 'edit'"
+                  id="task-status"
+                  v-model="form.status"
+                  class="control"
+                >
+                  <option v-for="option in CARE_STATUS_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
+                </select>
+                <input
+                  v-else
+                  id="task-status"
+                  :value="careStatusLabel(form.status)"
+                  type="text"
+                  class="control"
+                  readonly
+                />
+              </div>
+            </div>
+          </template>
 
           <!-- Conditional Baseline Fields (When Phase = Baseline) -->
           <template v-if="form.phase === 'Baseline'">
@@ -552,7 +586,7 @@ function handleSubmit(): void {
                   v-model="form.changeReason"
                   rows="2"
                   class="control"
-                  placeholder="Why are the trials or mastery criteria changing?"
+                  placeholder="Why are the trials, mastery criteria or status changing?"
                   :aria-invalid="errors.changeReason ? 'true' : undefined"
                   aria-describedby="task-change-reason-hint"
                 ></textarea>

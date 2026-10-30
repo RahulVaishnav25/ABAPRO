@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   ASSESSMENT_TYPE_GROUPS,
+  CARE_STATUS_OPTIONS,
   type AssessmentSummary,
+  type CareStatus,
   type ClientDirectoryItem,
   type MeasurementProcedure,
   type ProgramWrite,
@@ -59,7 +61,7 @@ const teachingMethod = ref('');
 const netTeachingIdea = ref('');
 const measurementProcedure = ref<MeasurementProcedure>('Probe');
 const masteryCriteria = ref('');
-const status = ref<'active' | 'paused' | 'completed' | 'discontinued'>('active');
+const status = ref<CareStatus>('in_treatment');
 
 const description = ref('');
 const objective = ref('');
@@ -130,7 +132,8 @@ async function save(): Promise<void> {
       goalStatement: goalStatement.value || undefined,
       teachingProcedure: teachingProcedure.value || undefined,
       reviewOn: reviewOn.value || undefined,
-      status: status.value,
+      // New programs start In Treatment. Status changes only from the Edit form.
+      status: programId.value ? status.value : undefined,
       measurementType: measurementProcedure.value === 'Step by Step' ? 'trial' : 'probe',
       notes: notes.value || undefined,
       changeReason: changeReason.value || undefined,
@@ -176,7 +179,7 @@ onMounted(() => void load());
           <AppInput v-model="dateImplemented" label="Date Implemented" type="date" />
           <AppInput v-model="dateMastered" label="Date Mastered" type="date" />
           <AppSelect v-model="assessmentType" label="Assessment Type" :groups="assessmentTypeGroups" placeholder="None" />
-          <AppSelect v-model="status" label="Status" :options="[{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused' }, { value: 'completed', label: 'Completed' }, { value: 'discontinued', label: 'Discontinued' }]" />
+          <AppSelect v-if="programId" v-model="status" label="Status" :options="[...CARE_STATUS_OPTIONS]" />
           <AppInput v-model="reviewOn" label="Review date" type="date" />
         </div>
       </section>

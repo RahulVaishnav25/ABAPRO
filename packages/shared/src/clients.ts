@@ -1,3 +1,5 @@
+import type { CareStatus } from './programs';
+
 export type ClientStatus = 'active' | 'inactive';
 
 /** Create and update body for a client. `status` and `confirmDeactivation` apply to updates only. */
@@ -12,7 +14,7 @@ export interface ClientWrite {
   status?: ClientStatus;
   confirmDeactivation?: boolean;
 }
-export type ProgramStatus = 'active' | 'paused' | 'completed' | 'discontinued';
+export type ProgramStatus = CareStatus;
 export type GuardianRelationship = 'parent' | 'guardian' | 'grandparent' | 'caregiver' | 'other';
 export type ContactChannel = 'email' | 'phone' | 'portal';
 export type MeasurementType = 'frequency' | 'duration' | 'interval' | 'latency' | 'rate';

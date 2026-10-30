@@ -18,6 +18,8 @@ const MIGRATIONS = [
   '013_merge_program_fields',
   '014_remove_sessions_targets_progress',
   '015_care_team_assignments',
+  '016_care_statuses',
+  '017_mastered_status',
 ];
 
 export async function migrate(db: Database): Promise<void> {

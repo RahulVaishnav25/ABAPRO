@@ -15,6 +15,7 @@ import type {
   ProgramSummary,
   StaffOption,
 } from '@abapro/shared';
+import { careStatusLabel } from '@abapro/shared';
 import { ApiError } from '@/api/client';
 import {
   activityRequest,
@@ -853,7 +854,7 @@ onMounted(async () => {
         <EmptyState v-if="programs.length === 0" title="No programs" description="Programs created for this client stay on the record when their status changes." />
         <article v-for="program in programs" :key="program.id" class="record">
           <RouterLink :to="`/programs/${program.id}`"><strong>{{ program.title }}</strong></RouterLink>
-          · {{ program.status }} · {{ program.measurementType }} · {{ program.targetCount }} tasks
+          · {{ careStatusLabel(program.status) }} · {{ program.measurementType }} · {{ program.targetCount }} tasks
         </article>
         <div class="heading">
           <h2>Client goals</h2>

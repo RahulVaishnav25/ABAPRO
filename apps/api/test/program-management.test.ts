@@ -144,6 +144,7 @@ describe.sequential('program and target management', () => {
         measurementType: 'frequency',
         masteryCriteria: 'Recorded for the clinician. The application does not apply it.',
         notes: 'Synthetic teaching notes.',
+        status: 'on_hold',
       }),
     });
     expect(program.response.status).toBe(201);
@@ -159,6 +160,7 @@ describe.sequential('program and target management', () => {
     expect(detail.assessmentId).toBe(assessmentId);
     expect(detail.goals[0]?.statement).toBe('Request a preferred item across two settings.');
     expect(detail.configurationVersion).toBe(1);
+    expect(detail.status).toBe('in_treatment');
 
     const trial = await api(admin, `/api/v1/programs/${programId}/targets`, {
       method: 'POST',
@@ -181,6 +183,7 @@ describe.sequential('program and target management', () => {
     });
     expect(frequency.response.status).toBe(201);
     const withTargets = frequency.body as ProgramDetail;
+    expect(withTargets.targets.every((item) => item.status === 'in_treatment')).toBe(true);
     expect(withTargets.targets).toHaveLength(2);
     expect(withTargets.targets.map((item) => item.measurementMethod)).toEqual(['trial', 'frequency']);
 
@@ -194,7 +197,7 @@ describe.sequential('program and target management', () => {
   it('versions measurement changes and requires a reason', async () => {
     const noReason = await api(admin, `/api/v1/programs/${programId}/targets/${trialTargetId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ title: 'Spoken request', measurementMethod: 'frequency', status: 'active' }),
+      body: JSON.stringify({ title: 'Spoken request', measurementMethod: 'frequency', status: 'in_treatment' }),
     });
     expect(noReason.response.status).toBe(400);
 
@@ -203,7 +206,7 @@ describe.sequential('program and target management', () => {
       body: JSON.stringify({
         title: 'Spoken request',
         measurementMethod: 'frequency',
-        status: 'active',
+        status: 'in_treatment',
         changeReason: 'Measurement changed after the baseline probe.',
       }),
     });
@@ -214,7 +217,7 @@ describe.sequential('program and target management', () => {
 
     const inactive = await api(admin, `/api/v1/programs/${programId}/targets/${trialTargetId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ title: 'Spoken request', measurementMethod: 'frequency', status: 'inactive' }),
+      body: JSON.stringify({ title: 'Spoken request', measurementMethod: 'frequency', status: 'on_hold' }),
     });
     expect(inactive.response.status).toBe(400);
     const deactivated = await api(admin, `/api/v1/programs/${programId}/targets/${trialTargetId}`, {
@@ -222,12 +225,12 @@ describe.sequential('program and target management', () => {
       body: JSON.stringify({
         title: 'Spoken request',
         measurementMethod: 'frequency',
-        status: 'inactive',
+        status: 'on_hold',
         changeReason: 'Target paused while the teaching plan is reviewed.',
       }),
     });
     expect(deactivated.response.status).toBe(200);
-    expect((deactivated.body as ProgramDetail).targets.find((item) => item.id === trialTargetId)?.status).toBe('inactive');
+    expect((deactivated.body as ProgramDetail).targets.find((item) => item.id === trialTargetId)?.status).toBe('on_hold');
   });
 
   it('keeps one field each for the implementation date and teaching steps', async () => {
@@ -291,7 +294,7 @@ describe.sequential('program and target management', () => {
     const malformed = await api(admin, '/api/v1/programs/targets/task-1700000000000-abcde');
     expect(malformed.response.status).toBe(404);
 
-    const base = { title: 'Echoic single words', measurementMethod: 'probe', expectedTrialCount: 4, phase: 'baseline', status: 'active' };
+    const base = { title: 'Echoic single words', measurementMethod: 'probe', expectedTrialCount: 4, phase: 'baseline', status: 'in_treatment' };
     const sdOnly = await api(admin, `/api/v1/programs/${programId}/targets/${taskTargetId}`, {
       method: 'PATCH',
       body: JSON.stringify({ ...base, sd: 'Say "car"' }),
@@ -311,6 +314,46 @@ describe.sequential('program and target management', () => {
     });
     expect(withReason.response.status).toBe(200);
     expect((withReason.body as ProgramDetail).targets.find((item) => item.id === taskTargetId)).toMatchObject({ masteryProbe: 90, configurationVersion: 2 });
+  });
+
+  it('lets an assigned therapist add tasks and change statuses but not see organisation records', async () => {
+    const added = await api(therapist, `/api/v1/programs/${programId}/targets`, {
+      method: 'POST',
+      body: JSON.stringify({ title: 'Therapist task', measurementMethod: 'frequency', phase: 'intervention' }),
+    });
+    expect(added.response.status).toBe(201);
+    expect((added.body as ProgramDetail).targets.find((item) => item.title === 'Therapist task')?.status).toBe('in_treatment');
+
+    const noReason = await api(therapist, `/api/v1/programs/${programId}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'on_hold', changeReason: '' }) });
+    expect(noReason.response.status).toBe(400);
+    const held = await api(therapist, `/api/v1/programs/${programId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'on_hold', changeReason: 'Family requested a short break.' }),
+    });
+    expect(held.response.status).toBe(200);
+    expect((held.body as ProgramDetail).status).toBe('on_hold');
+    const mastered = await api(therapist, `/api/v1/programs/${programId}/targets/${taskTargetId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'mastered', changeReason: 'Skill mastered across three sessions.' }),
+    });
+    expect(mastered.response.status).toBe(200);
+    expect((mastered.body as ProgramDetail).targets.find((item) => item.id === taskTargetId)?.status).toBe('mastered');
+
+    const reviewerChange = await api(reviewer, `/api/v1/programs/${programId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'in_treatment', changeReason: 'Reviewer should not change this.' }),
+    });
+    expect(reviewerChange.response.status).toBe(403);
+    const reviewerTask = await api(reviewer, `/api/v1/programs/${programId}/targets`, {
+      method: 'POST',
+      body: JSON.stringify({ title: 'Reviewer task', measurementMethod: 'frequency' }),
+    });
+    expect(reviewerTask.response.status).toBe(403);
+
+    for (const path of ['/api/v1/clinics', '/api/v1/organizations', `/api/v1/organizations/${organizationId}`]) {
+      expect((await api(therapist, path)).response.status).toBe(403);
+    }
+    expect((await api(admin, `/api/v1/organizations/${organizationId}`)).response.status).toBe(200);
   });
 
   it('isolates programs between organizations', async () => {

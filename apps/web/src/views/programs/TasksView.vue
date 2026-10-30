@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import type { ProgramSummary } from '@abapro/shared';
+import { careStatusLabel, type ProgramSummary } from '@abapro/shared';
 import { createTaskRequest, tasksRequest, updateTaskRequest, type CreateTaskInput, type TaskItem } from '@/api/tasks';
 import CreateTaskModal from '@/components/programs/CreateTaskModal.vue';
 import AppButton from '@/components/ui/AppButton.vue';
@@ -14,6 +14,7 @@ import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
 import type { BadgeTone } from '@/components/ui/types';
+import { careStatusTone } from '@/lib/format';
 import { useToastStore } from '@/stores/toast';
 import { errorMessage, useLoader } from '@/lib/loader';
 
@@ -182,19 +183,6 @@ function phaseTone(phase: string): BadgeTone {
   }
 }
 
-function statusTone(taskStatus: string): BadgeTone {
-  switch (taskStatus) {
-    case 'active':
-      return 'success';
-    case 'mastered':
-    case 'completed':
-      return 'info';
-    case 'inactive':
-    default:
-      return 'neutral';
-  }
-}
-
 watch([phaseFilter, statusFilter], () => {
   page.value = 1;
 });
@@ -249,9 +237,10 @@ onMounted(() => void load());
         label="Status"
         :options="[
           { value: '', label: 'Any status' },
-          { value: 'active', label: 'Active' },
+          { value: 'in_treatment', label: 'In Treatment' },
+          { value: 'maintenance', label: 'Maintenance' },
+          { value: 'on_hold', label: 'On Hold' },
           { value: 'mastered', label: 'Mastered' },
-          { value: 'inactive', label: 'Inactive' },
         ]"
       />
     </div>
@@ -316,7 +305,7 @@ onMounted(() => void load());
               </span>
             </td>
             <td>
-              <StatusBadge :tone="statusTone(task.status)" :label="task.status" />
+              <StatusBadge :tone="careStatusTone(task.status)" :label="careStatusLabel(task.status)" />
             </td>
             <td>
               <div class="row-actions">

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import type { ClientDirectoryItem, ProgramSummary } from '@abapro/shared';
+import { careStatusLabel, type ClientDirectoryItem, type ProgramSummary } from '@abapro/shared';
 import { clientDirectoryRequest } from '@/api/clients';
 import { programsRequest } from '@/api/programs';
 import AppButton from '@/components/ui/AppButton.vue';
@@ -13,8 +13,7 @@ import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
-import type { BadgeTone } from '@/components/ui/types';
-import { formatShortDate } from '@/lib/format';
+import { careStatusTone, formatShortDate } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth';
 import { useLoader } from '@/lib/loader';
 
@@ -118,26 +117,6 @@ function toggleSort(key: string): void {
   page.value = 1;
 }
 
-function statusTone(programStatus: string): BadgeTone {
-  switch (programStatus) {
-    case 'active':
-      return 'success';
-    case 'paused':
-      return 'warning';
-    case 'completed':
-      return 'info';
-    case 'discontinued':
-      return 'neutral';
-    default:
-      return 'neutral';
-  }
-}
-
-function statusLabel(programStatus: string): string {
-  if (!programStatus) return 'Unknown';
-  return programStatus.charAt(0).toUpperCase() + programStatus.slice(1);
-}
-
 function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
   try {
@@ -197,10 +176,10 @@ onMounted(() => void load());
         label="Status"
         :options="[
           { value: '', label: 'Any status' },
-          { value: 'active', label: 'Active' },
-          { value: 'paused', label: 'Paused' },
-          { value: 'completed', label: 'Completed' },
-          { value: 'discontinued', label: 'Discontinued' },
+          { value: 'in_treatment', label: 'In Treatment' },
+          { value: 'maintenance', label: 'Maintenance' },
+          { value: 'on_hold', label: 'On Hold' },
+          { value: 'mastered', label: 'Mastered' },
         ]"
       />
       <AppSelect v-model="clientId" label="Client" :options="clientOptions" />
@@ -246,7 +225,7 @@ onMounted(() => void load());
             <td>{{ program.measurementProcedure || program.measurementType || '—' }}</td>
             <td>{{ program.targetCount }}</td>
             <td>
-              <StatusBadge :tone="statusTone(program.status)" :label="statusLabel(program.status)" />
+              <StatusBadge :tone="careStatusTone(program.status)" :label="careStatusLabel(program.status)" />
             </td>
             <td>{{ formatDate(program.dateImplemented) }}</td>
             <td>{{ formatDate(program.dateMastered) }}</td>

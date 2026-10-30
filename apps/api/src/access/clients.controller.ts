@@ -25,7 +25,6 @@ import {
   SensitiveProfileDto,
   ShareRecordDto,
   UpdateClientDto,
-  UpdateProgramStatusDto,
 } from './access.dto';
 import { ClientRecordsService } from './client-records.service';
 import { ClientsService } from './clients.service';
@@ -226,17 +225,6 @@ export class ClientsController {
   @RequirePermissions(PERMISSIONS.programsView)
   programs(@CurrentUser() user: AuthUser, @Param('clientId') clientId: string) {
     return this.records.programs(user, clientId);
-  }
-
-  @Patch(':clientId/programs/:programId')
-  @RequirePermissions(PERMISSIONS.programsEdit)
-  updateProgram(
-    @CurrentUser() user: AuthUser,
-    @Param('clientId') clientId: string,
-    @Param('programId') programId: string,
-    @Body() body: UpdateProgramStatusDto,
-  ) {
-    return this.records.updateProgram(user, clientId, programId, body);
   }
 
   @Get(':clientId/documents')

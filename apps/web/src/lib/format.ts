@@ -1,3 +1,5 @@
+import type { BadgeTone } from '@/components/ui/types';
+
 export function formatDateTime(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat('en-US', {
     timeZone,
@@ -34,4 +36,12 @@ export function validateLogin(email: string, password: string): FieldErrors {
     errors.password = 'Password must be at least 8 characters.';
   }
   return errors;
+}
+
+/** Badge colour for a program or task status. */
+export function careStatusTone(status: string): BadgeTone {
+  if (status === 'in_treatment') return 'success';
+  if (status === 'maintenance') return 'info';
+  if (status === 'on_hold') return 'warning';
+  return 'neutral';
 }

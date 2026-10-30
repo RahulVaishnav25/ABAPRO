@@ -1,14 +1,17 @@
 import { IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { CARE_STATUSES } from '@abapro/shared';
 import type {
   AssessmentItemWrite,
   AssessmentStatus,
   AssessmentTemplateWrite,
   AssessmentWrite,
+  CareStatus,
   DocumentUpload,
   MeasurementMethod,
   MeasurementProcedure,
   ProgramWrite,
+  StatusChange,
   ResponseKind,
   TargetStatus,
   TargetWrite,
@@ -208,8 +211,8 @@ export class ProgramDto implements ProgramWrite {
   reviewOn?: string;
 
   @IsOptional()
-  @IsIn(['active', 'paused', 'completed', 'discontinued'])
-  status?: 'active' | 'paused' | 'completed' | 'discontinued';
+  @IsIn(CARE_STATUSES)
+  status?: CareStatus;
 
   @IsOptional()
   @IsIn(['trial', 'probe', 'frequency', 'duration', 'abc'])
@@ -335,7 +338,7 @@ export class TargetDto implements TargetWrite {
   phase?: string;
 
   @IsOptional()
-  @IsIn(['active', 'inactive', 'mastered', 'discontinued'])
+  @IsIn(CARE_STATUSES)
   status?: TargetStatus;
 
   @IsOptional()
@@ -390,16 +393,6 @@ export class TargetDto implements TargetWrite {
   changeReason?: string;
 }
 
-export class StatusDto {
-  @IsIn(['active', 'inactive', 'mastered', 'discontinued', 'paused', 'completed'])
-  status!: string;
-
-  @IsString()
-  @MinLength(12)
-  @MaxLength(1000)
-  changeReason!: string;
-}
-
 export class AssignmentDto {
   @IsUUID()
   userId!: string;
@@ -408,6 +401,15 @@ export class AssignmentDto {
 export class CopyTemplateDto {
   @IsUUID()
   clientId!: string;
+}
+
+export class StatusChangeDto implements StatusChange {
+  @IsIn(CARE_STATUSES)
+  status!: CareStatus;
+
+  @IsString()
+  @MaxLength(1000)
+  changeReason!: string;
 }
 
 export class DocumentUploadDto implements DocumentUpload {

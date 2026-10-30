@@ -203,9 +203,9 @@ describe.sequential('organisation clinics', () => {
       body: JSON.stringify({ name: 'Seaside', location: 'Salem' }),
     });
     expect(therapistClinicEdit.response.status).toBe(403);
+    // Therapists work only with assigned clients and cannot list clinics.
     const therapistClinicList = await api(therapist, '/api/v1/clinics');
-    expect(therapistClinicList.response.status).toBe(200);
-    expect((therapistClinicList.body as ClinicDirectoryPage).items.map((item) => item.name)).toEqual(['Seaside']);
+    expect(therapistClinicList.response.status).toBe(403);
     const therapistDashboard = await api(therapist, '/api/v1/platform/dashboard');
     expect(therapistDashboard.response.status).toBe(403);
 

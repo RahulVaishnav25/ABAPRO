@@ -23,7 +23,7 @@ function target(overrides: Partial<TargetListItem> = {}): TargetListItem {
     promptHierarchy: 'Independent, gesture, model',
     masteryCriteria: 'Reviewed by the supervisor.',
     phase: 'intervention',
-    status: 'active',
+    status: 'in_treatment',
     startedOn: '2026-10-01',
     reviewOn: null,
     clinicalNotes: 'Prefers vehicles.',
@@ -72,8 +72,8 @@ describe('tasks', () => {
   });
 
   it('shows defaults for targets saved before task criteria existed', () => {
-    const task = toTask(target({ masterySessions: null, masteryProbe: null, phase: 'baseline', status: 'discontinued' }));
-    expect(task).toMatchObject({ masterySessions: 3, masteryProbe: 100, baselineProbe: 100, phase: 'Baseline', status: 'inactive' });
+    const task = toTask(target({ masterySessions: null, masteryProbe: null, phase: 'baseline', status: 'on_hold' }));
+    expect(task).toMatchObject({ masterySessions: 3, masteryProbe: 100, baselineProbe: 100, phase: 'Baseline', status: 'on_hold' });
   });
 
   it('asks for a reason only when versioned criteria change', () => {
@@ -81,6 +81,8 @@ describe('tasks', () => {
     expect(taskCriteriaChanged(task, input({ name: 'Renamed', sd: 'New SD' }))).toBe(false);
     expect(taskCriteriaChanged(task, input({ desiredTrials: 6 }))).toBe(true);
     expect(taskCriteriaChanged(task, input({ masteryProbe: 80 }))).toBe(true);
+    expect(taskCriteriaChanged(task, input({ status: 'in_treatment' }))).toBe(false);
+    expect(taskCriteriaChanged(task, input({ status: 'on_hold' }))).toBe(true);
     const frequency = toTask(target({ measurementMethod: 'frequency', expectedTrialCount: null }));
     expect(taskCriteriaChanged(frequency, input({ desiredTrials: 9, masteryProbe: 90 }))).toBe(false);
   });
@@ -95,6 +97,14 @@ describe('tasks', () => {
     expect(created.id).toBe('new');
   });
 
+  it('sends a status chosen on the Edit form', async () => {
+    vi.mocked(targetRequest).mockResolvedValue(target());
+    vi.mocked(saveTargetRequest).mockResolvedValue(program([target({ status: 'maintenance' })]));
+    const updated = await updateTaskRequest('target-1', input({ status: 'maintenance', changeReason: 'Skill moved to maintenance.' }));
+    expect(saveTargetRequest).toHaveBeenCalledWith('program-1', expect.objectContaining({ status: 'maintenance' }), 'target-1');
+    expect(updated.status).toBe('maintenance');
+  });
+
   it('keeps fields the task screens do not edit and sends only changed criteria', async () => {
     const existing = target({ masterySessions: null, masteryProbe: null });
     vi.mocked(targetRequest).mockResolvedValue(existing);
@@ -106,7 +116,7 @@ describe('tasks', () => {
       teachingInstructions: 'Wait five seconds.',
       clinicalNotes: 'Prefers vehicles.',
       measurementMethod: 'trial',
-      status: 'active',
+      status: 'in_treatment',
       phase: 'intervention',
       sd: 'New SD',
       masterySessions: undefined,

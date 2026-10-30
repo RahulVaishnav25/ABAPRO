@@ -714,3 +714,24 @@ table.data-table {
     background-position: 0 0;
   }
 }
+
+/* Accent colours for program and task statuses. */
+.care-tone-in_treatment {
+  --status-accent: var(--color-success);
+  --status-soft: var(--color-success-soft);
+}
+
+.care-tone-maintenance {
+  --status-accent: var(--color-info);
+  --status-soft: var(--color-info-soft);
+}
+
+.care-tone-on_hold {
+  --status-accent: var(--color-warning);
+  --status-soft: var(--color-warning-soft);
+}
+
+.care-tone-mastered {
+  --status-accent: #6941c6;
+  --status-soft: #f4f0ff;
+}

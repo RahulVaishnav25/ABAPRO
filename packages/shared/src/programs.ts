@@ -3,7 +3,21 @@ export type AssessmentTemplateStatus = 'active' | 'retired';
 export type ResponseKind = 'text' | 'yes_no' | 'rating' | 'count';
 export type MeasurementMethod = 'trial' | 'probe' | 'frequency' | 'duration' | 'abc';
 export type MeasurementProcedure = 'Probe' | 'Step by Step' | (string & {});
-export type TargetStatus = 'active' | 'inactive' | 'mastered' | 'discontinued';
+/** Statuses shared by programs and tasks. New records start In Treatment. */
+export const CARE_STATUSES = ['in_treatment', 'maintenance', 'on_hold', 'mastered'] as const;
+export type CareStatus = (typeof CARE_STATUSES)[number];
+export type TargetStatus = CareStatus;
+
+export const CARE_STATUS_OPTIONS: ReadonlyArray<{ value: CareStatus; label: string }> = [
+  { value: 'in_treatment', label: 'In Treatment' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'on_hold', label: 'On Hold' },
+  { value: 'mastered', label: 'Mastered' },
+];
+
+export function careStatusLabel(status: string): string {
+  return CARE_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? status;
+}
 
 export interface AssessmentGroup {
   group: string;
@@ -179,7 +193,7 @@ export interface ProgramSummary {
   domain?: string;
   dateImplemented?: string | null;
   dateMastered?: string | null;
-  status: 'active' | 'paused' | 'completed' | 'discontinued';
+  status: CareStatus;
   measurementType: MeasurementMethod;
   measurementProcedure?: MeasurementProcedure | null;
   targetCount: number;
@@ -302,6 +316,12 @@ export interface TargetWrite {
   baselineSessions?: number | null;
   baselineProbe?: number | null;
   changeReason?: string;
+}
+
+/** Changes a program's or task's status. Every status change records a reason. */
+export interface StatusChange {
+  status: CareStatus;
+  changeReason: string;
 }
 
 export interface DocumentUpload {
