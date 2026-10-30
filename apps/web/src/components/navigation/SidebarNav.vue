@@ -48,7 +48,9 @@ const items = computed<SidebarNavItem[]>(() => {
   const isPlatformAdmin = Boolean(auth.user?.platformAdmin);
   const isOrgAdmin = auth.user?.role === 'organization_admin' || auth.can('settings.manage');
 
-  const navItems: SidebarNavItem[] = navigationFor(auth.user?.permissions ?? [], {
+  // A super admin's menu comes from the platform role. Opening Programs or Tasks moves the session
+  // into an organisation, and that organisation's permissions must not reshape the menu.
+  const navItems: SidebarNavItem[] = navigationFor(isPlatformAdmin ? [] : auth.user?.permissions ?? [], {
     platformAdmin: isPlatformAdmin,
     organizationId: auth.user?.organization?.id,
   }).filter((item) => {
