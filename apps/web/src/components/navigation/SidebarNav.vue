@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { navigationFor, PERMISSIONS } from '@abapro/shared';
+import { navigationFor } from '@abapro/shared';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useBrandingStore } from '@/stores/branding';
@@ -22,6 +22,9 @@ const TASKS_NAV_ITEM: SidebarNavItem = {
   icon: 'tasks',
   matches: ['/programs/tasks', '/tasks'],
 };
+
+/** Every role sees its items in this order; a role only shows the items it has access to. */
+const NAV_ORDER = ['platform', 'home', 'organisations', 'clinics', 'children', 'programs', 'tasks', 'settings'];
 
 withDefaults(
   defineProps<{
@@ -46,22 +49,17 @@ const brandLogo = computed(() => branding.effectiveBranding.logoUrl || appIconUr
 
 const items = computed<SidebarNavItem[]>(() => {
   const isPlatformAdmin = Boolean(auth.user?.platformAdmin);
-  const isOrgAdmin = auth.user?.role === 'organization_admin' || auth.can('settings.manage');
 
   // A super admin's menu comes from the platform role. Opening Programs or Tasks moves the session
   // into an organisation, and that organisation's permissions must not reshape the menu.
+  // Only a super admin lists organisations here; everyone else opens theirs from My Organisation in the top bar.
   const navItems: SidebarNavItem[] = navigationFor(isPlatformAdmin ? [] : auth.user?.permissions ?? [], {
     platformAdmin: isPlatformAdmin,
     organizationId: auth.user?.organization?.id,
-  }).filter((item) => {
-    if (item.key === 'organisations') {
-      return isPlatformAdmin || isOrgAdmin;
-    }
-    return true;
-  });
+  }).filter((item) => item.key !== 'organisations' || isPlatformAdmin);
 
   if (isPlatformAdmin && !navItems.some((item) => item.key === 'programs')) {
-    navItems.splice(1, 0, {
+    navItems.push({
       key: 'programs',
       title: 'Programs',
       route: '/programs',
@@ -70,19 +68,11 @@ const items = computed<SidebarNavItem[]>(() => {
     });
   }
 
-  const programsIdx = navItems.findIndex((item) => item.key === 'programs');
-  if (programsIdx !== -1) {
-    navItems.splice(programsIdx + 1, 0, TASKS_NAV_ITEM);
-  } else if (isPlatformAdmin || auth.user?.permissions?.includes(PERMISSIONS.programsView)) {
-    const settingsIdx = navItems.findIndex((item) => item.key === 'settings');
-    if (settingsIdx !== -1) {
-      navItems.splice(settingsIdx, 0, TASKS_NAV_ITEM);
-    } else {
-      navItems.push(TASKS_NAV_ITEM);
-    }
+  if (navItems.some((item) => item.key === 'programs')) {
+    navItems.push(TASKS_NAV_ITEM);
   }
 
-  return navItems;
+  return navItems.sort((a, b) => NAV_ORDER.indexOf(a.key) - NAV_ORDER.indexOf(b.key));
 });
 
 function isItemActive(item: SidebarNavItem, path: string): boolean {
