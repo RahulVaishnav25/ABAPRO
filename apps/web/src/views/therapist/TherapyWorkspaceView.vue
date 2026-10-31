@@ -36,6 +36,15 @@ const router = useRouter();
 const toast = useToastStore();
 
 const clients = ref<ClientDirectoryItem[]>([]);
+const clientSearch = ref('');
+/** Matches the full name as well as the initials and code shown on each tile. */
+const filteredClients = computed(() => {
+  const query = clientSearch.value.trim().toLowerCase();
+  if (!query) return clients.value;
+  return clients.value.filter((client) =>
+    [client.displayName, client.preferredName ?? '', client.initials, client.clientCode].some((value) => value.toLowerCase().includes(query)),
+  );
+});
 const programs = ref<ProgramSummary[]>([]);
 const tasks = ref<TaskItem[]>([]);
 const expanded = ref(new Set<string>());
@@ -89,6 +98,9 @@ const clientLoader = useLoader(async () => {
   }
 }, 'Your clients could not be loaded.');
 
+// After the first load, switching clients keeps the current content in place until the next client loads.
+const workspaceLoaded = ref(false);
+
 const workspaceLoader = useLoader(async () => {
   if (!selectedId.value) {
     programs.value = [];
@@ -98,6 +110,7 @@ const workspaceLoader = useLoader(async () => {
   const [clientPrograms, allTasks] = await Promise.all([programsRequest(selectedId.value), targetsRequest()]);
   programs.value = clientPrograms;
   tasks.value = allTasks.filter((task) => task.clientId === selectedId.value).map(toTask);
+  workspaceLoaded.value = true;
 }, 'This client’s programs could not be loaded.', false);
 
 function selectClient(id: string): void {
@@ -226,8 +239,20 @@ onMounted(async () => {
       <SkeletonBlock v-if="clientLoader.loading.value" height="240px" />
       <ErrorState v-else-if="clientLoader.error.value" title="Clients unavailable" :description="clientLoader.error.value" @retry="clientLoader.load" />
       <p v-else-if="clients.length === 0" class="clients-empty">No clients are assigned to you yet.</p>
-      <ul v-else class="client-list">
-        <li v-for="client in clients" :key="client.id">
+      <template v-else>
+        <label class="visually-hidden" for="client-search">Search clients by name or code</label>
+        <input
+          id="client-search"
+          v-model="clientSearch"
+          type="search"
+          class="client-search"
+          placeholder="Name or code"
+          autocomplete="off"
+        />
+        <p v-if="filteredClients.length === 0" class="clients-empty">No matching clients.</p>
+      </template>
+      <ul v-if="filteredClients.length" class="client-list">
+        <li v-for="client in filteredClients" :key="client.id">
           <button
             type="button"
             class="client-tile"
@@ -250,9 +275,13 @@ onMounted(async () => {
             <span v-if="selected" class="workspace-initials" aria-hidden="true">{{ selected.initials }}</span>
             <div>
               <h1 class="workspace-title">Therapy Workspace</h1>
-              <p class="workspace-subtitle">
-                {{ selected ? `Client ${selected.clientCode}` : 'Choose a client to see their programs.' }}
+              <p v-if="selected" class="workspace-client">
+                <RouterLink class="workspace-client-name" :to="`/clients/${selected.id}`" title="Open client details">
+                  {{ selected.displayName }}
+                </RouterLink>
+                <span class="workspace-client-code">{{ selected.clientCode }}</span>
               </p>
+              <p v-else class="workspace-subtitle">Choose a client to see their programs.</p>
             </div>
           </div>
           <div class="views" role="group" aria-label="View">
@@ -288,7 +317,7 @@ onMounted(async () => {
         </div>
       </header>
 
-      <SkeletonBlock v-if="workspaceLoader.loading.value" height="320px" />
+      <SkeletonBlock v-if="workspaceLoader.loading.value && !workspaceLoaded" height="320px" />
       <ErrorState v-else-if="workspaceLoader.error.value" title="Workspace unavailable" :description="workspaceLoader.error.value" @retry="workspaceLoader.load" />
       <EmptyState v-else-if="!selected" title="No client selected" description="Choose a client on the left to open their therapy workspace." />
       <EmptyState v-else-if="programs.length === 0" title="No programs yet" description="Programs created for this client appear here." />
@@ -298,7 +327,12 @@ onMounted(async () => {
         description="No programs or tasks for this client have that status."
       />
 
-      <div v-else class="groups" :class="`is-${viewMode}`">
+      <div
+        v-else
+        class="groups"
+        :class="[`is-${viewMode}`, { 'is-refreshing': workspaceLoader.loading.value }]"
+        :aria-busy="workspaceLoader.loading.value"
+      >
         <ProgramCard
           v-for="program in visiblePrograms"
           :key="program.id"
@@ -341,17 +375,22 @@ onMounted(async () => {
 
 <style scoped>
 .therapy {
+  /* Height of the client panel: the viewport below the top bar, breadcrumbs and page padding. */
+  --panel-height: max(360px, calc(100dvh - var(--topbar-height, 64px) - 96px));
   display: grid;
   grid-template-columns: 136px minmax(0, 1fr);
+  align-items: start;
   gap: 20px;
-  min-height: calc(100vh - var(--topbar-height, 64px) - 64px);
 }
 
 /* Client selector */
 .clients {
+  position: sticky;
+  top: calc(var(--topbar-height, 64px) + 16px + env(safe-area-inset-top, 0px));
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: var(--panel-height);
   padding: 16px 12px;
   background: linear-gradient(180deg, #0e6b62 0%, #0a4f49 100%);
   border-radius: var(--radius-lg);
@@ -372,14 +411,42 @@ onMounted(async () => {
   opacity: 0.85;
 }
 
+.client-search {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.client-search::placeholder {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.client-search:focus {
+  outline: 3px solid #ffd479;
+  outline-offset: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Only the list scrolls; the panel keeps its size however many clients there are. */
 .client-list {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
   margin: 0;
-  padding: 0;
+  padding: 2px 2px 4px;
   list-style: none;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 .client-tile {
@@ -442,6 +509,14 @@ onMounted(async () => {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  /* Never shorter than the client panel, so the page keeps its height while clients change. */
+  min-height: var(--panel-height);
+}
+
+.groups.is-refreshing {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.15s;
 }
 
 .workspace-header {
@@ -487,6 +562,37 @@ onMounted(async () => {
   margin: 2px 0 0;
   color: var(--color-text-muted);
   font-size: 0.88rem;
+}
+
+.workspace-client {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 2px 0 0;
+}
+
+.workspace-client-name {
+  color: var(--color-ink);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.workspace-client-name:hover,
+.workspace-client-name:focus-visible {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.workspace-client-code {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .workspace-top {
@@ -583,6 +689,15 @@ onMounted(async () => {
 @media (max-width: 720px) {
   .therapy {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .clients {
+    position: static;
+    height: auto;
+  }
+
+  .workspace {
+    min-height: 0;
   }
 
   .client-list {
