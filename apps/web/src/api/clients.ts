@@ -160,7 +160,7 @@ export function uploadAvatarRequest(clientId: string, contentType: string, conte
   return apiRequest(encodedPath`/clients/${clientId}/avatar`, { method: 'POST', body: { contentType, contentBase64 } });
 }
 
-export function fileToBase64(file: File): Promise<string> {
+export function fileToBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {

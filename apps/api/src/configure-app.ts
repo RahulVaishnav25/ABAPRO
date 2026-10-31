@@ -8,6 +8,8 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 export function configureApp(app: INestApplication): AppConfig {
   const config = app.get<AppConfig>(APP_CONFIG);
   app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+  // Program attachments, including audio, may be up to 10 MB, which is about 14 MB once base64 encoded.
+  app.use(/^\/api\/v1\/programs\/[^/]+\/attachments$/, json({ limit: '15mb' }));
   app.use('/api', json({ limit: '2mb' }));
   app.use((request: Request, response: Response, next: NextFunction) => {
     if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {

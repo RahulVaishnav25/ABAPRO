@@ -6,6 +6,10 @@ import type {
   AssessmentStatus,
   AssessmentTemplateWrite,
   AssessmentWrite,
+  HomeActivityStatus,
+  HomeActivityWrite,
+  ProgramAttachmentUpload,
+  ProgramNoteWrite,
   CareStatus,
   DocumentUpload,
   MeasurementMethod,
@@ -451,3 +455,67 @@ export class DocumentUploadDto implements DocumentUpload {
   contentBase64!: string;
 }
 
+export class ProgramNoteDto implements ProgramNoteWrite {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title!: string;
+
+  // Sanitised by the service before it is stored.
+  @IsString()
+  @MaxLength(50_000)
+  bodyHtml!: string;
+
+  @IsDateString()
+  noteDate!: string;
+}
+
+export class HomeActivityDto implements HomeActivityWrite {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(5000)
+  instructions!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  purpose?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  frequency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  guidance?: string;
+
+  @IsOptional()
+  @IsIn(['active', 'completed'])
+  status?: HomeActivityStatus;
+}
+
+export class ProgramAttachmentDto implements ProgramAttachmentUpload {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(180)
+  fileName!: string;
+
+  @IsString()
+  @MaxLength(120)
+  contentType!: string;
+
+  // Audio or document is decided by the service from the file type.
+  @IsString()
+  contentBase64!: string;
+
+  @IsOptional()
+  @IsUUID()
+  homeActivityId?: string;
+}

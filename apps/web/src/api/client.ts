@@ -71,3 +71,46 @@ async function readErrorMessage(response: Response): Promise<string> {
   }
   return response.statusText || 'Request failed.';
 }
+
+/** Sends a JSON body like apiRequest, reporting how much of it has been sent, for file uploads. */
+export function apiUpload<T>(path: string, body: unknown, onProgress: (fraction: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open('POST', `${baseUrl}${path}`);
+    request.withCredentials = true;
+    request.setRequestHeader('Content-Type', 'application/json');
+    request.setRequestHeader('Accept', 'application/json');
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total);
+    };
+    request.onerror = () => reject(new ApiError(0, 'The server could not be reached. Start the API and try again.'));
+    request.onload = () => {
+      let payload: unknown = null;
+      try {
+        payload = request.responseText ? JSON.parse(request.responseText) : null;
+      } catch {
+        payload = null;
+      }
+      if (request.status >= 200 && request.status < 300) {
+        resolve(payload as T);
+        return;
+      }
+      const message = (payload as { message?: string } | null)?.message ?? (request.statusText || 'Request failed.');
+      if (request.status === 401) unauthorizedHandler?.(message);
+      reject(new ApiError(request.status, message));
+    };
+    request.send(JSON.stringify(body));
+  });
+}
+
+/** Fetches a file the API serves, for downloading or playing. */
+export async function apiBlob(path: string): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, { credentials: 'include' });
+  } catch {
+    throw new ApiError(0, 'The server could not be reached. Start the API and try again.');
+  }
+  if (!response.ok) throw new ApiError(response.status, await readErrorMessage(response));
+  return response.blob();
+}

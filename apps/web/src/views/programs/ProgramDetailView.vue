@@ -3,14 +3,12 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { careStatusLabel, type MeasurementMethod, type ProgramDetail } from '@abapro/shared';
 import type { BadgeTone } from '@/components/ui/types';
-import { fileToBase64 } from '@/api/clients';
-import { programRequest, uploadProgramDocumentRequest } from '@/api/programs';
+import { programRequest } from '@/api/programs';
 import { createTaskRequest, programTasks, updateTaskRequest, type CreateTaskInput, type TaskItem } from '@/api/tasks';
-import { ApiError } from '@/api/client';
 import CreateTaskModal from '@/components/programs/CreateTaskModal.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
-import FileUpload from '@/components/ui/FileUpload.vue';
+import ProgramCommunicationSection from '@/components/programs/communication/ProgramCommunicationSection.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
@@ -47,7 +45,6 @@ const route = useRoute();
 const router = useRouter();
 const programId = computed(() => String(route.params.programId ?? ''));
 const program = ref<ProgramDetail | null>(null);
-const files = ref<File[]>([]);
 const tasks = computed(() => (program.value ? programTasks(program.value) : []));
 const isCreateTaskOpen = ref(false);
 const taskModalMode = ref<'create' | 'edit' | 'preview'>('create');
@@ -106,22 +103,6 @@ async function handleTaskSubmit(input: CreateTaskInput): Promise<void> {
     });
   } finally {
     submittingTask.value = false;
-  }
-}
-
-async function upload(): Promise<void> {
-  if (!program.value || !files.value[0]) return;
-  const file = files.value[0];
-  try {
-    program.value = await uploadProgramDocumentRequest(program.value.id, {
-      fileName: file.name,
-      contentType: file.type,
-      contentBase64: await fileToBase64(file),
-    });
-    files.value = [];
-    toast.push({ tone: 'success', title: 'Attachment saved', message: 'Scanning is not connected, so the file is marked not scanned.' });
-  } catch (uploadError) {
-    toast.push({ tone: 'danger', title: 'Attachment was not saved', message: uploadError instanceof ApiError ? uploadError.message : 'Try again.' });
   }
 }
 
@@ -357,40 +338,15 @@ onMounted(() => void load());
         </div>
       </section>
 
-      <!-- Section: Notes & Attachments -->
+      <!-- Section: Notes, attachments and home activities -->
       <section class="detail-section">
         <div class="section-header">
           <div>
             <h2 class="section-title">Notes & Attachments</h2>
-            <p class="section-desc">Clinical notes, uploaded reports, and associated documentation</p>
+            <p class="section-desc">Session notes, files, audio and home activities, shared with the child’s parents</p>
           </div>
         </div>
-        <div class="notes-content">
-          <div class="callout-block">
-            <span class="callout-label">Program Notes</span>
-            <p class="callout-body">{{ program.notes || 'No general program notes recorded.' }}</p>
-          </div>
-        </div>
-        <div class="attachments-area">
-          <span class="callout-label">Attached Documents</span>
-          <div v-if="program.documents.length === 0" class="empty-docs">
-            <p>No documents attached to this program.</p>
-          </div>
-          <ul v-else class="documents-list">
-            <li v-for="document in program.documents" :key="document.id" class="document-item">
-              <span class="document-name">📄 {{ document.fileName }}</span>
-              <span class="document-status" :class="document.scanStatus === 'not_configured' ? 'status-unscanned' : 'status-rejected'">
-                {{ document.scanStatus === 'not_configured' ? 'Not scanned' : 'Rejected' }}
-              </span>
-            </li>
-          </ul>
-          <div v-if="auth.can('documents.upload')" class="upload-wrapper">
-            <FileUpload v-model="files" label="Upload Document" accept="application/pdf,image/png,image/jpeg,image/webp" :max-size-mb="0.5" />
-            <div class="upload-actions">
-              <AppButton type="button" :disabled="files.length === 0" @click="upload">Save attachment</AppButton>
-            </div>
-          </div>
-        </div>
+        <ProgramCommunicationSection :program-id="program.id" :legacy-notes="program.notes" />
       </section>
       <!-- Create / Edit / Preview Task Modal -->
       <CreateTaskModal
@@ -648,72 +604,6 @@ dd {
   font-size: 0.82rem;
   color: var(--color-text-muted);
   margin-top: 6px;
-}
-
-.empty-docs {
-  text-align: center;
-  padding: 32px 20px;
-  color: var(--color-text-muted);
-  background: var(--color-surface-muted, #f7f9fa);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.notes-content {
-  margin-bottom: 8px;
-}
-
-.attachments-area {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.documents-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.document-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  background: var(--color-surface-muted, #f7f9fa);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 0.92rem;
-}
-
-.status-unscanned {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-}
-
-.status-rejected {
-  font-size: 0.8rem;
-  color: var(--color-danger);
-  font-weight: 600;
-}
-
-.upload-wrapper {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.upload-actions {
-  display: flex;
-  justify-content: flex-start;
 }
 
 .tasks-header {
