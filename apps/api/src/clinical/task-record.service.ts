@@ -6,6 +6,10 @@ import {
   type AuthUser,
   type CareStatus,
   type PromptLevel,
+  type RecordPhaseGroup,
+  type SessionHistory,
+  type SessionHistoryEntry,
+  type SessionHistoryFilters,
   type RecordResponse,
   type TaskRecord,
   type TaskRecordDay,
@@ -28,6 +32,7 @@ interface TargetLimits {
   clientId: string;
   phase: string;
   status: CareStatus;
+  programStatus: CareStatus;
   promptUsed: boolean;
   trialsPerSession: number;
   sessionsPerDay: number;
@@ -133,6 +138,118 @@ export class TaskRecordService {
     });
   }
 
+  /**
+   * Every record saved on a program's tasks, for organisation administrators (super admins act as one inside an
+   * organisation). Read-only: records are never changed or removed.
+   */
+  async sessionHistory(user: AuthUser, programId: string, filters: SessionHistoryFilters): Promise<SessionHistory> {
+    if (user.role !== 'organization_admin') {
+      throw new ForbiddenException('Only organisation administrators can view session history.');
+    }
+    return this.authorization.withOrganization(user, async (tx, organizationId) => {
+      const programs = await tx.query<{ id: string; name: string; client_id: string; client_name: string }>(
+        `SELECT p.id, p.name, p.client_id, c.display_name AS client_name
+         FROM client_programs p JOIN clients c ON c.id = p.client_id
+         WHERE p.id = $1 AND p.organization_id = $2`,
+        [programId, organizationId],
+      );
+      const program = programs[0];
+      if (!program) throw new NotFoundException('That program was not found.');
+      await this.authorization.findAccessibleClient(tx, user, organizationId, asString(program.client_id), 'view', PERMISSIONS.programsView);
+
+      const tasks = await tx.query<{ id: string; name: string }>(
+        `SELECT id, name FROM client_targets WHERE program_id = $1 ORDER BY sort_order, created_at`,
+        [programId],
+      );
+      const therapists = await tx.query<{ id: string; name: string }>(
+        `SELECT DISTINCT u.id, u.name FROM task_records r JOIN users u ON u.id = r.therapist_id
+         WHERE r.program_id = $1 ORDER BY u.name`,
+        [programId],
+      );
+
+      const params: unknown[] = [programId];
+      const conditions = ['r.program_id = $1'];
+      const add = (sql: string, value: unknown) => {
+        params.push(value);
+        conditions.push(sql.replace('?', `$${params.length}`));
+      };
+      if (filters.taskId) add('r.target_id = ?::uuid', filters.taskId);
+      if (filters.therapistId) add('r.therapist_id = ?::uuid', filters.therapistId);
+      if (filters.phase) add(`r.phase = ANY(string_to_array(?, ','))`, PHASE_GROUPS[filters.phase].join(','));
+      if (filters.from) add('r.record_date >= ?::date', filters.from);
+      if (filters.to) add('r.record_date <= ?::date', filters.to);
+      const where = conditions.join(' AND ');
+
+      const rows = await tx.query<{
+        id: string; recorded_at: unknown; record_date: string; therapist_id: string; therapist_name: string;
+        client_id: string; client_name: string; target_id: string; task_title: string; phase: string;
+        session_number: number; trial_number: number; trials_per_session: number; sessions_per_day: number;
+        response: RecordResponse | null; prompt_levels: string; task_status: CareStatus; program_status: CareStatus;
+      }>(
+        `SELECT r.id, r.recorded_at, to_char(r.record_date, 'YYYY-MM-DD') AS record_date,
+                r.therapist_id, u.name AS therapist_name, r.client_id, c.display_name AS client_name,
+                r.target_id, t.name AS task_title, r.phase, r.session_number, r.trial_number,
+                r.trials_per_session, r.sessions_per_day, r.response,
+                array_to_string(r.prompt_levels, ',') AS prompt_levels, r.task_status, r.program_status
+         FROM task_records r
+         JOIN users u ON u.id = r.therapist_id
+         JOIN clients c ON c.id = r.client_id
+         JOIN client_targets t ON t.id = r.target_id
+         WHERE ${where}
+         ORDER BY r.recorded_at DESC, r.session_number DESC, r.trial_number DESC
+         LIMIT ${SESSION_HISTORY_LIMIT}`,
+        params,
+      );
+      const counted = await tx.query<{ total: number | string }>(`SELECT count(*) AS total FROM task_records r WHERE ${where}`, params);
+      const totals = await tx.query<{ target_id: string; task_title: string; therapist_id: string; therapist_name: string; trials: number | string }>(
+        `SELECT r.target_id, t.name AS task_title, r.therapist_id, u.name AS therapist_name, count(*) AS trials
+         FROM task_records r
+         JOIN users u ON u.id = r.therapist_id
+         JOIN client_targets t ON t.id = r.target_id
+         WHERE ${where}
+         GROUP BY r.target_id, t.name, t.sort_order, r.therapist_id, u.name
+         ORDER BY t.sort_order, t.name, u.name`,
+        params,
+      );
+
+      return {
+        programId: asString(program.id),
+        programTitle: asString(program.name),
+        clientName: asString(program.client_name),
+        tasks: tasks.map((row) => ({ id: asString(row.id), title: asString(row.name) })),
+        therapists: therapists.map((row) => ({ id: asString(row.id), name: asString(row.name) })),
+        entries: rows.map((row): SessionHistoryEntry => ({
+          id: asString(row.id),
+          recordedAt: asDate(row.recorded_at).toISOString(),
+          recordDate: asString(row.record_date),
+          therapistId: asString(row.therapist_id),
+          therapistName: asString(row.therapist_name),
+          clientId: asString(row.client_id),
+          clientName: asString(row.client_name),
+          taskId: asString(row.target_id),
+          taskTitle: asString(row.task_title),
+          phase: phaseGroup(asString(row.phase)),
+          sessionNumber: Number(row.session_number),
+          trialNumber: Number(row.trial_number),
+          trialsPerSession: Number(row.trials_per_session),
+          sessionsPerDay: Number(row.sessions_per_day),
+          response: row.response ?? null,
+          promptLevels: row.prompt_levels ? (asString(row.prompt_levels).split(',') as PromptLevel[]) : [],
+          taskStatus: row.task_status,
+          programStatus: row.program_status,
+        })),
+        total: Number(counted[0]?.total ?? 0),
+        totals: totals.map((row) => ({
+          taskId: asString(row.target_id),
+          taskTitle: asString(row.task_title),
+          therapistId: asString(row.therapist_id),
+          therapistName: asString(row.therapist_name),
+          trials: Number(row.trials),
+        })),
+      };
+    });
+  }
+
   async record(user: AuthUser, targetId: string, input: TaskRecordWrite): Promise<TaskRecordingStatus> {
     return this.authorization.withOrganization(user, async (tx, organizationId) => {
       // Locking the task makes concurrent records for it wait, so each one sees the previous one's trial.
@@ -171,12 +288,13 @@ export class TaskRecordService {
         await tx.query(
           `INSERT INTO task_records (
              id, organization_id, client_id, program_id, target_id, therapist_id, response, record_date,
-             session_number, trial_number, trials_per_session, sessions_per_day, phase, prompt_levels
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::date,$9,$10,$11,$12,$13,COALESCE(string_to_array(NULLIF($14, ''), ','), '{}'))`,
+             session_number, trial_number, trials_per_session, sessions_per_day, phase, prompt_levels,
+             task_status, program_status
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::date,$9,$10,$11,$12,$13,COALESCE(string_to_array(NULLIF($14, ''), ','), '{}'),$15,$16)`,
           [
             input.requestId, organizationId, target.clientId, target.programId, target.id, user.id, response, date,
             before.nextSession, before.nextTrial, target.trialsPerSession, target.sessionsPerDay, target.phase,
-            promptLevels.join(','),
+            promptLevels.join(','), target.status, target.programStatus,
           ],
         );
       } catch (error) {
@@ -193,6 +311,20 @@ export class TaskRecordService {
       return recordingStatus(target, date, last.get(target.id), true);
     });
   }
+}
+
+/** Raw phases saved on records, by the group Session History shows. */
+const PHASE_GROUPS: Record<RecordPhaseGroup, string[]> = {
+  baseline: ['baseline'],
+  treatment: ['intervention'],
+  mastery: ['maintenance', 'mastered'],
+};
+const SESSION_HISTORY_LIMIT = 500;
+
+function phaseGroup(phase: string): RecordPhaseGroup {
+  if (PHASE_GROUPS.baseline.includes(phase)) return 'baseline';
+  if (PHASE_GROUPS.mastery.includes(phase)) return 'mastery';
+  return 'treatment';
 }
 
 /**
@@ -234,13 +366,16 @@ async function findTarget(tx: Queryable, organizationId: string, targetId: strin
 
 async function targetLimits(tx: Queryable, organizationId: string, where: string, params: unknown[], lock = false): Promise<TargetLimits[]> {
   const rows = await tx.query<{
-    id: string; program_id: string; client_id: string; phase: string; status: CareStatus; prompt_used: boolean; expected_trial_count: number | null; mastery_sessions: number | null;
+    id: string; program_id: string; client_id: string; phase: string; status: CareStatus; program_status: CareStatus;
+    prompt_used: boolean; expected_trial_count: number | null; mastery_sessions: number | null;
   }>(
-    `SELECT t.id, t.program_id, t.client_id, t.phase, t.status, t.prompt_used, t.expected_trial_count, t.mastery_sessions
+    `SELECT t.id, t.program_id, t.client_id, t.phase, t.status, p.status AS program_status, t.prompt_used,
+            t.expected_trial_count, t.mastery_sessions
      FROM client_targets t
+     JOIN client_programs p ON p.id = t.program_id
      WHERE t.organization_id = $1 AND ${where}
      ORDER BY t.sort_order, t.created_at
-     ${lock ? 'FOR UPDATE' : ''}`,
+     ${lock ? 'FOR UPDATE OF t' : ''}`,
     [organizationId, ...params],
   );
   return rows.map((row) => {
@@ -252,6 +387,7 @@ async function targetLimits(tx: Queryable, organizationId: string, where: string
       clientId: asString(row.client_id),
       phase,
       status: row.status,
+      programStatus: row.program_status,
       promptUsed: row.prompt_used === true,
       trialsPerSession: phase === 'intervention' ? Math.max(1, trials ?? 1) : 1,
       sessionsPerDay: Math.max(1, asNullableNumber(row.mastery_sessions) ?? DEFAULT_SESSIONS_PER_DAY),

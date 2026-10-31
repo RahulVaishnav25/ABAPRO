@@ -4,6 +4,9 @@ import {
   type AuthUser,
   type ProgramDetail,
   type ProgramSummary,
+  RECORD_PHASE_OPTIONS,
+  type RecordPhaseGroup,
+  type SessionHistory,
   type TargetListItem,
   type TaskRecordHistory,
   type TaskRecordingStatus,
@@ -84,6 +87,29 @@ export class ProgramsController {
     @Body() body: TaskRecordDto,
   ): Promise<TaskRecordingStatus> {
     return this.records.record(user, targetId, body);
+  }
+
+  // Organisation administrators only; the service checks the role.
+  @Get(':programId/session-history')
+  @RequirePermissions(PERMISSIONS.programsView)
+  sessionHistory(
+    @CurrentUser() user: AuthUser,
+    @Param('programId', new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.NOT_FOUND })) programId: string,
+    @Query('taskId', new ParseUUIDPipe({ optional: true })) taskId?: string,
+    @Query('therapistId', new ParseUUIDPipe({ optional: true })) therapistId?: string,
+    @Query('phase') phase?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ): Promise<SessionHistory> {
+    if (phase !== undefined && !RECORD_PHASE_OPTIONS.some((option) => option.value === phase)) {
+      throw new BadRequestException('Choose Baseline, Treatment or Mastery.');
+    }
+    for (const date of [from, to]) {
+      if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw new BadRequestException('Use dates in the form YYYY-MM-DD.');
+      }
+    }
+    return this.records.sessionHistory(user, programId, { taskId, therapistId, phase: phase as RecordPhaseGroup | undefined, from, to });
   }
 
   @Get(':programId')

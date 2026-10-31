@@ -414,3 +414,67 @@ export interface TaskRecordWrite {
   promptLevels?: PromptLevel[];
 }
 
+// Session History: a read-only audit of the records saved on a program's tasks, for administrators.
+
+/** The phase a record was saved in, grouped as the Session History shows it. Maintenance and Mastered are Mastery. */
+export type RecordPhaseGroup = 'baseline' | 'treatment' | 'mastery';
+
+export const RECORD_PHASE_OPTIONS: ReadonlyArray<{ value: RecordPhaseGroup; label: string }> = [
+  { value: 'baseline', label: 'Baseline' },
+  { value: 'treatment', label: 'Treatment' },
+  { value: 'mastery', label: 'Mastery' },
+];
+
+export interface SessionHistoryEntry {
+  id: string;
+  recordedAt: string;
+  recordDate: string;
+  therapistId: string;
+  therapistName: string;
+  clientId: string;
+  clientName: string;
+  taskId: string;
+  taskTitle: string;
+  phase: RecordPhaseGroup;
+  sessionNumber: number;
+  trialNumber: number;
+  trialsPerSession: number;
+  sessionsPerDay: number;
+  response: RecordResponse | null;
+  promptLevels: PromptLevel[];
+  /** Statuses when the record was saved. */
+  taskStatus: CareStatus;
+  programStatus: CareStatus;
+}
+
+export interface SessionHistoryTotal {
+  taskId: string;
+  taskTitle: string;
+  therapistId: string;
+  therapistName: string;
+  trials: number;
+}
+
+export interface SessionHistory {
+  programId: string;
+  programTitle: string;
+  clientName: string;
+  /** Filter choices: every task in the program, and every therapist who recorded on it. */
+  tasks: Array<{ id: string; title: string }>;
+  therapists: Array<{ id: string; name: string }>;
+  /** Records matching the filters, newest first, up to the API's page limit. */
+  entries: SessionHistoryEntry[];
+  /** How many records match the filters, which may exceed the entries returned. */
+  total: number;
+  /** Trials recorded by each therapist on each task, within the filters. */
+  totals: SessionHistoryTotal[];
+}
+
+export interface SessionHistoryFilters {
+  taskId?: string;
+  therapistId?: string;
+  phase?: RecordPhaseGroup;
+  /** Record dates, YYYY-MM-DD, inclusive. */
+  from?: string;
+  to?: string;
+}

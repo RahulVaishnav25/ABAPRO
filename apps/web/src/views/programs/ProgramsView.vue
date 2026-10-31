@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router';
 import { careStatusLabel, type ClientDirectoryItem, type ProgramSummary } from '@abapro/shared';
 import { clientDirectoryRequest } from '@/api/clients';
 import { programsRequest } from '@/api/programs';
+import SessionHistoryDialog from '@/components/programs/SessionHistoryDialog.vue';
+import ActionMenu from '@/components/therapist/ActionMenu.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
@@ -33,6 +35,9 @@ const direction = ref<'asc' | 'desc'>('asc');
 let searchTimer = 0;
 
 const canEdit = computed(() => auth.can('programs.edit'));
+// Organisation administrators, and super admins acting as one, see recording activity. The API enforces this too.
+const canViewSessionHistory = computed(() => auth.user?.role === 'organization_admin');
+const historyProgram = ref<ProgramSummary | null>(null);
 
 const clientOptions = computed(() => [
   { value: '', label: 'Any client' },
@@ -233,6 +238,12 @@ onMounted(() => void load());
               <div class="row-actions">
                 <AppButton size="sm" variant="secondary" @click="router.push(`/programs/${program.id}`)">View</AppButton>
                 <AppButton v-if="canEdit" size="sm" variant="secondary" @click="router.push(`/programs/${program.id}/edit`)">Edit</AppButton>
+                <ActionMenu
+                  v-if="canViewSessionHistory"
+                  :label="`More actions for ${program.title}`"
+                  :items="[{ key: 'history', label: 'Session History' }]"
+                  @select="historyProgram = program"
+                />
               </div>
             </td>
           </tr>
@@ -246,6 +257,12 @@ onMounted(() => void load());
       <span>Page {{ page }} of {{ pageCount }}</span>
       <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="page += 1">Next</AppButton>
     </div>
+    <SessionHistoryDialog
+      :open="historyProgram !== null"
+      :program-id="historyProgram?.id ?? null"
+      :program-title="historyProgram?.title ?? ''"
+      @close="historyProgram = null"
+    />
   </PageContainer>
 </template>
 

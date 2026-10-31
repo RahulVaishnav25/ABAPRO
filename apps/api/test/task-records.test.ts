@@ -4,7 +4,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { AuthUser, ProgramDetail, TaskRecordHistory, TaskRecordingStatus } from '@abapro/shared';
+import type { AuthUser, ProgramDetail, SessionHistory, TaskRecordHistory, TaskRecordingStatus } from '@abapro/shared';
 import { createApplication, type RunningApplication } from '../src/create-application';
 
 const password = 'correct-horse-battery';
@@ -19,6 +19,7 @@ describe.sequential('task records', () => {
   const second = new CookieJar();
   const outsider = new CookieJar();
   const supervisor = new CookieJar();
+  const orgAdmin = new CookieJar();
   let clientId = '';
   let programId = '';
   let sessionTask = '';
@@ -60,6 +61,7 @@ describe.sequential('task records', () => {
     const secondUser = await inviteAndAccept(admin, second, 'records-second@example.com', 'Sid Second', 'therapist');
     await inviteAndAccept(admin, outsider, 'records-outsider@example.com', 'Oz Outsider', 'therapist');
     const supervisorUser = await inviteAndAccept(admin, supervisor, 'records-supervisor@example.com', 'Sue Supervisor', 'clinical_supervisor');
+    await inviteAndAccept(admin, orgAdmin, 'records-orgadmin@example.com', 'Ola Admin', 'organization_admin');
 
     const client = await api(admin, '/api/v1/clients', { method: 'POST', body: JSON.stringify({ displayName: 'Rory Records', clientCode: 'RR-100' }) });
     clientId = (client.body as { id: string }).id;
@@ -227,6 +229,52 @@ describe.sequential('task records', () => {
       body: JSON.stringify({ requestId: randomUUID(), promptLevels: ['independent'] }),
     });
     expect(plain.response.status).toBe(400);
+  });
+
+  it('shows administrators a read-only session history of the program', async () => {
+    const history = (jar: CookieJar, query = '') => api(jar, `/api/v1/programs/${programId}/session-history${query}`);
+    for (const jar of [first, second, supervisor, outsider]) {
+      expect((await history(jar)).response.status).toBe(403);
+    }
+
+    for (const jar of [orgAdmin, admin]) {
+      const all = await history(jar);
+      expect(all.response.status, all.text).toBe(200);
+      const body = all.body as SessionHistory;
+      const rows = await running.database.query<{ count: number | string }>(`SELECT count(*) FROM task_records WHERE program_id = $1`, [programId]);
+      expect(body.total).toBe(Number(rows[0]?.count));
+      expect(body.entries).toHaveLength(body.total);
+      const times = body.entries.map((entry) => entry.recordedAt);
+      expect([...times].sort().reverse()).toEqual(times);
+      expect(body.entries[0]).toMatchObject({ clientName: 'Rory Records', phase: 'treatment' });
+      expect(body.therapists.map((item) => item.name)).toEqual(['Fay First', 'Sid Second']);
+      expect(body.totals.reduce((sum, item) => sum + item.trials, 0)).toBe(body.total);
+    }
+
+    // Statuses are saved with each record: Status task was recorded while In Treatment and while Maintenance.
+    const statusTask = ((await history(orgAdmin)).body as SessionHistory).tasks.find((task) => task.title === 'Status task')?.id ?? '';
+    const forTask = (await history(orgAdmin, `?taskId=${statusTask}`)).body as SessionHistory;
+    expect(forTask.entries.every((entry) => entry.taskId === statusTask)).toBe(true);
+    expect(new Set(forTask.entries.map((entry) => entry.taskStatus))).toEqual(new Set(['in_treatment', 'maintenance']));
+    expect(forTask.totals.map((item) => [item.therapistName, item.trials])).toEqual([['Fay First', 2], ['Sid Second', 2]]);
+
+    const prompted = ((await history(orgAdmin, '?phase=treatment')).body as SessionHistory).entries.find((entry) => entry.promptLevels.length > 0);
+    expect(prompted?.response).toBeNull();
+    const firstOnly = (await history(orgAdmin, `?therapistId=${forTask.therapists.find((item) => item.name === 'Fay First')?.id}`)).body as SessionHistory;
+    expect(firstOnly.entries.every((entry) => entry.therapistName === 'Fay First')).toBe(true);
+    expect(((await history(orgAdmin, '?phase=baseline')).body as SessionHistory).total).toBe(0);
+    expect(((await history(orgAdmin, '?from=2999-01-01')).body as SessionHistory).total).toBe(0);
+    expect(((await history(orgAdmin, '?to=2000-01-01')).body as SessionHistory).total).toBe(0);
+    expect((await history(orgAdmin, '?phase=sometimes')).response.status).toBe(400);
+    expect((await history(orgAdmin, '?from=soon')).response.status).toBe(400);
+
+    // Nothing can change or remove a record.
+    const recordId = forTask.entries[0]?.id ?? '';
+    for (const method of ['PATCH', 'PUT', 'DELETE']) {
+      const attempt = await api(orgAdmin, `/api/v1/programs/targets/${statusTask}/records/${recordId}`, { method, body: JSON.stringify({ response: 'no' }) });
+      expect(attempt.response.status).toBe(404);
+    }
+    expect(((await history(orgAdmin, `?taskId=${statusTask}`)).body as SessionHistory).total).toBe(forTask.total);
   });
 
   it('starts a new day with the full limit', async () => {

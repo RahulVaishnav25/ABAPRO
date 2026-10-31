@@ -8,6 +8,8 @@ import type {
   ProgramDetail,
   ProgramSummary,
   ProgramWrite,
+  SessionHistory,
+  SessionHistoryFilters,
   StatusChange,
   TargetListItem,
   TargetWrite,
@@ -83,6 +85,13 @@ export function taskRecordsRequest(taskId: string, from?: string): Promise<TaskR
 
 export function recordTaskRequest(taskId: string, body: TaskRecordWrite): Promise<TaskRecordingStatus> {
   return apiRequest(encodedPath`/programs/targets/${taskId}/records`, { method: 'POST', body });
+}
+
+/** Administrators only: every record saved on the program's tasks, newest first. */
+export function sessionHistoryRequest(programId: string, filters: SessionHistoryFilters = {}): Promise<SessionHistory> {
+  const query = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])));
+  const search = query.toString();
+  return apiRequest(`${encodedPath`/programs/${programId}/session-history`}${search ? `?${search}` : ''}`);
 }
 
 export function uploadProgramDocumentRequest(programId: string, file: DocumentUpload): Promise<ProgramDetail> {
