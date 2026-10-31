@@ -1,16 +1,34 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { careStatusLabel, CARE_STATUSES, type CareStatus, type ClientDirectoryItem, type ProgramSummary } from '@abapro/shared';
+import {
+  careStatusLabel,
+  CARE_STATUSES,
+  type CareStatus,
+  type ClientDirectoryItem,
+  promptLevelLabel,
+  type ProgramSummary,
+  type PromptLevel,
+  type RecordResponse,
+  type TaskRecordingStatus,
+} from '@abapro/shared';
 import { clientDirectoryRequest } from '@/api/clients';
-import { programsRequest, setProgramStatusRequest, setTaskStatusRequest, targetsRequest } from '@/api/programs';
+import {
+  programsRequest,
+  recordingStatusesRequest,
+  recordTaskRequest,
+  setProgramStatusRequest,
+  setTaskStatusRequest,
+  targetsRequest,
+} from '@/api/programs';
 import { createTaskRequest, toTask, type CreateTaskInput, type TaskItem } from '@/api/tasks';
 import AppIcon from '@/components/navigation/AppIcon.vue';
 import CreateTaskModal from '@/components/programs/CreateTaskModal.vue';
 import type { ActionMenuItem } from '@/components/therapist/ActionMenu.vue';
 import ProgramCard from '@/components/therapist/ProgramCard.vue';
+import RecordDialog from '@/components/therapist/RecordDialog.vue';
 import StatusChangeDialog from '@/components/therapist/StatusChangeDialog.vue';
-import AppDialog from '@/components/ui/AppDialog.vue';
+import TaskGraphDialog from '@/components/therapist/TaskGraphDialog.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
@@ -47,6 +65,8 @@ const filteredClients = computed(() => {
 });
 const programs = ref<ProgramSummary[]>([]);
 const tasks = ref<TaskItem[]>([]);
+/** Today's shared recording capacity, by task. */
+const recording = ref(new Map<string, TaskRecordingStatus>());
 const expanded = ref(new Set<string>());
 
 // Client, status filter and view live in the URL so the workspace survives a reload.
@@ -105,11 +125,17 @@ const workspaceLoader = useLoader(async () => {
   if (!selectedId.value) {
     programs.value = [];
     tasks.value = [];
+    recording.value = new Map();
     return;
   }
-  const [clientPrograms, allTasks] = await Promise.all([programsRequest(selectedId.value), targetsRequest()]);
+  const [clientPrograms, allTasks, statuses] = await Promise.all([
+    programsRequest(selectedId.value),
+    targetsRequest(),
+    recordingStatusesRequest(selectedId.value),
+  ]);
   programs.value = clientPrograms;
   tasks.value = allTasks.filter((task) => task.clientId === selectedId.value).map(toTask);
+  recording.value = statusMap(statuses);
   workspaceLoaded.value = true;
 }, 'This client’s programs could not be loaded.', false);
 
@@ -144,7 +170,7 @@ function taskActions(task: TaskItem): ActionMenuItem[] {
   const items: ActionMenuItem[] = [];
   if (task.status !== 'on_hold') items.push({ key: 'hold', label: 'Move to On Hold' });
   if (task.status !== MASTERED_STATUS) items.push({ key: 'mastered', label: 'Mark as Mastered' });
-  items.push({ key: 'graph', label: 'View Task Graph' });
+  items.push({ key: 'graph', label: 'View Graph' });
   return items;
 }
 
@@ -223,7 +249,53 @@ async function addTask(input: CreateTaskInput): Promise<void> {
   }
 }
 
-// Task graph placeholder until graphs are built.
+// Recording. Other therapists may record at the same time, so capacity is refreshed when the popup opens.
+const recordTask = ref<TaskItem | null>(null);
+const recordingSaving = ref(false);
+/** Sent with the submit so that a repeated submit is saved once; renewed for each recording. */
+let recordRequestId = '';
+
+function statusMap(statuses: TaskRecordingStatus[]): Map<string, TaskRecordingStatus> {
+  return new Map(statuses.map((status) => [status.targetId, status]));
+}
+
+async function refreshRecording(): Promise<void> {
+  if (!selectedId.value) return;
+  const clientId = selectedId.value;
+  const statuses = await recordingStatusesRequest(clientId);
+  if (clientId === selectedId.value) recording.value = statusMap(statuses);
+}
+
+function openRecord(task: TaskItem): void {
+  recordRequestId = crypto.randomUUID();
+  recordTask.value = task;
+  void refreshRecording().catch(() => undefined);
+}
+
+async function saveRecord(value: { response: RecordResponse } | { promptLevels: PromptLevel[] }): Promise<void> {
+  const task = recordTask.value;
+  if (!task) return;
+  recordingSaving.value = true;
+  try {
+    const status = await recordTaskRequest(task.id, { requestId: recordRequestId, ...value });
+    recording.value = new Map(recording.value).set(task.id, status);
+    const recorded = 'promptLevels' in value
+      ? value.promptLevels.map(promptLevelLabel).join(', ')
+      : value.response === 'yes' ? '+ (Yes)' : '− (No)';
+    toast.push({
+      tone: 'success',
+      title: 'Recorded',
+      message: `${recorded} for ${task.name}. ${status.remainingToday} left today.`,
+    });
+    recordTask.value = null;
+  } catch (recordError) {
+    toast.push({ tone: 'danger', title: 'Not recorded', message: errorMessage(recordError, 'Try again.') });
+    await refreshRecording().catch(() => undefined);
+  } finally {
+    recordingSaving.value = false;
+  }
+}
+
 const graphTask = ref<TaskItem | null>(null);
 
 onMounted(async () => {
@@ -342,8 +414,10 @@ onMounted(async () => {
           :expanded="expanded.has(program.id)"
           :program-actions="programActions(program)"
           :task-actions="taskActions"
+          :recording="(task) => recording.get(task.id)"
           @program-action="onProgramAction(program, $event)"
           @task-action="onTaskAction"
+          @record="openRecord"
           @expand="expand(program.id)"
         />
       </div>
@@ -367,9 +441,16 @@ onMounted(async () => {
       @submit="addTask"
     />
 
-    <AppDialog :open="graphTask !== null" :title="`Task graph · ${graphTask?.name ?? ''}`" @close="graphTask = null">
-      <EmptyState title="Task graph coming soon" description="A graph of this task’s progress will appear here." />
-    </AppDialog>
+    <RecordDialog
+      :open="recordTask !== null"
+      :task="recordTask"
+      :status="recordTask ? recording.get(recordTask.id) : undefined"
+      :saving="recordingSaving"
+      @submit="saveRecord"
+      @close="recordTask = null"
+    />
+
+    <TaskGraphDialog :open="graphTask !== null" :task="graphTask" @close="graphTask = null" />
   </div>
 </template>
 

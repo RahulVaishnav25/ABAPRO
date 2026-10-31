@@ -524,6 +524,12 @@ table.data-table {
   padding: 20px;
 }
 
+.dialog.is-wide {
+  width: min(880px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
 .dialog h2 {
   font-size: 1.25rem;
 }

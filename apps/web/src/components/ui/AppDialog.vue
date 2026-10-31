@@ -5,6 +5,8 @@ const props = defineProps<{
   open: boolean;
   title: string;
   description?: string;
+  /** Wide dialogs hold graphs and tables, and scroll when taller than the window. */
+  wide?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -76,6 +78,7 @@ onBeforeUnmount(() => {
       <div
         ref="dialogRef"
         class="dialog"
+        :class="{ 'is-wide': wide }"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="titleId"

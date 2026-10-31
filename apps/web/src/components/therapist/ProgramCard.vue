@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { careStatusLabel, type ProgramSummary } from '@abapro/shared';
+import { careStatusLabel, RECORDABLE_STATUSES, type ProgramSummary, type TaskRecordingStatus } from '@abapro/shared';
 import type { TaskItem } from '@/api/tasks';
 import AppIcon from '@/components/navigation/AppIcon.vue';
 import ActionMenu, { type ActionMenuItem } from '@/components/therapist/ActionMenu.vue';
+import AppButton from '@/components/ui/AppButton.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { careStatusTone } from '@/lib/format';
 
@@ -18,8 +19,14 @@ const props = defineProps<{
   expanded: boolean;
   programActions: ActionMenuItem[];
   taskActions: (task: TaskItem) => ActionMenuItem[];
+  /** Today's shared recording capacity for a task, once loaded. */
+  recording: (task: TaskItem) => TaskRecordingStatus | undefined;
 }>();
-const emit = defineEmits<{ programAction: [key: string]; taskAction: [task: TaskItem, key: string]; expand: [] }>();
+const emit = defineEmits<{ programAction: [key: string]; taskAction: [task: TaskItem, key: string]; record: [task: TaskItem]; expand: [] }>();
+
+function capacity(status: TaskRecordingStatus | undefined): number {
+  return status ? status.trialsPerSession * status.sessionsPerDay : 0;
+}
 
 const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0, TASKS_SHOWN)));
 </script>
@@ -58,6 +65,18 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
             <strong class="task-name">{{ task.name }}</strong>
             <span class="task-meta">{{ task.phase }} · {{ task.desiredTrials }} trials</span>
             <StatusBadge :tone="careStatusTone(task.status)" :label="careStatusLabel(task.status)" />
+            <div v-if="recording(task)" class="task-record">
+              <span class="task-capacity">{{ recording(task)?.remainingToday }} of {{ capacity(recording(task)) }} left today</span>
+              <AppButton
+                v-if="recording(task)?.mayRecord && RECORDABLE_STATUSES.includes(task.status)"
+                size="sm"
+                :disabled="recording(task)?.remainingToday === 0"
+                :aria-label="`Record ${task.name}`"
+                @click="emit('record', task)"
+              >
+                Record
+              </AppButton>
+            </div>
           </div>
           <ActionMenu :label="`Actions for task ${task.name}`" :items="taskActions(task)" @select="emit('taskAction', task, $event)" />
         </li>
@@ -266,6 +285,22 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
 
 .task-meta {
   font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.task-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 8px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.task-capacity {
+  font-size: 0.78rem;
+  font-weight: 600;
   color: var(--color-text-muted);
 }
 

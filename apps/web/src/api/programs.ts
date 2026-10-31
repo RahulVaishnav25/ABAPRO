@@ -11,6 +11,9 @@ import type {
   StatusChange,
   TargetListItem,
   TargetWrite,
+  TaskRecordHistory,
+  TaskRecordingStatus,
+  TaskRecordWrite,
 } from '@abapro/shared';
 import { apiRequest, encodedPath } from './client';
 
@@ -67,6 +70,19 @@ export function targetsRequest(programId?: string): Promise<TargetListItem[]> {
 
 export function targetRequest(id: string): Promise<TargetListItem> {
   return apiRequest(encodedPath`/programs/targets/${id}`);
+}
+
+/** Today's remaining recording capacity for each of a client's tasks. */
+export function recordingStatusesRequest(clientId: string): Promise<TaskRecordingStatus[]> {
+  return apiRequest(`/programs/records/status?${new URLSearchParams({ clientId })}`);
+}
+
+export function taskRecordsRequest(taskId: string, from?: string): Promise<TaskRecordHistory> {
+  return apiRequest(`${encodedPath`/programs/targets/${taskId}/records`}${from ? `?${new URLSearchParams({ from })}` : ''}`);
+}
+
+export function recordTaskRequest(taskId: string, body: TaskRecordWrite): Promise<TaskRecordingStatus> {
+  return apiRequest(encodedPath`/programs/targets/${taskId}/records`, { method: 'POST', body });
 }
 
 export function uploadProgramDocumentRequest(programId: string, file: DocumentUpload): Promise<ProgramDetail> {

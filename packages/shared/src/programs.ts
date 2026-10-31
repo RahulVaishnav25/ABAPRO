@@ -333,3 +333,84 @@ export interface DocumentUpload {
 }
 
 
+// Task recording. A day holds up to sessionsPerDay sessions of trialsPerSession records,
+// shared by every therapist assigned to the client.
+
+export type RecordResponse = 'yes' | 'no';
+
+/** Recorded instead of Yes or No on tasks with Prompt Used. A record may hold several. */
+export const PROMPT_LEVELS = ['independent', 'full_prompt', 'partial_prompt', 'gesture_prompt', 'model_prompt', 'positional'] as const;
+export type PromptLevel = (typeof PROMPT_LEVELS)[number];
+
+export const PROMPT_LEVEL_OPTIONS: ReadonlyArray<{ value: PromptLevel; label: string }> = [
+  { value: 'independent', label: 'Independent' },
+  { value: 'full_prompt', label: 'Full Prompt' },
+  { value: 'partial_prompt', label: 'Partial Prompt' },
+  { value: 'gesture_prompt', label: 'Gesture Prompt' },
+  { value: 'model_prompt', label: 'Model Prompt' },
+  { value: 'positional', label: 'Positional' },
+];
+
+export function promptLevelLabel(level: string): string {
+  return PROMPT_LEVEL_OPTIONS.find((option) => option.value === level)?.label ?? level;
+}
+
+/** Only tasks in these statuses take new records. Records already saved stay in the history. */
+export const RECORDABLE_STATUSES: readonly CareStatus[] = ['in_treatment', 'maintenance'];
+
+export interface TaskRecordingStatus {
+  targetId: string;
+  /** The client's current day, YYYY-MM-DD. */
+  date: string;
+  trialsPerSession: number;
+  sessionsPerDay: number;
+  recordedToday: number;
+  remainingToday: number;
+  /** The session and trial the next record fills, or null when today is full. */
+  nextSession: number | null;
+  nextTrial: number | null;
+  /** The task's Prompt Used setting: records take prompt levels instead of Yes or No. */
+  promptUsed: boolean;
+  /** Whether the current user may record for this task: an assigned therapist, on a task In Treatment or Maintenance. */
+  mayRecord: boolean;
+}
+
+export interface TaskRecord {
+  id: string;
+  targetId: string;
+  clientId: string;
+  therapistId: string;
+  therapistName: string;
+  /** Yes or No, or null when the record holds prompt levels. */
+  response: RecordResponse | null;
+  promptLevels: PromptLevel[];
+  recordDate: string;
+  sessionNumber: number;
+  trialNumber: number;
+  recordedAt: string;
+}
+
+export interface TaskRecordDay {
+  date: string;
+  yes: number;
+  no: number;
+  /** How many records that day selected each prompt level. */
+  prompts: Record<PromptLevel, number>;
+}
+
+export interface TaskRecordHistory {
+  status: TaskRecordingStatus;
+  days: TaskRecordDay[];
+  /** The most recent records in the requested range, newest first. */
+  records: TaskRecord[];
+}
+
+export interface TaskRecordWrite {
+  /** Generated when the Record popup opens, so a repeated submit saves once. */
+  requestId: string;
+  /** For tasks without Prompt Used. */
+  response?: RecordResponse;
+  /** For tasks with Prompt Used: one or more levels. */
+  promptLevels?: PromptLevel[];
+}
+

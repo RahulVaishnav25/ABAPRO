@@ -1,6 +1,6 @@
-import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CARE_STATUSES } from '@abapro/shared';
+import { CARE_STATUSES, PROMPT_LEVELS } from '@abapro/shared';
 import type {
   AssessmentItemWrite,
   AssessmentStatus,
@@ -11,10 +11,13 @@ import type {
   MeasurementMethod,
   MeasurementProcedure,
   ProgramWrite,
+  PromptLevel,
   StatusChange,
+  RecordResponse,
   ResponseKind,
   TargetStatus,
   TargetWrite,
+  TaskRecordWrite,
 } from '@abapro/shared';
 
 export class ItemDto implements AssessmentItemWrite {
@@ -414,6 +417,23 @@ export class StatusChangeDto implements StatusChange {
   @IsString()
   @MaxLength(1000)
   changeReason!: string;
+}
+
+export class TaskRecordDto implements TaskRecordWrite {
+  @IsUUID()
+  requestId!: string;
+
+  // The service requires a response or prompt levels, matching the task's Prompt Used setting.
+  @IsOptional()
+  @IsIn(['yes', 'no'])
+  response?: RecordResponse;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(PROMPT_LEVELS.length)
+  @ArrayUnique()
+  @IsIn(PROMPT_LEVELS, { each: true })
+  promptLevels?: PromptLevel[];
 }
 
 export class DocumentUploadDto implements DocumentUpload {

@@ -1,19 +1,25 @@
-import { Body, Controller, Get, HttpStatus, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpStatus, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   PERMISSIONS,
   type AuthUser,
   type ProgramDetail,
   type ProgramSummary,
   type TargetListItem,
+  type TaskRecordHistory,
+  type TaskRecordingStatus,
 } from '@abapro/shared';
 import { RequirePermissions } from '../common/auth.decorators';
 import { CurrentUser } from '../common/current-user.decorator';
-import { DocumentUploadDto, ProgramDto, StatusChangeDto, TargetDto } from './clinical.dto';
+import { DocumentUploadDto, ProgramDto, StatusChangeDto, TargetDto, TaskRecordDto } from './clinical.dto';
 import { ProgramService } from './program.service';
+import { TaskRecordService } from './task-record.service';
 
 @Controller('v1/programs')
 export class ProgramsController {
-  constructor(@Inject(ProgramService) private readonly programs: ProgramService) {}
+  constructor(
+    @Inject(ProgramService) private readonly programs: ProgramService,
+    @Inject(TaskRecordService) private readonly records: TaskRecordService,
+  ) {}
 
   @Get()
   @RequirePermissions(PERMISSIONS.programsView)
@@ -44,6 +50,40 @@ export class ProgramsController {
     @Param('targetId', new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.NOT_FOUND })) targetId: string,
   ): Promise<TargetListItem> {
     return this.programs.getTarget(user, targetId);
+  }
+
+  /** Today's remaining recording capacity for each of a client's tasks. */
+  @Get('records/status')
+  @RequirePermissions(PERMISSIONS.programsView)
+  recordingStatuses(
+    @CurrentUser() user: AuthUser,
+    @Query('clientId', new ParseUUIDPipe()) clientId: string,
+  ): Promise<TaskRecordingStatus[]> {
+    return this.records.statuses(user, clientId);
+  }
+
+  @Get('targets/:targetId/records')
+  @RequirePermissions(PERMISSIONS.programsView)
+  taskRecords(
+    @CurrentUser() user: AuthUser,
+    @Param('targetId', new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.NOT_FOUND })) targetId: string,
+    @Query('from') from?: string,
+  ): Promise<TaskRecordHistory> {
+    if (from !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+      throw new BadRequestException('Use a from date in the form YYYY-MM-DD.');
+    }
+    return this.records.history(user, targetId, from);
+  }
+
+  // The service allows only therapists assigned to the client.
+  @Post('targets/:targetId/records')
+  @RequirePermissions(PERMISSIONS.programsView)
+  recordTask(
+    @CurrentUser() user: AuthUser,
+    @Param('targetId', new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.NOT_FOUND })) targetId: string,
+    @Body() body: TaskRecordDto,
+  ): Promise<TaskRecordingStatus> {
+    return this.records.record(user, targetId, body);
   }
 
   @Get(':programId')
