@@ -8,6 +8,7 @@
     "prebuild": "npm run build -w @abapro/shared",
     "build": "nest build",
     "start": "node dist/main.js",
+    "seed:sample": "npm run build && node dist/seed/seed-sample-data.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src test"
   },
