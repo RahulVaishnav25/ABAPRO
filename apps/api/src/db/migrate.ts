@@ -20,6 +20,7 @@ const MIGRATIONS = [
   '015_care_team_assignments',
   '016_care_statuses',
   '017_mastered_status',
+  '018_task_prompt_used',
 ];
 
 export async function migrate(db: Database): Promise<void> {

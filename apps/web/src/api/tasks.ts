@@ -13,6 +13,7 @@ export interface TaskItem {
   baselineSessions?: number;
   baselineProbe?: number;
   sd: string;
+  promptUsed: boolean;
   programId: string;
   programTitle: string;
   clientId: string;
@@ -29,6 +30,7 @@ export interface CreateTaskInput {
   baselineSessions?: number;
   baselineProbe?: number;
   sd: string;
+  promptUsed?: boolean;
   /** Chosen in the modal when it is not opened from a program. */
   programId?: string;
   /** Set only from the Edit form. New tasks always start In Treatment. */
@@ -72,6 +74,7 @@ export function toTask(target: TargetListItem): TaskItem {
     // The modal fills a blank baseline probe with 100%, so show the same default.
     baselineProbe: target.baselineProbe ?? (target.phase === 'baseline' ? DEFAULT_MASTERY_PROBE : undefined),
     sd: target.sd,
+    promptUsed: target.promptUsed,
     programId: target.programId,
     programTitle: target.programTitle,
     clientId: target.clientId,
@@ -127,6 +130,7 @@ export async function createTaskRequest(
     expectedTrialCount: usesTrials(program.measurementType) ? input.desiredTrials : undefined,
     phase: apiPhase(input.phase),
     ...taskCriteria(input),
+    promptUsed: input.promptUsed ?? false,
   });
   // A new target is placed after the program's existing targets.
   const created = detail.targets.reduce((latest, target) => (target.sortOrder > latest.sortOrder ? target : latest));
@@ -159,6 +163,7 @@ export async function updateTaskRequest(taskId: string, input: CreateTaskInput):
     masteryProbe: criteria.masteryProbe === current.masteryProbe ? undefined : criteria.masteryProbe,
     baselineSessions: criteria.baselineSessions === (current.baselineSessions ?? null) ? undefined : criteria.baselineSessions,
     baselineProbe: criteria.baselineProbe === (current.baselineProbe ?? null) ? undefined : criteria.baselineProbe,
+    promptUsed: input.promptUsed ?? target.promptUsed,
     changeReason: input.changeReason?.trim() || undefined,
   };
   return findTask(await saveTargetRequest(target.programId, body, target.id), target.id);

@@ -242,6 +242,7 @@ export class ProgramService {
         masteryProbe: input.masteryProbe === undefined ? current.mastery_probe : input.masteryProbe,
         baselineSessions: input.baselineSessions === undefined ? current.baseline_sessions : input.baselineSessions,
         baselineProbe: input.baselineProbe === undefined ? current.baseline_probe : input.baselineProbe,
+        promptUsed: input.promptUsed ?? current.prompt_used,
       };
       const configChanged = measurement.method !== current.measurement_method
         || measurement.trials !== current.expected_trial_count
@@ -269,7 +270,7 @@ export class ProgramService {
              baseline_note = $7, teaching_instructions = $8, prompt_hierarchy = $9, mastery_criteria = $10,
              phase = $11, status = $12, started_on = $13, review_on = $14, clinical_notes = $15,
              sd = $16, mastery_sessions = $17, mastery_probe = $18, baseline_sessions = $19, baseline_probe = $20,
-             updated_at = now()
+             prompt_used = $21, updated_at = now()
          WHERE id = $1`,
         [
           targetId, input.title.trim(), input.description?.trim() ?? '', input.operationalDefinition?.trim() ?? '',
@@ -277,6 +278,7 @@ export class ProgramService {
           input.promptHierarchy?.trim() ?? '', input.masteryCriteria?.trim() ?? '', nextPhase, status,
           input.startedOn || null, input.reviewOn || null, input.clinicalNotes?.trim() ?? '',
           criteria.sd, criteria.masterySessions, criteria.masteryProbe, criteria.baselineSessions, criteria.baselineProbe,
+          criteria.promptUsed,
         ],
       );
       await recordAudit(tx, {
@@ -564,15 +566,15 @@ async function insertTarget(
        id, organization_id, client_id, program_id, name, description, operational_definition, measurement_method,
        expected_trial_count, baseline_note, teaching_instructions, prompt_hierarchy, mastery_criteria, phase, status,
        started_on, review_on, clinical_notes, sort_order, created_by,
-       sd, mastery_sessions, mastery_probe, baseline_sessions, baseline_probe
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'in_treatment',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+       sd, mastery_sessions, mastery_probe, baseline_sessions, baseline_probe, prompt_used
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'in_treatment',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
     [
       id, organizationId, clientId, programId, input.title.trim(), input.description?.trim() ?? '', input.operationalDefinition?.trim() ?? '',
       measurement.method, measurement.trials, input.baselineNote?.trim() ?? '', input.teachingInstructions?.trim() ?? '',
       input.promptHierarchy?.trim() ?? '', input.masteryCriteria?.trim() ?? '', input.phase ?? 'baseline',
       input.startedOn || null, input.reviewOn || null, input.clinicalNotes?.trim() ?? '', sortOrder, userId,
       input.sd?.trim() ?? '', input.masterySessions ?? null, input.masteryProbe ?? null,
-      input.baselineSessions ?? null, input.baselineProbe ?? null,
+      input.baselineSessions ?? null, input.baselineProbe ?? null, input.promptUsed ?? false,
     ],
   );
   await insertTargetVersion(tx, organizationId, id, 1, measurement, input, 'Initial configuration', userId);
@@ -616,13 +618,14 @@ interface TargetRow {
   mastery_probe: number | null;
   baseline_sessions: number | null;
   baseline_probe: number | null;
+  prompt_used: boolean;
 }
 
 async function targetRow(tx: Queryable, programId: string, targetId: string): Promise<TargetRow> {
   const rows = await tx.query<{ [key: string]: unknown } & TargetRow>(
     `SELECT measurement_method, expected_trial_count, mastery_criteria, prompt_hierarchy, teaching_instructions,
             baseline_note, phase, status, configuration_version,
-            sd, mastery_sessions, mastery_probe, baseline_sessions, baseline_probe
+            sd, mastery_sessions, mastery_probe, baseline_sessions, baseline_probe, prompt_used
      FROM client_targets WHERE id = $1 AND program_id = $2`,
     [targetId, programId],
   );
@@ -641,13 +644,14 @@ async function targetRow(tx: Queryable, programId: string, targetId: string): Pr
     mastery_probe: asNullableNumber(row.mastery_probe),
     baseline_sessions: asNullableNumber(row.baseline_sessions),
     baseline_probe: asNullableNumber(row.baseline_probe),
+    prompt_used: row.prompt_used === true,
   };
 }
 
 const TARGET_COLUMNS = `t.id, t.name, t.description, t.operational_definition, t.measurement_method, t.expected_trial_count,
   t.baseline_note, t.teaching_instructions, t.prompt_hierarchy, t.mastery_criteria, t.phase, t.status,
   to_char(t.started_on, 'YYYY-MM-DD') AS started_on, to_char(t.review_on, 'YYYY-MM-DD') AS review_on,
-  t.clinical_notes, t.sd, t.mastery_sessions, t.mastery_probe, t.baseline_sessions, t.baseline_probe,
+  t.clinical_notes, t.sd, t.mastery_sessions, t.mastery_probe, t.baseline_sessions, t.baseline_probe, t.prompt_used,
   t.sort_order, t.configuration_version`;
 
 interface TargetSelectRow {
@@ -656,7 +660,7 @@ interface TargetSelectRow {
   expected_trial_count: number | null; baseline_note: string; teaching_instructions: string; prompt_hierarchy: string;
   mastery_criteria: string; phase: string; status: TargetStatus; started_on: string | null; review_on: string | null;
   clinical_notes: string; sd: string; mastery_sessions: number | null; mastery_probe: number | null;
-  baseline_sessions: number | null; baseline_probe: number | null; sort_order: number; configuration_version: number;
+  baseline_sessions: number | null; baseline_probe: number | null; prompt_used: boolean; sort_order: number; configuration_version: number;
 }
 
 /** Lists targets with their program and client. `where` may refer to `t` (target) and `p` (program). */
@@ -696,6 +700,7 @@ function mapTarget(target: TargetSelectRow): TargetSummary {
     masteryProbe: asNullableNumber(target.mastery_probe),
     baselineSessions: asNullableNumber(target.baseline_sessions),
     baselineProbe: asNullableNumber(target.baseline_probe),
+    promptUsed: target.prompt_used === true,
     sortOrder: Number(target.sort_order),
     configurationVersion: Number(target.configuration_version),
   };

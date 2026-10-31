@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { CARE_STATUS_OPTIONS, careStatusLabel, type CareStatus, type ProgramSummary } from '@abapro/shared';
 import { taskCriteriaChanged, type CreateTaskInput, type TaskItem } from '@/api/tasks';
+import AppCheckbox from '@/components/ui/AppCheckbox.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -30,7 +31,7 @@ const emit = defineEmits<{
 
 const taskNameInput = ref<HTMLInputElement | null>(null);
 
-const form = reactive<CreateTaskInput & { programId: string; changeReason: string; status: CareStatus }>({
+const form = reactive<CreateTaskInput & { programId: string; changeReason: string; status: CareStatus; promptUsed: boolean }>({
   name: '',
   desiredTrials: 1,
   phase: 'Treatment',
@@ -39,6 +40,7 @@ const form = reactive<CreateTaskInput & { programId: string; changeReason: strin
   baselineSessions: undefined,
   baselineProbe: 100,
   sd: '',
+  promptUsed: false,
   programId: '',
   changeReason: '',
   status: 'in_treatment',
@@ -82,6 +84,7 @@ function resetForm(): void {
   form.baselineSessions = undefined;
   form.baselineProbe = 100;
   form.sd = '';
+  form.promptUsed = false;
   form.programId = '';
   form.changeReason = '';
   form.status = 'in_treatment';
@@ -97,6 +100,7 @@ function populateFromTask(t: TaskItem): void {
   form.baselineSessions = t.baselineSessions;
   form.baselineProbe = t.baselineProbe ?? 100;
   form.sd = t.sd || '';
+  form.promptUsed = t.promptUsed;
   form.programId = t.programId;
   form.changeReason = '';
   form.status = t.status;
@@ -239,6 +243,7 @@ function handleSubmit(): void {
     masterySessions: Number(form.masterySessions) || 3,
     masteryProbe: Number(form.masteryProbe),
     sd: form.sd.trim(),
+    promptUsed: form.promptUsed,
     programId: choosesProgram.value ? form.programId : undefined,
     changeReason: needsReason.value ? form.changeReason.trim() : undefined,
     status: props.mode === 'edit' ? form.status : undefined,
@@ -571,6 +576,12 @@ function handleSubmit(): void {
               ></textarea>
               <p id="task-sd-hint" class="field-hint">Based on current target.</p>
             </div>
+          </div>
+
+          <div class="field-divider" aria-hidden="true"></div>
+
+          <div class="field-group">
+            <AppCheckbox v-model="form.promptUsed" label="Prompt Used" :disabled="mode === 'preview'" />
           </div>
 
           <template v-if="needsReason">

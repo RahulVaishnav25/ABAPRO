@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CARE_STATUSES } from '@abapro/shared';
 import type {
@@ -388,6 +388,10 @@ export class TargetDto implements TargetWrite {
   baselineProbe?: number | null;
 
   @IsOptional()
+  @IsBoolean()
+  promptUsed?: boolean;
+
+  @IsOptional()
   @IsString()
   @MaxLength(1000)
   changeReason?: string;
@@ -426,3 +430,4 @@ export class DocumentUploadDto implements DocumentUpload {
   @MaxLength(700_000)
   contentBase64!: string;
 }
+

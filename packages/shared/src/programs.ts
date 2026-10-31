@@ -163,6 +163,7 @@ export interface TargetSummary {
   masteryProbe: number | null;
   baselineSessions: number | null;
   baselineProbe: number | null;
+  promptUsed: boolean;
   sortOrder: number;
   configurationVersion: number;
 }
@@ -315,6 +316,7 @@ export interface TargetWrite {
   masteryProbe?: number | null;
   baselineSessions?: number | null;
   baselineProbe?: number | null;
+  promptUsed?: boolean;
   changeReason?: string;
 }
 
@@ -329,4 +331,5 @@ export interface DocumentUpload {
   contentType: string;
   contentBase64: string;
 }
+
 

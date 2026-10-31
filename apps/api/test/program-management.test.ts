@@ -272,11 +272,12 @@ describe.sequential('program and target management', () => {
         masteryProbe: 80,
         baselineSessions: 2,
         baselineProbe: 70,
+        promptUsed: true,
       }),
     });
     expect(created.response.status).toBe(201);
     const stored = (created.body as ProgramDetail).targets.find((item) => item.title === 'Echoic single words');
-    expect(stored).toMatchObject({ sd: 'Say "ball"', masterySessions: 3, masteryProbe: 80, baselineSessions: 2, baselineProbe: 70 });
+    expect(stored).toMatchObject({ sd: 'Say "ball"', masterySessions: 3, masteryProbe: 80, baselineSessions: 2, baselineProbe: 70, promptUsed: true });
     taskTargetId = stored?.id ?? '';
 
     const all = await api(admin, '/api/v1/programs/targets');
@@ -301,7 +302,13 @@ describe.sequential('program and target management', () => {
     });
     expect(sdOnly.response.status).toBe(200);
     const kept = (sdOnly.body as ProgramDetail).targets.find((item) => item.id === taskTargetId);
-    expect(kept).toMatchObject({ sd: 'Say "car"', masterySessions: 3, masteryProbe: 80, baselineSessions: 2, configurationVersion: 1 });
+    expect(kept).toMatchObject({ sd: 'Say "car"', masterySessions: 3, masteryProbe: 80, baselineSessions: 2, promptUsed: true, configurationVersion: 1 });
+    const unchecked = await api(admin, `/api/v1/programs/${programId}/targets/${taskTargetId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...base, promptUsed: false }),
+    });
+    expect(unchecked.response.status).toBe(200);
+    expect((unchecked.body as ProgramDetail).targets.find((item) => item.id === taskTargetId)).toMatchObject({ promptUsed: false, configurationVersion: 1 });
 
     const noReason = await api(admin, `/api/v1/programs/${programId}/targets/${taskTargetId}`, {
       method: 'PATCH',

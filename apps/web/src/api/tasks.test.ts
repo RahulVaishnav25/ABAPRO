@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProgramDetail, TargetListItem } from '@abapro/shared';
 import { saveTargetRequest, targetRequest } from './programs';
-import { apiPhase, createTaskRequest, displayPhase, taskCriteriaChanged, toTask, updateTaskRequest, type CreateTaskInput } from './tasks';
+import { apiPhase, createTaskRequest, displayPhase, getTaskRequest, taskCriteriaChanged, toTask, updateTaskRequest, type CreateTaskInput } from './tasks';
 
 vi.mock('./programs', () => ({
   programsRequest: vi.fn(),
@@ -32,6 +32,7 @@ function target(overrides: Partial<TargetListItem> = {}): TargetListItem {
     masteryProbe: 90,
     baselineSessions: null,
     baselineProbe: null,
+    promptUsed: false,
     sortOrder: 0,
     configurationVersion: 1,
     programId: 'program-1',
@@ -89,10 +90,10 @@ describe('tasks', () => {
 
   it('creates a target in the chosen program and returns it as a task', async () => {
     vi.mocked(saveTargetRequest).mockResolvedValue(program([target({ id: 'old' }), target({ id: 'new', title: 'Echoic', sortOrder: 1 })]));
-    const created = await createTaskRequest({ id: 'program-1', measurementType: 'trial' }, input({ name: ' Echoic ', phase: 'Baseline', baselineSessions: 2, baselineProbe: 80 }));
+    const created = await createTaskRequest({ id: 'program-1', measurementType: 'trial' }, input({ name: ' Echoic ', phase: 'Baseline', baselineSessions: 2, baselineProbe: 80, promptUsed: true }));
     expect(saveTargetRequest).toHaveBeenCalledWith('program-1', {
       title: 'Echoic', measurementMethod: 'trial', expectedTrialCount: 5, phase: 'baseline',
-      sd: 'What do you want?', masterySessions: 3, masteryProbe: 90, baselineSessions: 2, baselineProbe: 80,
+      sd: 'What do you want?', masterySessions: 3, masteryProbe: 90, baselineSessions: 2, baselineProbe: 80, promptUsed: true,
     });
     expect(created.id).toBe('new');
   });
@@ -122,5 +123,15 @@ describe('tasks', () => {
       masterySessions: undefined,
       masteryProbe: undefined,
     }), 'target-1');
+  });
+
+  it('keeps Prompt Used unless the Edit form sends it', async () => {
+    vi.mocked(targetRequest).mockResolvedValue(target({ promptUsed: true }));
+    vi.mocked(saveTargetRequest).mockResolvedValue(program([target({ promptUsed: true })]));
+    expect((await getTaskRequest('target-1')).promptUsed).toBe(true);
+    await updateTaskRequest('target-1', input());
+    expect(saveTargetRequest).toHaveBeenLastCalledWith('program-1', expect.objectContaining({ promptUsed: true }), 'target-1');
+    await updateTaskRequest('target-1', input({ promptUsed: false }));
+    expect(saveTargetRequest).toHaveBeenLastCalledWith('program-1', expect.objectContaining({ promptUsed: false }), 'target-1');
   });
 });
