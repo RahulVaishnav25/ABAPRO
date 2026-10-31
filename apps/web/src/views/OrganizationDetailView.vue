@@ -15,7 +15,6 @@ import {
   type OrganizationFormValue,
 } from '@/components/organization/form-values';
 import OrganizationFormFields from '@/components/organization/OrganizationFormFields.vue';
-import TeamMemberForm from '@/components/organization/TeamMemberForm.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
@@ -221,14 +220,6 @@ onMounted(() => {
             </form>
           </div>
         </div>
-      </section>
-      <section class="panel">
-        <h2>Team members</h2>
-        <p v-if="organization.members.length === 0">No team members yet.</p>
-        <ul v-else>
-          <li v-for="member in organization.members" :key="member.userId">{{ member.name }} · {{ member.email }} · {{ member.roleLabel }}</li>
-        </ul>
-        <TeamMemberForm v-if="canManage" :organization-id="organization.id" @created="organization = $event" />
       </section>
       <form v-if="canManage" class="panel" @submit.prevent="addClinic">
         <h2>Add a clinic</h2>
