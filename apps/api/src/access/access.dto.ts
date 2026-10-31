@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -336,4 +337,34 @@ export class UpdateRolePermissionsDto {
 export class ChangeRoleDto {
   @IsIn(['organization_admin', 'clinical_supervisor', 'therapist', 'parent', 'reviewer'])
   role!: 'organization_admin' | 'clinical_supervisor' | 'therapist' | 'parent' | 'reviewer';
+}
+
+export class CreateParentDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name!: string;
+
+  @IsString()
+  @MaxLength(180)
+  email!: string;
+
+  @IsString()
+  @MinLength(10)
+  @MaxLength(128)
+  password!: string;
+
+  // Optional: a parent without a linked client stays pending.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsUUID('all', { each: true })
+  clientIds?: string[];
+}
+
+export class ParentClientsDto {
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID('all', { each: true })
+  clientIds!: string[];
 }

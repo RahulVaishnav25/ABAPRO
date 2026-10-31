@@ -25,6 +25,7 @@ const MIGRATIONS = [
   '020_task_record_prompt_levels',
   '021_task_record_statuses',
   '022_program_communication',
+  '023_parent_linked_clients',
 ];
 
 export async function migrate(db: Database): Promise<void> {

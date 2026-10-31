@@ -13,6 +13,6 @@ import { OrganizationService } from '../organizations/organization.service';
   imports: [AccessModule],
   controllers: [AuthController, OrganizationController],
   providers: [AccountService, OidcClientService, SessionService, OrganizationService, ClinicDirectoryService, PlatformAccountService],
-  exports: [SessionService, AccountService],
+  exports: [SessionService, AccountService, OrganizationService],
 })
 export class AuthModule {}

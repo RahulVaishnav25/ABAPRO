@@ -126,10 +126,10 @@ export function featureByKey(key: string): FeatureDefinition {
 }
 
 export interface PrimaryNavigationItem {
-  key: 'home' | 'children' | 'programs' | 'settings' | 'organisations' | 'clinics' | 'platform';
+  key: 'home' | 'children' | 'programs' | 'onboarding' | 'settings' | 'organisations' | 'clinics' | 'platform';
   title: string;
   route: string;
-  icon: 'home' | 'children' | 'programs' | 'settings' | 'organisations' | 'clinics' | 'dashboard';
+  icon: 'home' | 'children' | 'programs' | 'team' | 'settings' | 'organisations' | 'clinics' | 'dashboard';
   matches: readonly string[];
 }
 
@@ -137,6 +137,7 @@ export const PRIMARY_NAVIGATION = [
   { key: 'home', title: 'Dashboard', route: '/', icon: 'dashboard', matches: [] },
   { key: 'children', title: 'Clients', route: '/clients', icon: 'children', matches: ['/clients'] },
   { key: 'programs', title: 'Programs', route: '/programs', icon: 'programs', matches: ['/programs'] },
+  { key: 'onboarding', title: 'Onboarding', route: '/onboarding/teams', icon: 'team', matches: ['/onboarding/teams', '/onboarding/parents'] },
   { key: 'settings', title: 'Settings', route: '/settings', icon: 'settings', matches: ['/settings', '/team'] },
 ] as const satisfies readonly PrimaryNavigationItem[];
 
@@ -168,10 +169,14 @@ export function navigationFor(
   permissions: readonly Permission[],
   options: { platformAdmin?: boolean; organizationId?: string } = {},
 ): PrimaryNavigationItem[] {
-  const items: PrimaryNavigationItem[] = PRIMARY_NAVIGATION.filter((item) => {
+  const items: PrimaryNavigationItem[] = PRIMARY_NAVIGATION.map((item): PrimaryNavigationItem =>
+    // Someone who manages parents but cannot view the team starts on the Parents tab.
+    item.key === 'onboarding' && !permissions.includes(PERMISSIONS.teamView) ? { ...item, route: '/onboarding/parents' } : item,
+  ).filter((item) => {
     if (item.key === 'home') return !options.platformAdmin && permissions.includes(PERMISSIONS.dashboardView);
     if (item.key === 'children') return permissions.includes(PERMISSIONS.clientsView);
     if (item.key === 'programs') return permissions.includes(PERMISSIONS.programsView);
+    if (item.key === 'onboarding') return permissions.includes(PERMISSIONS.teamView) || permissions.includes(PERMISSIONS.guardiansManage);
     return permissions.includes(PERMISSIONS.settingsView) || permissions.includes(PERMISSIONS.teamView) || options.platformAdmin === true;
   });
   if (options.platformAdmin) {

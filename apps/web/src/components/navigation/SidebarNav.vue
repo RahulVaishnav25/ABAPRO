@@ -32,7 +32,7 @@ const TASKS_NAV_ITEM: SidebarNavItem = {
 };
 
 /** Every role sees its items in this order; a role only shows the items it has access to. */
-const NAV_ORDER = ['platform', 'home', 'therapy', 'organisations', 'clinics', 'children', 'programs', 'tasks', 'settings'];
+const NAV_ORDER = ['platform', 'home', 'therapy', 'organisations', 'clinics', 'children', 'programs', 'tasks', 'onboarding', 'settings'];
 
 withDefaults(
   defineProps<{
@@ -81,6 +81,11 @@ const items = computed<SidebarNavItem[]>(() => {
 
   if (navItems.some((item) => item.key === 'programs')) {
     navItems.push(TASKS_NAV_ITEM);
+  }
+
+  // Like Programs, opening Onboarding moves a super admin into an organisation.
+  if (isPlatformAdmin && !navItems.some((item) => item.key === 'onboarding')) {
+    navItems.push({ key: 'onboarding', title: 'Onboarding', route: '/onboarding/teams', icon: 'team', matches: ['/onboarding/teams', '/onboarding/parents'] });
   }
 
   if (auth.user?.role === 'therapist') {

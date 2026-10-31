@@ -1,5 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpException, Inject, Post, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
-import type { AuthProviderInfo, AuthUser, LogoutResult, SignInAccount } from '@abapro/shared';
+import { Body, Controller, ForbiddenException, Get, HttpCode, HttpException, Inject, Post, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { PARENT_ACCESS_PENDING_MESSAGE, type AuthProviderInfo, type AuthUser, type LogoutResult, type SignInAccount } from '@abapro/shared';
 import type { Request, Response } from 'express';
 import * as Iron from '@hapi/iron';
 import type { AppConfig } from '../config/app-config';
@@ -101,6 +101,10 @@ export class AuthController {
     if (!account) {
       throw new UnauthorizedException('The email or password is incorrect.');
     }
+    const userId = await this.userIdForAccount(account.id);
+    if (userId && (await this.accounts.load(userId, null)).parentAccessPending) {
+      throw new ForbiddenException(PARENT_ACCESS_PENDING_MESSAGE);
+    }
     const created = await this.sessions.createForAccount(account);
     setCookie(response, SESSION_COOKIE, created.secret, {
       secure: this.config.cookieSecure,
@@ -151,6 +155,12 @@ export class AuthController {
       const tokens = await this.oidc.exchange(currentUrl, stored);
       const secret = await this.sessions.create(tokens);
       clearCookie(response, OIDC_COOKIE, { secure: this.config.cookieSecure, path: '/api/v1/auth' });
+      const resolved = await this.sessions.resolve(secret);
+      if (resolved?.user.parentAccessPending) {
+        await this.sessions.revoke(secret);
+        response.redirect(`${this.config.webOrigin}/login?error=parent_pending`);
+        return;
+      }
       setCookie(response, SESSION_COOKIE, secret, {
         secure: this.config.cookieSecure,
         path: '/api',
@@ -194,6 +204,12 @@ export class AuthController {
   @Post('refresh')
   refresh(@CurrentUser() user: AuthUser): AuthUser {
     return user;
+  }
+
+  /** The user for an identity account, or null before its first sign-in. */
+  private async userIdForAccount(accountId: string): Promise<string | null> {
+    const rows = await this.database.query<{ id: string }>(`SELECT id FROM users WHERE issuer = $1 AND subject = $2`, [this.config.oidcIssuer, accountId]);
+    return rows[0] ? String(rows[0].id) : null;
   }
 }
 

@@ -28,7 +28,15 @@ export interface AuthUser {
   clinic: ClinicSummary | null;
   clinics: ClinicSummary[];
   permissions: Permission[];
+  /**
+   * A parent account with no linked child yet, and no other organisation to use. Such an account cannot sign in;
+   * the API refuses the sign-in and ends any session it still has.
+   */
+  parentAccessPending?: boolean;
 }
+
+export const PARENT_ACCESS_PENDING_MESSAGE =
+  'Your parent account is not active yet. You can sign in once the clinic links your child to your account.';
 
 export interface AuthProviderInfo {
   passwordResetEnabled: boolean;

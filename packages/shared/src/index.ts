@@ -8,3 +8,4 @@ export * from './organization';
 export * from './dashboard';
 export * from './branding';
 export * from './communication';
+export * from './parents';

@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Response } from 'express';
-import type { AuthUser } from '@abapro/shared';
+import { PARENT_ACCESS_PENDING_MESSAGE, type AuthUser } from '@abapro/shared';
 import type { AppConfig } from '../config/app-config';
 import { APP_CONFIG } from '../config/app-config.module';
 import { IS_PUBLIC } from './auth.decorators';
@@ -44,6 +44,16 @@ export class SessionAuthGuard implements CanActivate {
         return true;
       }
       throw new UnauthorizedException('Your session has expired.');
+    }
+
+    // A parent whose last linked child was removed loses the session on the next request.
+    if (resolved.user.parentAccessPending) {
+      await this.sessions.revoke(secret);
+      clearCookie(context.switchToHttp().getResponse<Response>(), SESSION_COOKIE, { secure: this.config.cookieSecure, path: '/api' });
+      if (isPublic) {
+        return true;
+      }
+      throw new UnauthorizedException(PARENT_ACCESS_PENDING_MESSAGE);
     }
 
     request.user = resolved.user;

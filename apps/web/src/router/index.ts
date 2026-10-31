@@ -15,6 +15,8 @@ const OnboardingView = () => import('@/views/OnboardingView.vue');
 const AcceptInvitationView = () => import('@/views/AcceptInvitationView.vue');
 const SettingsView = () => import('@/views/SettingsView.vue');
 const TeamView = () => import('@/views/TeamView.vue');
+const TeamsView = () => import('@/views/onboarding/TeamsView.vue');
+const ParentsView = () => import('@/views/onboarding/ParentsView.vue');
 const ClientsView = () => import('@/views/clients/ClientsView.vue');
 const ClientFormView = () => import('@/views/clients/ClientFormView.vue');
 const ClientProfileView = () => import('@/views/clients/ClientProfileView.vue');
@@ -151,6 +153,18 @@ export const router = createRouter({
         {
           path: 'tasks/:taskId/edit',
           redirect: (to) => `/programs/tasks/${String(to.params.taskId)}/edit`,
+        },
+        {
+          path: 'onboarding/teams',
+          name: 'onboarding-teams',
+          component: TeamsView,
+          meta: { title: 'Teams', breadcrumb: 'Teams', permission: PERMISSIONS.teamView },
+        },
+        {
+          path: 'onboarding/parents',
+          name: 'onboarding-parents',
+          component: ParentsView,
+          meta: { title: 'Parents', breadcrumb: 'Parents', permission: PERMISSIONS.guardiansManage },
         },
         {
           path: 'programs/new',
@@ -308,7 +322,7 @@ router.beforeEach(async (to) => {
 
   const isPublic = to.matched.some((record) => record.meta.public);
   if (!isPublic && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } };
+    return { name: 'login', query: auth.signedOutReason ? { error: auth.signedOutReason } : { redirect: to.fullPath } };
   }
   // The therapy workspace is the therapist's view of their assigned clients.
   if (to.name === 'therapy-workspace' && auth.isAuthenticated && auth.user?.role !== 'therapist') {
@@ -325,7 +339,8 @@ router.beforeEach(async (to) => {
     return { name: 'platform-dashboard' };
   }
   if (auth.isAuthenticated && !auth.user?.organization && !isPublic) {
-    const isClinicalRoute = to.path.startsWith('/programs') || to.path === '/tasks' || to.name === 'tasks';
+    // A super admin opening these pages works inside an organisation, so one is chosen for them.
+    const isClinicalRoute = to.path.startsWith('/programs') || to.path === '/tasks' || to.name === 'tasks' || to.path.startsWith('/onboarding/');
     if (auth.user?.platformAdmin && isClinicalRoute) {
       try {
         const { apiRequest } = await import('@/api/client');

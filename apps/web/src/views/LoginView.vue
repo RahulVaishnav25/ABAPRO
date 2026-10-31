@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { PARENT_ACCESS_PENDING_MESSAGE } from '@abapro/shared';
 import { useRoute, useRouter } from 'vue-router';
 import { passwordLoginRequest } from '@/api/resources';
 import AuthSplit from '@/components/auth/AuthSplit.vue';
@@ -15,7 +16,8 @@ const auth = useAuthStore();
 const email = ref('');
 const password = ref('');
 const saving = ref(false);
-const formError = ref('');
+// Set when a parent account without a linked child is signed out or refused.
+const formError = ref(route.query.error === 'parent_pending' ? PARENT_ACCESS_PENDING_MESSAGE : '');
 
 async function submit(): Promise<void> {
   formError.value = '';

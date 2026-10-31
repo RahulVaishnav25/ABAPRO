@@ -61,13 +61,25 @@ export class AccountService {
        ORDER BY o.name`,
       [userId],
     );
-    const organizations: OrganizationSummary[] = memberships.map((membership) => ({
+    // A parent membership with no linked child gives no access until a client is linked. Checked on every load,
+    // so removing the last link takes effect on the next request.
+    const pendingParent = new Set<string>();
+    for (const membership of memberships) {
+      if (membership.role !== 'parent') continue;
+      const linked = await db.query<{ linked: number | string }>(
+        `SELECT parent_linked_client_count($1, $2) AS linked`,
+        [userId, membership.organization_id],
+      );
+      if (Number(linked[0]?.linked ?? 0) === 0) pendingParent.add(asString(membership.organization_id));
+    }
+    const usable = memberships.filter((membership) => !pendingParent.has(asString(membership.organization_id)));
+    const organizations: OrganizationSummary[] = usable.map((membership) => ({
       id: asString(membership.organization_id),
       name: asString(membership.organization_name),
       timezone: asString(membership.timezone),
     }));
     const platformAdmin = asBoolean(user.platform_admin);
-    const active = memberships.find((membership) => asString(membership.organization_id) === organizationId) ?? null;
+    const active = usable.find((membership) => asString(membership.organization_id) === organizationId) ?? null;
     let role = active ? (asString(active.role) as Role) : null;
     let organization: OrganizationSummary | null = active
       ? {
@@ -101,6 +113,7 @@ export class AccountService {
       organizations,
       clinic,
       clinics,
+      parentAccessPending: !platformAdmin && usable.length === 0 && pendingParent.size > 0,
       permissions: role && organization
         ? await this.authorization.permissionsFor(db, organization.id, role, asString(user.id))
         : platformAdmin

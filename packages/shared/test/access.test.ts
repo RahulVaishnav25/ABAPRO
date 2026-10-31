@@ -46,7 +46,7 @@ describe('role permissions', () => {
 
   it('keeps clinic administration inside Settings and highlights the section that contains the current page', () => {
     const admin = navigationFor(permissionsForRole('organization_admin'), { platformAdmin: true }).map((item) => item.key);
-    expect(admin).toEqual(['platform', 'organisations', 'clinics', 'children', 'programs', 'settings']);
+    expect(admin).toEqual(['platform', 'organisations', 'clinics', 'children', 'programs', 'onboarding', 'settings']);
     expect(navigationFor([], { platformAdmin: true }).map((item) => item.key)).toEqual(['platform', 'organisations', 'clinics', 'settings']);
 
     const superAdminOrgItem = navigationFor([], { platformAdmin: true, organizationId: 'org-1' }).find((item) => item.key === 'organisations');
@@ -60,7 +60,11 @@ describe('role permissions', () => {
     expect(navigationFor(permissionsForRole('therapist')).map((item) => item.key)).not.toContain('organisations');
     expect(navigationFor(permissionsForRole('therapist'), { organizationId: 'org-1' }).map((item) => item.key)).toEqual(['home', 'organisations', 'clinics', 'children', 'programs']);
     const supervisor = navigationFor(permissionsForRole('clinical_supervisor')).map((item) => item.key);
-    expect(supervisor).toEqual(['home', 'children', 'programs', 'settings']);
+    expect(supervisor).toEqual(['home', 'children', 'programs', 'onboarding', 'settings']);
+    const onboarding = navigationFor(permissionsForRole('clinical_supervisor')).find((item) => item.key === 'onboarding');
+    expect(onboarding?.route).toBe('/onboarding/teams');
+    expect(onboarding && navigationItemIsActive(onboarding, '/onboarding/parents')).toBe(true);
+    expect(onboarding && navigationItemIsActive(onboarding, '/onboarding')).toBe(false);
     const settings = navigationFor(permissionsForRole('clinical_supervisor')).find((item) => item.key === 'settings');
     expect(settings && navigationItemIsActive(settings, '/team')).toBe(true);
     expect(settings && navigationItemIsActive(settings, '/programs')).toBe(false);
