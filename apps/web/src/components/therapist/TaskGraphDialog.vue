@@ -78,7 +78,7 @@ const rows = computed(() =>
 const today = computed(() => {
   const status = history.value?.status;
   if (!status) return '';
-  return `Today (${formatShortDate(status.date)}): ${status.recordedToday} recorded, ${status.remainingToday} of ${status.trialsPerSession * status.sessionsPerDay} left.`;
+  return `Today (${formatShortDate(status.date)}): ${status.recordedToday} recorded, ${status.remainingToday} of ${status.dailyLimit} left.`;
 });
 </script>
 

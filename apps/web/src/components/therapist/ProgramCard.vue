@@ -25,7 +25,7 @@ const props = defineProps<{
 const emit = defineEmits<{ programAction: [key: string]; taskAction: [task: TaskItem, key: string]; record: [task: TaskItem]; expand: [] }>();
 
 function capacity(status: TaskRecordingStatus | undefined): number {
-  return status ? status.trialsPerSession * status.sessionsPerDay : 0;
+  return status?.dailyLimit ?? 0;
 }
 
 const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0, TASKS_SHOWN)));

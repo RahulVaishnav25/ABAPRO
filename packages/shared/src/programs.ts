@@ -333,8 +333,8 @@ export interface DocumentUpload {
 }
 
 
-// Task recording. A day holds up to sessionsPerDay sessions of trialsPerSession records,
-// shared by every therapist assigned to the client.
+// Task recording. A task takes up to Desired Trials records a day for each client, shared by every therapist
+// assigned to the client. Mastery Sessions does not limit recording.
 
 export type RecordResponse = 'yes' | 'no';
 
@@ -362,12 +362,11 @@ export interface TaskRecordingStatus {
   targetId: string;
   /** The client's current day, YYYY-MM-DD. */
   date: string;
-  trialsPerSession: number;
-  sessionsPerDay: number;
+  /** Records allowed today: the task's Desired Trials. */
+  dailyLimit: number;
   recordedToday: number;
   remainingToday: number;
-  /** The session and trial the next record fills, or null when today is full. */
-  nextSession: number | null;
+  /** The trial the next record fills, or null when today is full. */
   nextTrial: number | null;
   /** The task's Prompt Used setting: records take prompt levels instead of Yes or No. */
   promptUsed: boolean;
@@ -436,8 +435,10 @@ export interface SessionHistoryEntry {
   taskId: string;
   taskTitle: string;
   phase: RecordPhaseGroup;
+  /** Records saved before the daily limit used Desired Trials alone may be in a later session of the day. */
   sessionNumber: number;
   trialNumber: number;
+  /** The limits when the record was saved: the daily limit is trialsPerSession × sessionsPerDay. */
   trialsPerSession: number;
   sessionsPerDay: number;
   response: RecordResponse | null;

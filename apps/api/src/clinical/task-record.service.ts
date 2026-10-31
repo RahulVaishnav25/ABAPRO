@@ -22,8 +22,6 @@ import { asDate, asNullableNumber, asString } from '../common/http';
 import type { Queryable } from '../db/database';
 import { AuthorizationService } from '../access/authorization.service';
 
-/** Mastery Sessions when a task has none set, as the task forms default it. */
-const DEFAULT_SESSIONS_PER_DAY = 3;
 const HISTORY_RECORD_LIMIT = 200;
 
 interface TargetLimits {
@@ -34,19 +32,13 @@ interface TargetLimits {
   status: CareStatus;
   programStatus: CareStatus;
   promptUsed: boolean;
-  trialsPerSession: number;
-  sessionsPerDay: number;
-}
-
-interface LastRecord {
-  session: number;
-  trial: number;
-  recorded: number;
+  /** Desired Trials: the records allowed a day for the client. */
+  dailyLimit: number;
 }
 
 /**
- * Yes/No records on tasks. Desired Trials caps the records in a session (Treatment phase only; other phases record
- * one trial per session) and Mastery Sessions caps the sessions in a day. Every therapist on the client shares them.
+ * Records on tasks. Desired Trials caps the records a task takes in a day for its client, in every phase, and every
+ * therapist on the client shares that allowance. Mastery Sessions does not limit recording.
  */
 @Injectable()
 export class TaskRecordService {
@@ -57,8 +49,8 @@ export class TaskRecordService {
       const client = await this.authorization.findAccessibleClient(tx, user, organizationId, clientId, 'view', PERMISSIONS.programsView);
       const targets = await targetLimits(tx, organizationId, 't.client_id = $2', [client.id]);
       const date = await clientToday(tx, client.id);
-      const last = await lastRecords(tx, client.id, date);
-      return targets.map((target) => recordingStatus(target, date, last.get(target.id), mayRecord(user, target)));
+      const recorded = await recordedToday(tx, client.id, date);
+      return targets.map((target) => recordingStatus(target, date, recorded.get(target.id), mayRecord(user, target)));
     });
   }
 
@@ -67,7 +59,7 @@ export class TaskRecordService {
       const target = await findTarget(tx, organizationId, targetId);
       await this.authorization.findAccessibleClient(tx, user, organizationId, target.clientId, 'view', PERMISSIONS.programsView);
       const date = await clientToday(tx, target.clientId);
-      const last = await lastRecords(tx, target.clientId, date);
+      const recorded = await recordedToday(tx, target.clientId, date);
       const params: unknown[] = [target.id];
       let range = '';
       if (from) {
@@ -114,7 +106,7 @@ export class TaskRecordService {
         prompts.set(day, counts);
       }
       return {
-        status: recordingStatus(target, date, last.get(target.id), mayRecord(user, target)),
+        status: recordingStatus(target, date, recorded.get(target.id), mayRecord(user, target)),
         days: days.map((row): TaskRecordDay => ({
           date: asString(row.day),
           yes: Number(row.yes),
@@ -269,8 +261,8 @@ export class TaskRecordService {
         if (asString(repeated[0].target_id) !== target.id || asString(repeated[0].therapist_id) !== user.id) {
           throw new ConflictException('That record was already saved.');
         }
-        const last = await lastRecords(tx, target.clientId, date);
-        return recordingStatus(target, date, last.get(target.id), mayRecord(user, target));
+        const recorded = await recordedToday(tx, target.clientId, date);
+        return recordingStatus(target, date, recorded.get(target.id), mayRecord(user, target));
       }
       // Read under the lock, so a status change saved at the same time is seen.
       if (!RECORDABLE_STATUSES.includes(target.status)) {
@@ -278,11 +270,9 @@ export class TaskRecordService {
       }
       const { response, promptLevels } = recordedValue(target, input);
 
-      const before = recordingStatus(target, date, (await lastRecords(tx, target.clientId, date)).get(target.id), true);
-      if (before.nextSession === null || before.nextTrial === null) {
-        throw new ConflictException(
-          `Today's limit for this task is reached: ${plural(target.sessionsPerDay, 'session')} of ${plural(target.trialsPerSession, 'trial')}.`,
-        );
+      const before = recordingStatus(target, date, (await recordedToday(tx, target.clientId, date)).get(target.id), true);
+      if (before.nextTrial === null) {
+        throw new ConflictException(`Today's limit for this task is reached: ${plural(target.dailyLimit, 'trial')} a day.`);
       }
       try {
         await tx.query(
@@ -293,7 +283,7 @@ export class TaskRecordService {
            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::date,$9,$10,$11,$12,$13,COALESCE(string_to_array(NULLIF($14, ''), ','), '{}'),$15,$16)`,
           [
             input.requestId, organizationId, target.clientId, target.programId, target.id, user.id, response, date,
-            before.nextSession, before.nextTrial, target.trialsPerSession, target.sessionsPerDay, target.phase,
+            1, before.nextTrial, target.dailyLimit, 1, target.phase,
             promptLevels.join(','), target.status, target.programStatus,
           ],
         );
@@ -305,10 +295,10 @@ export class TaskRecordService {
       }
       await recordAudit(tx, {
         organizationId, actorUserId: user.id, action: 'target.recorded', targetType: 'target', targetId: target.id,
-        metadata: { clientId: target.clientId, programId: target.programId, session: before.nextSession, trial: before.nextTrial, promptLevels },
+        metadata: { clientId: target.clientId, programId: target.programId, trial: before.nextTrial, promptLevels },
       });
-      const last = await lastRecords(tx, target.clientId, date);
-      return recordingStatus(target, date, last.get(target.id), true);
+      const recorded = await recordedToday(tx, target.clientId, date);
+      return recordingStatus(target, date, recorded.get(target.id), true);
     });
   }
 }
@@ -367,10 +357,10 @@ async function findTarget(tx: Queryable, organizationId: string, targetId: strin
 async function targetLimits(tx: Queryable, organizationId: string, where: string, params: unknown[], lock = false): Promise<TargetLimits[]> {
   const rows = await tx.query<{
     id: string; program_id: string; client_id: string; phase: string; status: CareStatus; program_status: CareStatus;
-    prompt_used: boolean; expected_trial_count: number | null; mastery_sessions: number | null;
+    prompt_used: boolean; expected_trial_count: number | null;
   }>(
     `SELECT t.id, t.program_id, t.client_id, t.phase, t.status, p.status AS program_status, t.prompt_used,
-            t.expected_trial_count, t.mastery_sessions
+            t.expected_trial_count
      FROM client_targets t
      JOIN client_programs p ON p.id = t.program_id
      WHERE t.organization_id = $1 AND ${where}
@@ -378,21 +368,17 @@ async function targetLimits(tx: Queryable, organizationId: string, where: string
      ${lock ? 'FOR UPDATE OF t' : ''}`,
     [organizationId, ...params],
   );
-  return rows.map((row) => {
-    const phase = asString(row.phase);
-    const trials = asNullableNumber(row.expected_trial_count);
-    return {
-      id: asString(row.id),
-      programId: asString(row.program_id),
-      clientId: asString(row.client_id),
-      phase,
-      status: row.status,
-      programStatus: row.program_status,
-      promptUsed: row.prompt_used === true,
-      trialsPerSession: phase === 'intervention' ? Math.max(1, trials ?? 1) : 1,
-      sessionsPerDay: Math.max(1, asNullableNumber(row.mastery_sessions) ?? DEFAULT_SESSIONS_PER_DAY),
-    };
-  });
+  return rows.map((row) => ({
+    id: asString(row.id),
+    programId: asString(row.program_id),
+    clientId: asString(row.client_id),
+    phase: asString(row.phase),
+    status: row.status,
+    programStatus: row.program_status,
+    promptUsed: row.prompt_used === true,
+    // Tasks measured without trials have no Desired Trials, and take one record a day.
+    dailyLimit: Math.max(1, asNullableNumber(row.expected_trial_count) ?? 1),
+  }));
 }
 
 /** Today's date where the client is: the client's time zone, else the organisation's. */
@@ -411,45 +397,32 @@ async function clientToday(tx: Queryable, clientId: string): Promise<string> {
   return asString(rows[0].today);
 }
 
-/** The latest session and trial recorded today for each of the client's tasks. */
-async function lastRecords(tx: Queryable, clientId: string, date: string): Promise<Map<string, LastRecord>> {
-  const rows = await tx.query<{ target_id: string; session_number: number; trial_number: number; recorded: number | string }>(
-    `SELECT DISTINCT ON (target_id) target_id, session_number, trial_number,
-            count(*) OVER (PARTITION BY target_id) AS recorded
+/** How many records each of the client's tasks has today. */
+async function recordedToday(tx: Queryable, clientId: string, date: string): Promise<Map<string, number>> {
+  const rows = await tx.query<{ target_id: string; recorded: number | string }>(
+    `SELECT target_id, count(*) AS recorded
      FROM task_records
      WHERE client_id = $1 AND record_date = $2::date
-     ORDER BY target_id, session_number DESC, trial_number DESC`,
+     GROUP BY target_id`,
     [clientId, date],
   );
-  return new Map(rows.map((row) => [
-    asString(row.target_id),
-    { session: Number(row.session_number), trial: Number(row.trial_number), recorded: Number(row.recorded) },
-  ]));
+  return new Map(rows.map((row) => [asString(row.target_id), Number(row.recorded)]));
 }
 
-export function recordingStatus(target: TargetLimits, date: string, last: LastRecord | undefined, canRecord: boolean): TaskRecordingStatus {
-  const { trialsPerSession, sessionsPerDay } = target;
-  let nextSession = 1;
-  let nextTrial = 1;
-  if (last) {
-    // Limits can change during a day; the next record continues from the last one under the current limits.
-    if (last.trial < trialsPerSession) {
-      nextSession = last.session;
-      nextTrial = last.trial + 1;
-    } else {
-      nextSession = last.session + 1;
-    }
-  }
-  const full = nextSession > sessionsPerDay;
+/**
+ * The next record is trial recorded + 1 of the day, in session 1. Records saved under the earlier session-based limit
+ * stay as they were; their trial numbers in session 1 never exceed the day's count, so the next number is free.
+ */
+export function recordingStatus(target: TargetLimits, date: string, recorded: number | undefined, canRecord: boolean): TaskRecordingStatus {
+  const count = recorded ?? 0;
+  const remaining = Math.max(0, target.dailyLimit - count);
   return {
     targetId: target.id,
     date,
-    trialsPerSession,
-    sessionsPerDay,
-    recordedToday: last?.recorded ?? 0,
-    remainingToday: full ? 0 : trialsPerSession - nextTrial + 1 + (sessionsPerDay - nextSession) * trialsPerSession,
-    nextSession: full ? null : nextSession,
-    nextTrial: full ? null : nextTrial,
+    dailyLimit: target.dailyLimit,
+    recordedToday: count,
+    remainingToday: remaining,
+    nextTrial: remaining > 0 ? count + 1 : null,
     promptUsed: target.promptUsed,
     mayRecord: canRecord,
   };

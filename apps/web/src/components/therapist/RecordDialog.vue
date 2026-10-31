@@ -49,10 +49,10 @@ const full = computed(() => props.status?.remainingToday === 0);
 const position = computed(() => {
   const status = props.status;
   if (!status) return 'Checking today’s records…';
-  if (status.nextSession === null || status.nextTrial === null) {
-    return `Today is complete: ${status.sessionsPerDay} of ${status.sessionsPerDay} sessions recorded.`;
+  if (status.nextTrial === null) {
+    return `Today is complete: ${status.dailyLimit} of ${status.dailyLimit} trials recorded.`;
   }
-  return `Session ${status.nextSession} of ${status.sessionsPerDay} · Trial ${status.nextTrial} of ${status.trialsPerSession}`;
+  return `Trial ${status.nextTrial} of ${status.dailyLimit} today`;
 });
 
 function submit(): void {
@@ -87,7 +87,7 @@ function submit(): void {
     </dl>
     <p class="record-position">{{ position }}</p>
     <p v-if="status" class="record-remaining">
-      {{ status.remainingToday }} of {{ status.trialsPerSession * status.sessionsPerDay }} records left today, shared by everyone on this client’s care team.
+      {{ status.remainingToday }} of {{ status.dailyLimit }} records left today, shared by everyone on this client’s care team.
     </p>
     <fieldset v-if="!full && promptUsed" class="choice-group record-options" aria-describedby="record-levels-error">
       <legend>Prompt levels</legend>

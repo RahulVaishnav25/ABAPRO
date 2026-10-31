@@ -74,19 +74,18 @@ describe.sequential('task records', () => {
       body: JSON.stringify({ clientId, title: 'Requesting', domain: 'Communication', measurementType: 'trial', expectedTrialCount: 5 }),
     });
     programId = (program.body as ProgramDetail).id;
-    // One trial per session, three sessions a day: three records in total.
+    // Desired Trials alone sets the daily limit; Mastery Sessions differs on purpose and must not count.
     await api(admin, `/api/v1/programs/${programId}/targets`, {
       method: 'POST',
-      body: JSON.stringify({ title: 'One a session', measurementMethod: 'trial', expectedTrialCount: 1, phase: 'intervention', masterySessions: 3, masteryProbe: 100 }),
+      body: JSON.stringify({ title: 'Three a day', measurementMethod: 'trial', expectedTrialCount: 3, phase: 'intervention', masterySessions: 1, masteryProbe: 100 }),
     });
-    // Two trials per session, two sessions a day: four records in total.
     const withTrials = await api(admin, `/api/v1/programs/${programId}/targets`, {
       method: 'POST',
-      body: JSON.stringify({ title: 'Two a session', measurementMethod: 'trial', expectedTrialCount: 2, phase: 'intervention', masterySessions: 2, masteryProbe: 100 }),
+      body: JSON.stringify({ title: 'Two a day', measurementMethod: 'trial', expectedTrialCount: 2, phase: 'intervention', masterySessions: 5, masteryProbe: 100 }),
     });
     const targets = (withTrials.body as ProgramDetail).targets;
-    sessionTask = targets.find((target) => target.title === 'One a session')?.id ?? '';
-    trialTask = targets.find((target) => target.title === 'Two a session')?.id ?? '';
+    sessionTask = targets.find((target) => target.title === 'Three a day')?.id ?? '';
+    trialTask = targets.find((target) => target.title === 'Two a day')?.id ?? '';
   }, 120_000);
 
   afterAll(async () => {
@@ -94,26 +93,58 @@ describe.sequential('task records', () => {
     if (dataDir) await rm(dataDir, { recursive: true, force: true });
   });
 
-  it('shares the daily session limit between the assigned therapists', async () => {
-    expect(await status(first, sessionTask)).toMatchObject({ trialsPerSession: 1, sessionsPerDay: 3, recordedToday: 0, remainingToday: 3, nextSession: 1, nextTrial: 1, mayRecord: true });
+  it('shares the Desired Trials limit between the assigned therapists', async () => {
+    expect(await status(first, sessionTask)).toMatchObject({ dailyLimit: 3, recordedToday: 0, remainingToday: 3, nextTrial: 1, mayRecord: true });
     expect((await record(first, sessionTask, 'yes')).response.status).toBe(201);
-    expect(await status(second, sessionTask)).toMatchObject({ recordedToday: 1, remainingToday: 2, nextSession: 2 });
+    expect(await status(second, sessionTask)).toMatchObject({ recordedToday: 1, remainingToday: 2, nextTrial: 2 });
     expect((await record(second, sessionTask, 'no')).response.status).toBe(201);
     const last = await record(second, sessionTask, 'yes');
-    expect(last.body).toMatchObject({ recordedToday: 3, remainingToday: 0, nextSession: null, nextTrial: null });
+    expect(last.body).toMatchObject({ recordedToday: 3, remainingToday: 0, nextTrial: null });
     const over = await record(first, sessionTask, 'yes');
     expect(over.response.status).toBe(409);
-    expect(over.text).toContain('3 sessions of 1 trial');
+    expect(over.text).toContain('3 trials a day');
   });
 
-  it('fills each session with Desired Trials before starting the next', async () => {
-    const steps: Array<[number | null, number | null, number]> = [];
-    for (const jar of [first, second, first, second]) {
+  it('uses Desired Trials alone, in Treatment and in Baseline', async () => {
+    const steps: Array<[number | null, number]> = [];
+    for (const jar of [first, second]) {
       const saved = (await record(jar, trialTask, 'yes')).body as TaskRecordingStatus;
-      steps.push([saved.nextSession, saved.nextTrial, saved.remainingToday]);
+      steps.push([saved.nextTrial, saved.remainingToday]);
     }
-    expect(steps).toEqual([[1, 2, 3], [2, 1, 2], [2, 2, 1], [null, null, 0]]);
+    // Mastery Sessions is 5 on this task, and adds nothing.
+    expect(steps).toEqual([[2, 1], [null, 0]]);
     expect((await record(second, trialTask, 'no')).response.status).toBe(409);
+
+    const added = await api(admin, `/api/v1/programs/${programId}/targets`, {
+      method: 'POST',
+      body: JSON.stringify({ title: 'Baseline task', measurementMethod: 'trial', expectedTrialCount: 2, phase: 'baseline', masterySessions: 4, masteryProbe: 100 }),
+    });
+    const baselineTask = (added.body as ProgramDetail).targets.find((target) => target.title === 'Baseline task')?.id ?? '';
+    expect(await status(first, baselineTask)).toMatchObject({ dailyLimit: 2, remainingToday: 2 });
+    expect((await record(first, baselineTask, 'yes')).response.status).toBe(201);
+    expect((await record(second, baselineTask, 'no')).response.status).toBe(201);
+    expect((await record(first, baselineTask, 'yes')).response.status).toBe(409);
+    await running.database.query(`DELETE FROM task_records WHERE target_id = $1`, [baselineTask]);
+  });
+
+  it('continues a day recorded under the earlier session-based limit', async () => {
+    const added = await api(admin, `/api/v1/programs/${programId}/targets`, {
+      method: 'POST',
+      body: JSON.stringify({ title: 'Earlier day', measurementMethod: 'trial', expectedTrialCount: 3, phase: 'intervention', masterySessions: 3, masteryProbe: 100 }),
+    });
+    const earlierTask = (added.body as ProgramDetail).targets.find((target) => target.title === 'Earlier day')?.id ?? '';
+    expect((await record(first, earlierTask, 'yes')).response.status).toBe(201);
+    // As if saved by the earlier rules, in the second session of the day.
+    await running.database.query(`UPDATE task_records SET session_number = 2, sessions_per_day = 3 WHERE target_id = $1`, [earlierTask]);
+    expect((await record(second, earlierTask, 'no')).response.status).toBe(201);
+    expect((await record(first, earlierTask, 'yes')).body).toMatchObject({ recordedToday: 3, remainingToday: 0 });
+    expect((await record(second, earlierTask, 'yes')).response.status).toBe(409);
+    const rows = await running.database.query<{ session_number: number; trial_number: number }>(
+      `SELECT session_number, trial_number FROM task_records WHERE target_id = $1 ORDER BY recorded_at`,
+      [earlierTask],
+    );
+    expect(rows.map((row) => `${row.session_number}.${row.trial_number}`)).toEqual(['2.1', '1.2', '1.3']);
+    await running.database.query(`DELETE FROM task_records WHERE target_id = $1`, [earlierTask]);
   });
 
   it('saves a repeated submit once and never exceeds the limit under concurrent submits', async () => {
@@ -125,13 +156,13 @@ describe.sequential('task records', () => {
     expect((repeated.body as TaskRecordingStatus).recordedToday).toBe(1);
 
     const results = await Promise.all(Array.from({ length: 8 }, (_, index) => record(index % 2 ? first : second, trialTask, 'no')));
-    expect(results.filter((result) => result.response.status === 201)).toHaveLength(3);
+    expect(results.filter((result) => result.response.status === 201)).toHaveLength(1);
     expect(results.every((result) => [201, 409].includes(result.response.status))).toBe(true);
     const rows = await running.database.query<{ session_number: number; trial_number: number }>(
       `SELECT session_number, trial_number FROM task_records WHERE target_id = $1 ORDER BY session_number, trial_number`,
       [trialTask],
     );
-    expect(rows.map((row) => `${row.session_number}.${row.trial_number}`)).toEqual(['1.1', '1.2', '2.1', '2.2']);
+    expect(rows.map((row) => `${row.session_number}.${row.trial_number}`)).toEqual(['1.1', '1.2']);
   });
 
   it('lets only assigned therapists record, and shows every assigned user the shared history', async () => {
@@ -157,7 +188,7 @@ describe.sequential('task records', () => {
   it('records only tasks In Treatment or Maintenance, keeping earlier records', async () => {
     const added = await api(admin, `/api/v1/programs/${programId}/targets`, {
       method: 'POST',
-      body: JSON.stringify({ title: 'Status task', measurementMethod: 'trial', expectedTrialCount: 1, phase: 'intervention', masterySessions: 5, masteryProbe: 100 }),
+      body: JSON.stringify({ title: 'Status task', measurementMethod: 'trial', expectedTrialCount: 5, phase: 'intervention', masterySessions: 1, masteryProbe: 100 }),
     });
     const statusTask = (added.body as ProgramDetail).targets.find((target) => target.title === 'Status task')?.id ?? '';
     const setStatus = (value: string) => api(first, `/api/v1/programs/${programId}/targets/${statusTask}/status`, {
@@ -191,7 +222,7 @@ describe.sequential('task records', () => {
   it('records prompt levels instead of Yes or No when the task uses prompts', async () => {
     const added = await api(admin, `/api/v1/programs/${programId}/targets`, {
       method: 'POST',
-      body: JSON.stringify({ title: 'Prompted task', measurementMethod: 'trial', expectedTrialCount: 1, phase: 'intervention', masterySessions: 3, masteryProbe: 100, promptUsed: true }),
+      body: JSON.stringify({ title: 'Prompted task', measurementMethod: 'trial', expectedTrialCount: 3, phase: 'intervention', masterySessions: 1, masteryProbe: 100, promptUsed: true }),
     });
     const promptTask = (added.body as ProgramDetail).targets.find((target) => target.title === 'Prompted task')?.id ?? '';
     const send = (jar: CookieJar, body: Record<string, unknown>) =>

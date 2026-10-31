@@ -96,7 +96,8 @@ const entryRows = computed(() =>
     phase: phaseLabel(entry.phase),
     trial: `${entry.trialNumber} of ${entry.trialsPerSession}`,
     recorded: recorded(entry),
-    saved: `Session ${entry.sessionNumber} of ${entry.sessionsPerDay} on ${entry.recordDate} · Task ${careStatusLabel(entry.taskStatus)} · Program ${careStatusLabel(entry.programStatus)}`,
+    // Only records saved under the earlier session-based limit have more than one session a day.
+    saved: `${entry.sessionsPerDay > 1 ? `Session ${entry.sessionNumber} of ${entry.sessionsPerDay} on ` : ''}${entry.recordDate} · Task ${careStatusLabel(entry.taskStatus)} · Program ${careStatusLabel(entry.programStatus)}`,
     onHold: entry.taskStatus === 'on_hold' || entry.programStatus === 'on_hold',
   })),
 );
