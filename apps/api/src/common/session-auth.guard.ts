@@ -46,13 +46,14 @@ export class SessionAuthGuard implements CanActivate {
       throw new UnauthorizedException('Your session has expired.');
     }
 
-    // A parent whose last linked child was removed loses the session on the next request.
+    // A parent whose last linked child was removed loses the session on the next signed-in request.
+    // Public requests treat them as signed out but keep the session, so that request can still say why.
     if (resolved.user.parentAccessPending) {
-      await this.sessions.revoke(secret);
-      clearCookie(context.switchToHttp().getResponse<Response>(), SESSION_COOKIE, { secure: this.config.cookieSecure, path: '/api' });
       if (isPublic) {
         return true;
       }
+      await this.sessions.revoke(secret);
+      clearCookie(context.switchToHttp().getResponse<Response>(), SESSION_COOKIE, { secure: this.config.cookieSecure, path: '/api' });
       throw new UnauthorizedException(PARENT_ACCESS_PENDING_MESSAGE);
     }
 

@@ -21,17 +21,25 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null;
   }
 
-  async function restore(): Promise<void> {
-    try {
-      user.value = await currentUserRequest();
-      signedOutReason.value = null;
-    } catch (restoreError) {
-      user.value = null;
-      // A parent whose last linked child was removed is told why on the sign-in page.
-      if (restoreError instanceof ApiError && restoreError.message === PARENT_ACCESS_PENDING_MESSAGE) signedOutReason.value = 'parent_pending';
-    } finally {
-      ready.value = true;
-    }
+  // Startup and the first route guard both restore the session; they share one request, because the
+  // server ends a pending parent's session on the first call and a second call would lose the reason.
+  let restoring: Promise<void> | null = null;
+
+  function restore(): Promise<void> {
+    restoring ??= (async () => {
+      try {
+        user.value = await currentUserRequest();
+        signedOutReason.value = null;
+      } catch (restoreError) {
+        user.value = null;
+        // A parent whose last linked child was removed is told why on the sign-in page.
+        if (restoreError instanceof ApiError && restoreError.message === PARENT_ACCESS_PENDING_MESSAGE) signedOutReason.value = 'parent_pending';
+      } finally {
+        ready.value = true;
+        restoring = null;
+      }
+    })();
+    return restoring;
   }
 
   async function switchOrganization(organizationId: string, clinicId?: string): Promise<void> {

@@ -37,7 +37,8 @@ async function start(): Promise<void> {
   // Before sign-in: the language last used here, the browser's, or the platform default.
   const platformDefault = await authConfigRequest().then((config) => config.defaultLanguage).catch(() => undefined);
   await setLanguage(startingLanguage(platformDefault));
-  await Promise.all([auth.restore(), branding.initialize()]);
+  // The first route guard may already have restored the session.
+  await Promise.all([auth.ready ? Promise.resolve() : auth.restore(), branding.initialize()]);
   if (auth.user?.preferences) await applyPreferences(auth.user.preferences);
   // Signed in: the user's resolved language, timezone and formats, applied again whenever they change.
   watch(

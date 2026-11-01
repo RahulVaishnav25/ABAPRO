@@ -108,6 +108,8 @@ describe.sequential('parent onboarding and linked-client sign-in', () => {
 
     // Removing the last link ends the session on the next request and blocks sign-in again.
     expect((await setLinks(admin, pendingParent.userId, [])).body).toMatchObject({ portalStatus: 'pending', linkedClients: [] });
+    // A public request made first, such as the sign-in page's settings, does not use up the reason.
+    expect((await api(parent, '/api/v1/auth/config')).response.status).toBe(200);
     const ended = await api(parent, '/api/v1/auth/me');
     expect(ended.response.status).toBe(401);
     expect((ended.body as { message: string }).message).toBe(PARENT_ACCESS_PENDING_MESSAGE);
