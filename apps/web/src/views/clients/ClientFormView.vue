@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import type { ClientPlacementOrganization, ClientWrite, ContactChannel, GuardianRelationship, MeasurementType, StaffOption } from '@abapro/shared';
 import {
   assignClientRequest,
@@ -22,8 +23,12 @@ import {
   uploadDocumentRequest,
 } from '@/api/clients';
 import { ApiError } from '@/api/client';
+import AppIcon from '@/components/navigation/AppIcon.vue';
+import BehaviorFields from '@/components/clients/BehaviorFields.vue';
+import GoalFields from '@/components/clients/GoalFields.vue';
+import GuardianFields from '@/components/clients/GuardianFields.vue';
+import { useClientOptions } from '@/components/clients/options';
 import AppButton from '@/components/ui/AppButton.vue';
-import AppCheckbox from '@/components/ui/AppCheckbox.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import AppTextarea from '@/components/ui/AppTextarea.vue';
@@ -75,6 +80,8 @@ const auth = useAuthStore();
 const toast = useToastStore();
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
+const { clientStatusOptions } = useClientOptions();
 const clientId = computed(() => (typeof route.params.clientId === 'string' ? route.params.clientId : ''));
 const editing = computed(() => Boolean(clientId.value));
 const loading = ref(editing.value);
@@ -121,34 +128,28 @@ const canBehaviors = computed(() => auth.can('clients.edit'));
 const canGoals = computed(() => auth.can('programs.edit'));
 const canDocuments = computed(() => auth.can('documents.upload'));
 const canAssign = computed(() => auth.can('assignments.manage'));
-const relationshipOptions = [
-  { value: 'parent', label: 'Parent' },
-  { value: 'guardian', label: 'Guardian' },
-  { value: 'grandparent', label: 'Grandparent' },
-  { value: 'caregiver', label: 'Caregiver' },
-  { value: 'other', label: 'Other' },
-];
-const measurementOptions = [
-  { value: 'frequency', label: 'Frequency' },
-  { value: 'duration', label: 'Duration' },
-  { value: 'interval', label: 'Interval' },
-  { value: 'latency', label: 'Latency' },
-  { value: 'rate', label: 'Rate' },
-];
 const steps = computed(() => {
-  const items = [{ id: 'personal', label: 'Personal' }];
-  if (canGuardians.value) items.push({ id: 'guardians', label: 'Guardians' });
-  if (canSensitive.value) items.push({ id: 'clinical', label: 'Clinical' });
-  if (canBehaviors.value) items.push({ id: 'behaviors', label: 'Behaviors' });
-  if (canGoals.value) items.push({ id: 'goals', label: 'Goals' });
-  if (!editing.value && canAssign.value) items.push({ id: 'team', label: 'Care team' });
-  if (canDocuments.value) items.push({ id: 'documents', label: 'Documents' });
-  return items;
+  const ids = ['personal'];
+  if (canGuardians.value) ids.push('guardians');
+  if (canSensitive.value) ids.push('clinical');
+  if (canBehaviors.value) ids.push('behaviors');
+  if (canGoals.value) ids.push('goals');
+  if (!editing.value && canAssign.value) ids.push('team');
+  if (canDocuments.value) ids.push('documents');
+  return ids.map((id) => ({ id, label: t(`clients.form.steps.${id}`) }));
 });
 const currentStep = computed(() => steps.value[Math.min(stepIndex.value, steps.value.length - 1)]?.id ?? 'personal');
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1);
-const submitLabel = computed(() => (editing.value ? 'Save client' : 'Create client'));
+const submitLabel = computed(() => (editing.value ? t('clients.form.save') : t('clients.form.create')));
 const organizationOptions = computed(() => placement.value.map((item) => ({ value: item.id, label: item.name })));
+const therapistOptions = computed(() => [
+  { value: '', label: t('clients.form.noneYet') },
+  ...staff.value.filter((person) => person.role === 'therapist' || person.role === 'clinical_supervisor').map((person) => ({ value: person.id, label: person.name })),
+]);
+const supervisorOptions = computed(() => [
+  { value: '', label: t('clients.form.noneYet') },
+  ...staff.value.filter((person) => person.role === 'clinical_supervisor').map((person) => ({ value: person.id, label: person.name })),
+]);
 const clinicOptions = computed(() => (placement.value.find((item) => item.id === organizationId.value)?.clinics ?? []).map((item) => ({ value: item.id, label: item.name })));
 
 function alignClinic(nextOrganizationId?: string): void {
@@ -160,33 +161,33 @@ function alignClinic(nextOrganizationId?: string): void {
 
 async function personalReady(): Promise<boolean> {
   if (!organizationId.value) {
-    formError.value = 'Choose an organisation.';
+    formError.value = t('clients.validation.organisation');
     return false;
   }
   if (!clinicId.value) {
-    formError.value = 'Choose a clinic.';
+    formError.value = t('clients.validation.clinic');
     return false;
   }
   if (personal.displayName.trim().length < 2) {
-    formError.value = 'Enter the display name.';
+    formError.value = t('clients.validation.displayName');
     return false;
   }
   const code = personal.clientCode.trim();
   if (!code) return true;
   if (!clientCodePattern.test(code)) {
-    formError.value = 'Use letters, numbers, and hyphens for the internal client ID.';
+    formError.value = t('clients.validation.codeFormat');
     return false;
   }
   checkingCode.value = true;
   try {
     const result = await clientCodeAvailableRequest(code, editing.value ? clientId.value : undefined, organizationId.value);
     if (!result.available) {
-      formError.value = 'That internal client ID already exists in your organisation.';
+      formError.value = t('clients.validation.codeTaken');
       return false;
     }
     return true;
   } catch (checkError) {
-    formError.value = checkError instanceof ApiError ? checkError.message : 'The internal client ID could not be checked.';
+    formError.value = errorMessage(checkError, t('clients.validation.codeCheck'));
     return false;
   } finally {
     checkingCode.value = false;
@@ -210,6 +211,14 @@ async function submitStep(): Promise<void> {
     return;
   }
   void save();
+}
+
+/** Earlier steps can be revisited directly; later ones are reached with Continue, which checks each step. */
+function goToStep(index: number): void {
+  if (index >= stepIndex.value) return;
+  formError.value = '';
+  stepIndex.value = index;
+  revealStep();
 }
 
 function goBack(): void {
@@ -246,10 +255,6 @@ function removeGoal(index: number): void {
   const goal = goals.value[index];
   if (!goal || index === 0 || goal.id) return;
   goals.value.splice(index, 1);
-}
-
-function toggleChannel(guardian: GuardianDraft, channel: ContactChannel, checked: boolean): void {
-  guardian.channels = checked ? [...guardian.channels, channel] : guardian.channels.filter((item) => item !== channel);
 }
 
 async function load(): Promise<void> {
@@ -306,7 +311,7 @@ async function load(): Promise<void> {
       Object.assign(clinical, await clinicalProfileRequest(clientId.value));
     }
   } catch (loadError) {
-    error.value = errorMessage(loadError, 'The client form could not be loaded.');
+    error.value = errorMessage(loadError, t('clients.form.error'));
   } finally {
     loading.value = false;
   }
@@ -381,7 +386,7 @@ async function persist(id: string): Promise<void> {
 async function save(): Promise<void> {
   formError.value = '';
   if (personal.displayName.trim().length < 2) {
-    formError.value = 'Enter the display name.';
+    formError.value = t('clients.validation.displayName');
     stepIndex.value = 0;
     return;
   }
@@ -407,13 +412,13 @@ async function save(): Promise<void> {
     if (!editing.value && canAssign.value && supervisorId.value) {
       await assignClientRequest(id, supervisorId.value, 'supervisor');
     }
-    toast.push({ tone: 'success', title: editing.value ? 'Client updated' : 'Client created', message: personal.displayName.trim() });
+    toast.push({ tone: 'success', title: editing.value ? t('clients.form.updated') : t('clients.form.created'), message: personal.displayName.trim() });
     if (switchedOrganization) auth.user = await currentUserRequest();
     await router.push(`/clients/${id}`);
   } catch (saveError) {
     if (switchedOrganization) auth.user = await currentUserRequest().catch(() => auth.user);
-    formError.value = saveError instanceof ApiError ? saveError.message : 'The client could not be saved.';
-    if (/identifier|internal client id|organisation|clinic/i.test(formError.value)) stepIndex.value = 0;
+    formError.value = errorMessage(saveError, t('clients.form.saveError'));
+    if (saveError instanceof ApiError && /identifier|internal client id|organisation|clinic/i.test(saveError.message)) stepIndex.value = 0;
   } finally {
     saving.value = false;
   }
@@ -441,139 +446,142 @@ onMounted(async () => {
 <template>
   <PageContainer>
     <PageHeader
-      :title="editing ? 'Edit client' : 'New client'"
-      description="Personal details, guardians, and the clinical notes your role is allowed to record."
+      :title="editing ? t('clients.form.editTitle') : t('clients.form.newTitle')"
+      :description="t('clients.form.description')"
+      :back-to="editing ? `/clients/${clientId}` : '/clients'"
     />
     <SkeletonBlock v-if="loading" height="280px" />
-    <ErrorState v-else-if="error" title="Client form unavailable" :description="error" @retry="load" />
-    <template v-else>
-      <ol class="steps">
-        <li v-for="(step, index) in steps" :key="step.id" :class="{ current: currentStep === step.id }">{{ index + 1 }}. {{ step.label }}</li>
-      </ol>
-      <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
-      <form ref="formEl" class="panel" @submit.prevent="submitStep">
-        <div v-if="currentStep === 'personal'" class="step-fields">
-          <h2>Personal information</h2>
-          <div class="personal-grid">
-            <AppSelect v-model="organizationId" label="Organisation" required :disabled="editing" :options="organizationOptions" placeholder="Choose an organisation" @update:model-value="alignClinic" />
-            <AppSelect v-model="clinicId" label="Clinic" required :options="clinicOptions" placeholder="Choose a clinic" />
-            <AppInput v-model="personal.displayName" label="Display name" required />
-            <AppInput v-model="personal.clientCode" label="Internal client ID" hint="Unique in this organization. Letters, numbers, and hyphens." />
-            <AppInput v-model="personal.preferredName" label="Preferred name" />
-            <AppInput v-if="canSensitive" v-model="personal.dateOfBirth" label="Date of birth" type="date" />
-            <AppInput v-model="personal.language" label="Language" />
+    <ErrorState v-else-if="error" :title="t('clients.form.unavailable')" :description="error" @retry="load" />
+    <div v-else class="client-form">
+      <nav class="stepper" :aria-label="t('clients.form.stepsLabel')">
+        <ol>
+          <li
+            v-for="(step, index) in steps"
+            :key="step.id"
+            :class="{ 'is-current': index === stepIndex, 'is-done': index < stepIndex }"
+            :aria-current="index === stepIndex ? 'step' : undefined"
+          >
+            <button type="button" class="step" :disabled="index >= stepIndex" @click="goToStep(index)">
+              <span class="step-number" aria-hidden="true">
+                <AppIcon v-if="index < stepIndex" name="check" :size="14" />
+                <template v-else>{{ index + 1 }}</template>
+              </span>
+              <span class="step-label">{{ step.label }}</span>
+            </button>
+          </li>
+        </ol>
+      </nav>
+
+      <form ref="formEl" class="settings-card form-card" novalidate @submit.prevent="submitStep">
+        <p class="step-count">{{ t('clients.form.stepOf', { n: stepIndex + 1, total: steps.length }) }}</p>
+        <p v-if="formError" class="form-alert" role="alert"><AppIcon name="alert" :size="16" />{{ formError }}</p>
+
+        <div v-if="currentStep === 'personal'" class="form-stack">
+          <h2>{{ t('clients.form.personal') }}</h2>
+          <div class="form-grid">
             <AppSelect
-              v-if="editing"
-              v-model="personal.status"
-              label="Status"
-              :options="[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]"
+              v-model="organizationId"
+              :label="t('clients.fields.organisation')"
+              required
+              :disabled="editing"
+              :options="organizationOptions"
+              :placeholder="t('clients.fields.chooseOrganisation')"
+              @update:model-value="alignClinic"
             />
+            <AppSelect v-model="clinicId" :label="t('clients.fields.clinic')" required :options="clinicOptions" :placeholder="t('clients.fields.chooseClinic')" />
+          </div>
+          <div class="form-grid">
+            <AppInput v-model="personal.displayName" :label="t('clients.fields.displayName')" required />
+            <AppInput v-model="personal.preferredName" :label="t('clients.fields.preferredName')" />
+            <AppInput v-model="personal.clientCode" :label="t('clients.fields.clientCode')" :hint="t('clients.fields.clientCodeHint')" />
+            <AppInput v-model="personal.language" :label="t('clients.fields.language')" />
+            <AppInput v-if="canSensitive" v-model="personal.dateOfBirth" :label="t('clients.fields.dateOfBirth')" type="date" />
+            <AppSelect v-if="editing" v-model="personal.status" :label="t('clients.fields.status')" :options="clientStatusOptions" />
           </div>
         </div>
 
-        <template v-else-if="currentStep === 'guardians'">
-          <h2>Parent and guardian information</h2>
-          <article v-for="(guardian, index) in guardians" :key="guardian.id ?? guardian.key" class="repeat">
-            <header class="repeat-head">
-              <h3>Parent or guardian</h3>
-              <AppButton v-if="index > 0 && !guardian.id" type="button" variant="ghost" @click="removeGuardian(index)">Close</AppButton>
+        <div v-else-if="currentStep === 'guardians'" class="form-stack">
+          <h2>{{ t('clients.form.guardians') }}</h2>
+          <article v-for="(guardian, index) in guardians" :key="guardian.id ?? guardian.key" class="record-card">
+            <header class="card-header">
+              <h3>{{ t('clients.form.guardian', { n: index + 1 }) }}</h3>
+              <AppButton v-if="index > 0 && !guardian.id" type="button" variant="ghost" size="sm" icon="close" @click="removeGuardian(index)">{{ t('clients.form.remove') }}</AppButton>
             </header>
-            <div class="grid">
-              <AppInput v-model="guardian.name" label="Name" />
-              <AppSelect v-model="guardian.relationship" label="Relationship" :options="relationshipOptions" />
-              <AppInput v-model="guardian.email" label="Email" type="email" />
-              <AppInput v-model="guardian.phone" label="Phone" />
-              <AppSelect
-                v-model="guardian.linkedUserId"
-                label="Linked parent account"
-                :options="[{ value: '', label: 'Not linked' }, ...parents.map((person) => ({ value: person.id, label: `${person.name} (${person.email})` }))]"
-              />
-            </div>
-            <div class="choices">
-              <AppCheckbox :model-value="guardian.channels.includes('email')" label="Email updates" @update:model-value="toggleChannel(guardian, 'email', $event)" />
-              <AppCheckbox :model-value="guardian.channels.includes('phone')" label="Phone updates" @update:model-value="toggleChannel(guardian, 'phone', $event)" />
-              <AppCheckbox :model-value="guardian.channels.includes('portal')" label="Portal messages" @update:model-value="toggleChannel(guardian, 'portal', $event)" />
-              <AppCheckbox v-model="guardian.emergencyContact" label="Emergency contact" />
-              <AppCheckbox v-model="guardian.portalAccess" label="Authorized for parent portal access" />
-            </div>
+            <GuardianFields v-model="guardians[index]" :parents="parents" />
           </article>
-          <AppButton type="button" variant="secondary" block @click="guardians.push(blankGuardian())">Add parent or guardian</AppButton>
-        </template>
-
-        <div v-else-if="currentStep === 'clinical'" class="step-fields">
-          <h2>Clinical information</h2>
-          <p class="note">Restricted to people allowed to view medical and sensitive information.</p>
-          <AppTextarea v-model="clinical.medicalHistory" label="Relevant medical history" :rows="3" />
-          <AppTextarea v-model="clinical.allergies" label="Allergies" :rows="2" />
-          <AppTextarea v-model="clinical.precautions" label="Precautions" :rows="2" />
-          <AppTextarea v-model="clinical.communicationPreferences" label="Communication preferences" :rows="2" />
-          <AppTextarea v-model="clinical.summary" label="Other clinically necessary information" :rows="3" />
+          <AppButton type="button" variant="secondary" icon="plus" @click="guardians.push(blankGuardian())">{{ t('clients.profile.addGuardian') }}</AppButton>
         </div>
 
-        <template v-else-if="currentStep === 'behaviors'">
-          <h2>Behavior information</h2>
-          <p class="note">Record descriptions and measurement settings only. This form does not generate a diagnosis or a treatment recommendation.</p>
-          <article v-for="(behavior, index) in behaviors" :key="behavior.id ?? behavior.key" class="repeat">
-            <header class="repeat-head">
-              <h3>Behavior</h3>
-              <AppButton v-if="index > 0 && !behavior.id" type="button" variant="ghost" @click="removeBehavior(index)">Close</AppButton>
-            </header>
-            <div class="grid">
-              <AppInput v-model="behavior.name" label="Behavior" />
-              <AppSelect v-model="behavior.measurementType" label="Measurement" :options="measurementOptions" />
-              <AppSelect v-if="behavior.id" v-model="behavior.status" label="Status" :options="[{ value: 'active', label: 'Active' }, { value: 'discontinued', label: 'Discontinued' }]" />
-            </div>
-            <AppTextarea v-model="behavior.operationalDefinition" label="Operational definition" :rows="3" />
-            <AppTextarea v-model="behavior.measurementNotes" label="Measurement notes" :rows="2" />
-          </article>
-          <AppButton type="button" variant="secondary" block @click="behaviors.push(blankBehavior())">Add behavior</AppButton>
-        </template>
+        <div v-else-if="currentStep === 'clinical'" class="form-stack">
+          <h2>{{ t('clients.form.clinical') }}</h2>
+          <p class="restricted"><AppIcon name="info" :size="16" />{{ t('clients.form.clinicalNote') }}</p>
+          <AppTextarea v-model="clinical.medicalHistory" :label="t('clients.fields.medicalHistory')" :rows="3" />
+          <div class="form-grid">
+            <AppTextarea v-model="clinical.allergies" :label="t('clients.fields.allergies')" :rows="2" />
+            <AppTextarea v-model="clinical.precautions" :label="t('clients.fields.precautions')" :rows="2" />
+          </div>
+          <AppTextarea v-model="clinical.communicationPreferences" :label="t('clients.fields.communicationPreferences')" :rows="2" />
+          <AppTextarea v-model="clinical.summary" :label="t('clients.fields.otherInformation')" :rows="3" />
+        </div>
 
-        <template v-else-if="currentStep === 'goals'">
-          <h2>Goals and needs</h2>
-          <article v-for="(goal, index) in goals" :key="goal.id ?? goal.key" class="repeat">
-            <header class="repeat-head">
-              <h3>Goal</h3>
-              <AppButton v-if="index > 0 && !goal.id" type="button" variant="ghost" @click="removeGoal(index)">Close</AppButton>
+        <div v-else-if="currentStep === 'behaviors'" class="form-stack">
+          <h2>{{ t('clients.form.behaviors') }}</h2>
+          <p class="section-desc">{{ t('clients.form.behaviorsNote') }}</p>
+          <article v-for="(behavior, index) in behaviors" :key="behavior.id ?? behavior.key" class="record-card">
+            <header class="card-header">
+              <h3>{{ t('clients.form.behavior', { n: index + 1 }) }}</h3>
+              <AppButton v-if="index > 0 && !behavior.id" type="button" variant="ghost" size="sm" icon="close" @click="removeBehavior(index)">{{ t('clients.form.remove') }}</AppButton>
             </header>
-            <AppTextarea v-model="goal.statement" label="Goal" :rows="2" />
-            <AppTextarea v-model="goal.objective" label="Objective" :rows="2" />
-            <div class="grid">
-              <AppInput v-model="goal.assessmentReference" label="Assessment reference" />
-              <AppInput v-model="goal.reviewOn" label="Review date" type="date" />
-              <AppSelect v-if="goal.id" v-model="goal.status" label="Status" :options="[{ value: 'active', label: 'Active' }, { value: 'met', label: 'Met' }, { value: 'discontinued', label: 'Discontinued' }]" />
-            </div>
+            <BehaviorFields v-model="behaviors[index]" :show-status="Boolean(behavior.id)" />
           </article>
-          <AppButton type="button" variant="secondary" block @click="goals.push(blankGoal())">Add goal</AppButton>
-        </template>
+          <AppButton type="button" variant="secondary" icon="plus" @click="behaviors.push(blankBehavior())">{{ t('clients.profile.addBehavior') }}</AppButton>
+        </div>
 
-        <div v-else-if="currentStep === 'team'" class="step-fields">
-          <h2>Care team</h2>
-          <div class="grid">
-            <AppSelect v-model="therapistId" label="Assigned therapist" :options="[{ value: '', label: 'None yet' }, ...staff.filter((person) => person.role === 'therapist' || person.role === 'clinical_supervisor').map((person) => ({ value: person.id, label: person.name }))]" />
-            <AppSelect v-model="supervisorId" label="Clinical supervisor" :options="[{ value: '', label: 'None yet' }, ...staff.filter((person) => person.role === 'clinical_supervisor').map((person) => ({ value: person.id, label: person.name }))]" />
+        <div v-else-if="currentStep === 'goals'" class="form-stack">
+          <h2>{{ t('clients.form.goals') }}</h2>
+          <article v-for="(goal, index) in goals" :key="goal.id ?? goal.key" class="record-card">
+            <header class="card-header">
+              <h3>{{ t('clients.form.goal', { n: index + 1 }) }}</h3>
+              <AppButton v-if="index > 0 && !goal.id" type="button" variant="ghost" size="sm" icon="close" @click="removeGoal(index)">{{ t('clients.form.remove') }}</AppButton>
+            </header>
+            <GoalFields v-model="goals[index]" :show-status="Boolean(goal.id)" />
+          </article>
+          <AppButton type="button" variant="secondary" icon="plus" @click="goals.push(blankGoal())">{{ t('clients.profile.addGoal') }}</AppButton>
+        </div>
+
+        <div v-else-if="currentStep === 'team'" class="form-stack">
+          <h2>{{ t('clients.form.team') }}</h2>
+          <div class="form-grid">
+            <AppSelect v-model="therapistId" :label="t('clients.form.assignedTherapist')" :options="therapistOptions" />
+            <AppSelect v-model="supervisorId" :label="t('clients.form.clinicalSupervisor')" :options="supervisorOptions" />
           </div>
         </div>
 
-        <div v-else-if="currentStep === 'documents'" class="step-fields">
-          <h2>Documents</h2>
-          <FileUpload v-model="files" label="Care documents" accept="application/pdf,image/png,image/jpeg,image/webp" multiple :max-size-mb="0.5" hint="PDF or image, up to 512 KB. Files stay private and are not scanned in this environment." />
+        <div v-else-if="currentStep === 'documents'" class="form-stack">
+          <h2>{{ t('clients.form.documents') }}</h2>
+          <FileUpload
+            v-model="files"
+            :label="t('clients.form.careDocuments')"
+            accept="application/pdf,image/png,image/jpeg,image/webp"
+            multiple
+            :max-size-mb="0.5"
+            :hint="t('clients.form.documentsHint')"
+          />
         </div>
 
-        <AppButton v-if="stepIndex === 0" type="submit" :loading="checkingCode || (isLastStep && saving)">{{ isLastStep ? submitLabel : 'Continue' }}</AppButton>
-        <div v-else class="actions">
-          <AppButton type="button" variant="secondary" @click="goBack">Back</AppButton>
-          <AppButton v-if="!isLastStep" type="submit">Continue</AppButton>
-          <AppButton v-else type="submit" :loading="saving">{{ submitLabel }}</AppButton>
+        <div class="form-nav">
+          <AppButton v-if="stepIndex > 0" type="button" variant="secondary" icon="arrow-left" @click="goBack">{{ t('clients.form.back') }}</AppButton>
+          <AppButton v-if="!isLastStep" type="submit" icon-end="arrow-right" :loading="checkingCode">{{ t('clients.form.continue') }}</AppButton>
+          <AppButton v-else type="submit" :loading="saving || checkingCode">{{ submitLabel }}</AppButton>
         </div>
       </form>
-    </template>
+    </div>
     <ConfirmDialog
       :open="confirmOpen"
-      title="Deactivate client"
-      message="This keeps the clinical history and removes the client from active work. It does not delete the record."
+      :title="t('clients.deactivateTitle')"
+      :message="t('clients.deactivateMessage')"
       tone="danger"
-      confirm-label="Deactivate"
+      :confirm-label="t('clients.deactivate')"
       @confirm="save"
       @cancel="confirmOpen = false"
     />
@@ -581,115 +589,107 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.steps {
+.client-form {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 920px;
+}
+
+/* Stepper: numbered steps; completed ones show a check and can be revisited. */
+.stepper ol {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.steps li {
-  padding: 6px 12px;
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3) 0 6px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface);
   color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
 
-.current {
-  border-color: transparent;
-  background: var(--color-primary-soft);
-  color: var(--color-primary-ink);
+.step:disabled {
+  cursor: default;
+}
+
+.step-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
   font-weight: 700;
 }
 
-.panel {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+.is-current .step {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
+  font-weight: 600;
+}
+
+.is-current .step-number,
+.is-done .step-number {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.is-done .step {
+  color: var(--color-ink);
+}
+
+.is-done .step:hover {
+  border-color: var(--color-primary);
+}
+
+.form-card {
   scroll-margin-top: calc(var(--topbar-height) + 16px);
 }
 
-.step-fields {
-  display: grid;
-  gap: 16px;
+.form-card h2 {
+  font-size: var(--text-lg);
 }
 
-.personal-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  align-items: start;
-}
-
-.grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.grid > * {
-  flex: 1 1 220px;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: space-between;
-}
-
-.repeat {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.repeat-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.repeat-head h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-}
-
-.note {
-  margin: 0;
+.step-count {
   color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
 
-.form-error {
-  margin: 0;
-  color: var(--color-danger);
+.restricted {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-info-soft);
+  color: var(--color-info);
+  font-size: var(--text-sm);
 }
 
-h2 {
-  margin: 0;
-  font-size: 1.05rem;
+.form-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 
-@media (max-width: 640px) {
-  .personal-grid {
-    grid-template-columns: 1fr;
-  }
+.form-nav > :only-child {
+  margin-inline-start: auto;
 }
 </style>

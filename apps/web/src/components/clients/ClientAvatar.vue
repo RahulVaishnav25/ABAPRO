@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 
-const props = defineProps<{
-  clientId: string;
-  initials: string;
-  hasAvatar: boolean;
-  name: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    clientId: string;
+    initials: string;
+    hasAvatar: boolean;
+    name: string;
+    /** Diameter in pixels. */
+    size?: number;
+  }>(),
+  { size: 40 },
+);
 
 const failed = ref(false);
 watch(() => props.clientId, () => {
@@ -18,11 +23,12 @@ watch(() => props.clientId, () => {
   <img
     v-if="hasAvatar && !failed"
     class="avatar"
+    :style="{ width: `${size}px`, height: `${size}px` }"
     :src="`/api/v1/clients/${clientId}/avatar`"
     alt=""
     @error="failed = true"
   />
-  <span v-else class="avatar initials" :aria-label="`${name} initials`">{{ initials }}</span>
+  <span v-else class="avatar initials" :style="{ width: `${size}px`, height: `${size}px`, fontSize: `${Math.round(size * 0.36)}px` }" aria-hidden="true">{{ initials }}</span>
 </template>
 
 <style scoped>

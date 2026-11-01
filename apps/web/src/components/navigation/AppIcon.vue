@@ -51,6 +51,7 @@ const icons: Record<string, string[]> = {
   calendar: ['M5 6h14v14H5z', 'M5 10h14', 'M9 4v4', 'M15 4v4'],
   file: ['M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z', 'M14 3v5h5'],
   upload: ['M12 16V4', 'M7 9l5-5 5 5', 'M5 20h14'],
+  edit: ['M4 20h4L19 9l-4-4L4 16z', 'M13.5 6.5l4 4'],
   menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
 };
 

@@ -20,6 +20,14 @@ const props = withDefaults(
     pageSize?: number;
     loading?: boolean;
     density?: 'comfortable' | 'compact';
+    /**
+     * Server mode: the rows are one page that the server already searched, sorted and paged.
+     * Pass the total row count, the current page and sort; the table emits changes instead of applying them.
+     */
+    total?: number;
+    page?: number;
+    sort?: string;
+    direction?: 'asc' | 'desc';
   }>(),
   {
     searchable: true,
@@ -27,15 +35,31 @@ const props = withDefaults(
     pageSize: 8,
     loading: false,
     density: 'comfortable',
+    total: undefined,
+    page: 1,
+    sort: undefined,
+    direction: 'asc',
   },
 );
+const emit = defineEmits<{ 'update:page': [page: number]; sort: [key: string] }>();
 
+const server = computed(() => props.total !== undefined);
 const search = ref('');
-const page = ref(1);
-const sortKey = ref<string | null>(null);
-const sortDirection = ref<'asc' | 'desc'>('asc');
+const localPage = ref(1);
+const localSortKey = ref<string | null>(null);
+const localSortDirection = ref<'asc' | 'desc'>('asc');
+const page = computed(() => (server.value ? props.page : localPage.value));
+const sortKey = computed(() => (server.value ? props.sort ?? null : localSortKey.value));
+const sortDirection = computed(() => (server.value ? props.direction : localSortDirection.value));
+const totalRows = computed(() => (server.value ? props.total ?? 0 : filtered.value.length));
+
+function setPage(next: number): void {
+  if (server.value) emit('update:page', next);
+  else localPage.value = next;
+}
 
 const filtered = computed(() => {
+  if (server.value) return props.rows;
   const query = search.value.trim().toLowerCase();
   let next = props.rows;
   if (query) {
@@ -51,21 +75,22 @@ const filtered = computed(() => {
   return [...next].sort((left, right) => compareValues(left[key], right[key]) * direction);
 });
 
-const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / props.pageSize)));
+const pageCount = computed(() => Math.max(1, Math.ceil(totalRows.value / props.pageSize)));
 const visibleRows = computed(() => {
+  if (server.value) return props.rows;
   const start = (page.value - 1) * props.pageSize;
   return filtered.value.slice(start, start + props.pageSize);
 });
-const rangeStart = computed(() => (filtered.value.length === 0 ? 0 : (page.value - 1) * props.pageSize + 1));
-const rangeEnd = computed(() => Math.min(page.value * props.pageSize, filtered.value.length));
+const rangeStart = computed(() => (totalRows.value === 0 ? 0 : (page.value - 1) * props.pageSize + 1));
+const rangeEnd = computed(() => Math.min(page.value * props.pageSize, totalRows.value));
 
 watch([search, () => props.rows], () => {
-  page.value = 1;
+  if (!server.value) localPage.value = 1;
 });
 
 watch(pageCount, (count) => {
-  if (page.value > count) {
-    page.value = count;
+  if (!server.value && localPage.value > count) {
+    localPage.value = count;
   }
 });
 
@@ -80,12 +105,16 @@ function toggleSort(column: TableColumn): void {
   if (!column.sortable) {
     return;
   }
-  if (sortKey.value === column.key) {
-    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+  if (server.value) {
+    emit('sort', column.key);
     return;
   }
-  sortKey.value = column.key;
-  sortDirection.value = 'asc';
+  if (localSortKey.value === column.key) {
+    localSortDirection.value = localSortDirection.value === 'asc' ? 'desc' : 'asc';
+    return;
+  }
+  localSortKey.value = column.key;
+  localSortDirection.value = 'asc';
 }
 
 function ariaSort(column: TableColumn): 'ascending' | 'descending' | 'none' | undefined {
@@ -105,7 +134,7 @@ function rowId(row: Record<string, unknown>): string {
 
 <template>
   <section class="table-card">
-    <div v-if="searchable" class="table-toolbar">
+    <div v-if="searchable && !server" class="table-toolbar">
       <AppInput v-model="search" :label="t('table.search')" hide-label :placeholder="searchPlaceholder ?? t('table.searchPlaceholder')" />
     </div>
     <div class="table-scroll">
@@ -147,18 +176,16 @@ function rowId(row: Record<string, unknown>): string {
           </tr>
         </tbody>
       </table>
-      <EmptyState
-        v-if="!loading && visibleRows.length === 0"
-        :title="t('table.noMatches')"
-        :description="t('table.noMatchesHint')"
-      />
+      <slot v-if="!loading && visibleRows.length === 0" name="empty">
+        <EmptyState :title="t('table.noMatches')" :description="t('table.noMatchesHint')" />
+      </slot>
     </div>
     <div class="pager">
-      <p>{{ t('table.showing', { start: rangeStart, end: rangeEnd, total: filtered.length }) }}</p>
+      <p>{{ t('table.showing', { start: rangeStart, end: rangeEnd, total: totalRows }) }}</p>
       <div v-if="pageCount > 1" class="pager-actions">
-        <AppButton variant="secondary" size="sm" icon="chevron-left" :disabled="page <= 1" @click="page -= 1">{{ t('common.previous') }}</AppButton>
+        <AppButton variant="secondary" size="sm" icon="chevron-left" :disabled="page <= 1" @click="setPage(page - 1)">{{ t('common.previous') }}</AppButton>
         <span class="pager-page">{{ page }} / {{ pageCount }}</span>
-        <AppButton variant="secondary" size="sm" icon-end="chevron-right" :disabled="page >= pageCount" @click="page += 1">{{ t('common.next') }}</AppButton>
+        <AppButton variant="secondary" size="sm" icon-end="chevron-right" :disabled="page >= pageCount" @click="setPage(page + 1)">{{ t('common.next') }}</AppButton>
       </div>
     </div>
   </section>

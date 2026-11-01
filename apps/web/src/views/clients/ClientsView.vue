@@ -1,27 +1,28 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import type { ClientDirectoryItem, StaffOption } from '@abapro/shared';
+import { useI18n } from 'vue-i18n';
+import { CARE_STATUSES, type ClientDirectoryItem, type StaffOption } from '@abapro/shared';
 import { clientAssigneesRequest, clientDirectoryRequest, seedDemoClientsRequest } from '@/api/clients';
-import { ApiError } from '@/api/client';
 import ClientAvatar from '@/components/clients/ClientAvatar.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppTable from '@/components/ui/AppTable.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
-import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
-import { formatDateTime } from '@/lib/format';
+import { formatDayOf } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
-import { useLoader } from '@/lib/loader';
+import { errorMessage, useLoader } from '@/lib/loader';
 
 const auth = useAuthStore();
 const toast = useToastStore();
 const router = useRouter();
+const { t } = useI18n();
 const items = ref<ClientDirectoryItem[]>([]);
 const total = ref(0);
 const page = ref(1);
@@ -37,18 +38,35 @@ const staff = ref<StaffOption[]>([]);
 let searchTimer = 0;
 
 const canCreate = computed(() => auth.can('clients.create'));
-const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
-const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize + 1));
-const rangeEnd = computed(() => Math.min(page.value * pageSize, total.value));
+const statusOptions = computed(() => [
+  { value: '', label: t('clients.anyStatus') },
+  { value: 'active', label: t('clients.active') },
+  { value: 'inactive', label: t('clients.inactive') },
+]);
+const programStatusOptions = computed(() => [
+  { value: '', label: t('clients.anyProgramStatus') },
+  ...CARE_STATUSES.map((value) => ({ value, label: t(`status.${value}`) })),
+]);
+const columns = computed(() => [
+  { key: 'name', label: t('clients.columns.name'), sortable: true },
+  { key: 'code', label: t('clients.columns.code'), sortable: true },
+  { key: 'clinic', label: t('clients.columns.clinic') },
+  { key: 'therapists', label: t('clients.columns.therapists') },
+  { key: 'supervisors', label: t('clients.columns.supervisors') },
+  { key: 'status', label: t('clients.columns.status'), sortable: true },
+  { key: 'programs', label: t('clients.columns.programs'), sortable: true, align: 'end' as const },
+  { key: 'created', label: t('clients.columns.created'), sortable: true },
+]);
+const rows = computed(() => items.value.map((client) => ({ ...client, key: client.id }) as unknown as Record<string, unknown>));
 const therapistOptions = computed(() => [
-  { value: '', label: 'Any therapist' },
+  { value: '', label: t('clients.anyTherapist') },
   ...staff.value.filter((person) => person.role === 'therapist').map((person) => ({
     value: person.id,
     label: person.name,
   })),
 ]);
 const supervisorOptions = computed(() => [
-  { value: '', label: 'Any supervisor' },
+  { value: '', label: t('clients.anySupervisor') },
   ...staff.value.filter((person) => person.role === 'clinical_supervisor').map((person) => ({ value: person.id, label: person.name })),
 ]);
 
@@ -66,14 +84,17 @@ const { loading, error, load } = useLoader(async () => {
   });
   items.value = directory.items;
   total.value = directory.total;
-}, 'The client directory could not be loaded.');
+}, t('clients.error'));
 
 function names(people: Array<{ name: string }>): string {
-  return people.length ? people.map((person) => person.name).join(', ') : 'None';
+  return people.length ? people.map((person) => person.name).join(', ') : t('clients.none');
 }
 
-function when(value: string | null): string {
-  return value ? formatDateTime(value) : 'None';
+const client = (row: Record<string, unknown>) => row as unknown as ClientDirectoryItem;
+
+function setPage(next: number): void {
+  page.value = next;
+  void load();
 }
 
 function toggleSort(key: string): void {
@@ -92,15 +113,15 @@ async function addSamples(): Promise<void> {
     const result = await seedDemoClientsRequest();
     toast.push({
       tone: 'success',
-      title: result.created ? 'Sample clients added' : 'Sample clients already exist',
-      message: 'These records are synthetic.',
+      title: result.created ? t('clients.samplesAdded') : t('clients.samplesExist'),
+      message: t('clients.samplesSynthetic'),
     });
     await load();
   } catch (seedError) {
     toast.push({
       tone: 'danger',
-      title: 'Samples were not added',
-      message: seedError instanceof ApiError ? seedError.message : 'Try again.',
+      title: t('clients.samplesNotAdded'),
+      message: errorMessage(seedError, t('errors.generic')),
     });
   }
 }
@@ -130,92 +151,98 @@ onMounted(async () => {
 
 <template>
   <PageContainer>
-    <PageHeader title="Clients" description="Search the clients your role is allowed to open.">
+    <PageHeader :title="t('clients.title')" :description="t('clients.description')">
       <template #actions>
-        <AppButton v-if="canCreate" variant="secondary" @click="addSamples">Add sample clients</AppButton>
-        <AppButton v-if="canCreate" @click="router.push('/clients/new')">New client</AppButton>
+        <AppButton v-if="canCreate" variant="secondary" @click="addSamples">{{ t('clients.addSamples') }}</AppButton>
+        <AppButton v-if="canCreate" icon="plus" @click="router.push('/clients/new')">{{ t('clients.newClient') }}</AppButton>
       </template>
     </PageHeader>
     <div class="filter-bar">
-      <AppInput v-model="search" label="Search" placeholder="Name or client ID" />
-      <AppSelect v-model="status" label="Status" :options="[{ value: '', label: 'Any status' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]" />
-      <AppSelect v-model="therapistId" label="Therapist" :options="therapistOptions" />
-      <AppSelect v-model="supervisorId" label="Supervisor" :options="supervisorOptions" />
-      <AppSelect
-        v-model="programStatus"
-        label="Program status"
-        :options="[
-          { value: '', label: 'Any program status' },
-          { value: 'in_treatment', label: 'In Treatment program' },
-          { value: 'maintenance', label: 'Maintenance program' },
-          { value: 'on_hold', label: 'On Hold program' },
-          { value: 'mastered', label: 'Mastered program' },
-        ]"
-      />
+      <AppInput v-model="search" type="search" :label="t('clients.search')" :placeholder="t('clients.searchPlaceholder')" />
+      <AppSelect v-model="status" :label="t('clients.columns.status')" :options="statusOptions" />
+      <AppSelect v-model="therapistId" :label="t('clients.therapist')" :options="therapistOptions" />
+      <AppSelect v-model="supervisorId" :label="t('clients.supervisor')" :options="supervisorOptions" />
+      <AppSelect v-model="programStatus" :label="t('clients.programStatus')" :options="programStatusOptions" />
     </div>
-    <SkeletonBlock v-if="loading" height="240px" />
-    <ErrorState v-else-if="error" title="Client directory unavailable" :description="error" @retry="load" />
-    <EmptyState
-      v-else-if="items.length === 0"
-      title="No clients match"
-      description="Create a client or add the synthetic sample records."
-    />
-    <div v-else class="table-wrap panel">
-      <table>
-        <caption>Client directory</caption>
-        <thead>
-          <tr>
-            <th><button type="button" @click="toggleSort('name')">Name</button></th>
-            <th><button type="button" @click="toggleSort('code')">Client ID</button></th>
-            <th>Organisation</th>
-            <th>Clinic</th>
-            <th>Therapist</th>
-            <th>Supervisors</th>
-            <th><button type="button" @click="toggleSort('status')">Status</button></th>
-            <th><button type="button" @click="toggleSort('programs')">Active programs</button></th>
-            <th><button type="button" @click="toggleSort('created')">Created</button></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="client in items" :key="client.id">
-            <td>
-              <RouterLink class="person" :to="`/clients/${client.id}`">
-                <ClientAvatar :client-id="client.id" :initials="client.initials" :has-avatar="client.hasAvatar" :name="client.displayName" />
-                <span>
-                  <strong>{{ client.preferredName || client.displayName }}</strong>
-                  <small v-if="client.preferredName">{{ client.displayName }}</small>
-                </span>
-              </RouterLink>
-            </td>
-            <td>{{ client.clientCode }}</td>
-            <td>{{ client.organizationName }}</td>
-            <td>{{ client.clinicName || 'Not recorded' }}</td>
-            <td>{{ names(client.therapists) }}</td>
-            <td>{{ names(client.supervisors) }}</td>
-            <td><StatusBadge :tone="client.status === 'active' ? 'success' : 'neutral'" :label="client.status === 'active' ? 'Active' : 'Inactive'" /></td>
-            <td>{{ client.activeProgramCount }}</td>
-            <td>{{ when(client.createdAt) }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div v-if="!loading && !error" class="pager">
-      <span>Showing {{ rangeStart }}–{{ rangeEnd }} of {{ total }}</span>
-      <AppButton variant="secondary" size="sm" :disabled="page <= 1" @click="page -= 1; load()">Previous</AppButton>
-      <span>Page {{ page }} of {{ pageCount }}</span>
-      <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="page += 1; load()">Next</AppButton>
-    </div>
+    <ErrorState v-if="error" :title="t('clients.unavailable')" :description="error" @retry="load" />
+    <AppTable
+      v-else
+      :caption="t('clients.caption')"
+      :columns="columns"
+      :rows="rows"
+      row-key="key"
+      :loading="loading && items.length === 0"
+      :total="total"
+      :page="page"
+      :page-size="pageSize"
+      :sort="sort"
+      :direction="direction"
+      :class="{ 'is-refreshing': loading && items.length > 0 }"
+      @update:page="setPage"
+      @sort="toggleSort"
+    >
+      <template #cell-name="{ row }">
+        <RouterLink class="person" :to="`/clients/${client(row).id}`">
+          <ClientAvatar :client-id="client(row).id" :initials="client(row).initials" :has-avatar="client(row).hasAvatar" :name="client(row).displayName" />
+          <span class="person-names">
+            <strong>{{ client(row).preferredName || client(row).displayName }}</strong>
+            <small v-if="client(row).preferredName">{{ client(row).displayName }}</small>
+          </span>
+        </RouterLink>
+      </template>
+      <template #cell-code="{ row }"><span class="code">{{ client(row).clientCode }}</span></template>
+      <template #cell-clinic="{ row }">
+        <span class="person-names">
+          <span>{{ client(row).clinicName || t('clients.notRecorded') }}</span>
+          <small v-if="client(row).organizationName !== client(row).clinicName">{{ client(row).organizationName }}</small>
+        </span>
+      </template>
+      <template #cell-therapists="{ row }">{{ names(client(row).therapists) }}</template>
+      <template #cell-supervisors="{ row }">{{ names(client(row).supervisors) }}</template>
+      <template #cell-status="{ row }">
+        <StatusBadge :tone="client(row).status === 'active' ? 'success' : 'neutral'" :label="client(row).status === 'active' ? t('clients.active') : t('clients.inactive')" />
+      </template>
+      <template #cell-programs="{ row }">{{ client(row).activeProgramCount }}</template>
+      <template #cell-created="{ row }">{{ formatDayOf(client(row).createdAt) }}</template>
+      <template #empty>
+        <EmptyState icon="clients" :title="t('clients.empty')" :description="t('clients.emptyHint')" />
+      </template>
+    </AppTable>
   </PageContainer>
 </template>
 
 <style scoped>
-.table-wrap { overflow-x: auto; padding: 12px; }
-table { width: 100%; border-collapse: collapse; }
-th, td { text-align: start; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--color-border); }
-th button { border: 0; background: transparent; font-weight: 700; padding: 0; }
-caption { text-align: start; font-weight: 700; margin-bottom: 8px; }
-.person { display: flex; gap: 10px; align-items: center; text-decoration: none; color: inherit; }
-.person small, .pager { color: var(--color-text-muted); }
-.person span { display: grid; }
-.pager { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.person:hover strong,
+.person:focus-visible strong {
+  color: var(--color-primary-ink);
+  text-decoration: underline;
+}
+
+.person-names {
+  display: grid;
+  min-width: 0;
+}
+
+.person-names small {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.code {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.is-refreshing {
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
 </style>

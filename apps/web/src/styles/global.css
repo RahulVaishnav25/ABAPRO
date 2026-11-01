@@ -954,6 +954,110 @@ table.data-table {
   }
 }
 
+/* Section header: title on the start side, actions on the end side. */
+.card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.card-header h2,
+.card-header h3 {
+  font-size: var(--text-md);
+}
+
+/* Form layout: stacked fields, a responsive field grid, a row of checkboxes and an action row. */
+.form-stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.form-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  align-items: center;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.form-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* Label and value pairs. */
+.detail-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-4) var(--space-6);
+}
+
+.detail-list dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.detail-list dd {
+  margin: 2px 0 0;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+/* A repeated record inside a section, such as a guardian or a goal. */
+.record-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.record-card.is-editing {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.record-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.record-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* Uploads */
 .upload {
   border: 1.5px dashed var(--color-border-strong);
