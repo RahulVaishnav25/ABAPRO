@@ -1,40 +1,41 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { ParentAccountSummary } from '@abapro/shared';
 import { createParentRequest, parentsRequest, setParentClientsRequest } from '@/api/parents';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import ClientMultiPicker from '@/components/onboarding/ClientMultiPicker.vue';
 import OnboardingTabs from '@/components/onboarding/OnboardingTabs.vue';
+import ActionMenu, { type ActionMenuItem } from '@/components/ui/ActionMenu.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppTable from '@/components/ui/AppTable.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
-import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
-import { formatDateTime } from '@/lib/format';
+import type { BadgeTone } from '@/components/ui/types';
+import { formatDateTime, formatDayOf } from '@/lib/format';
 import { errorMessage, useLoader } from '@/lib/loader';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 
-const PAGE_SIZE = 20;
-const PENDING_HINT = 'Pending: cannot sign in until a client is linked.';
-
 const auth = useAuthStore();
 const toast = useToastStore();
+const { t } = useI18n();
 const parents = ref<ParentAccountSummary[]>([]);
 const search = ref('');
 const status = ref('');
-const page = ref(1);
 
 // Creating accounts follows the organisation's member onboarding: administrators only.
 const canCreate = computed(() => auth.user?.platformAdmin === true || auth.user?.role === 'organization_admin');
 
 const { loading, error, load } = useLoader(async () => {
   parents.value = await parentsRequest();
-}, 'Parent accounts could not be loaded.');
+}, t('onboarding.parents.error'));
 
 const filtered = computed(() => {
   const query = search.value.trim().toLowerCase();
@@ -43,14 +44,47 @@ const filtered = computed(() => {
     && (!status.value || parent.portalStatus === status.value),
   );
 });
-const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)));
-const paged = computed(() => filtered.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE));
-const rangeStart = computed(() => (filtered.value.length === 0 ? 0 : (page.value - 1) * PAGE_SIZE + 1));
-const rangeEnd = computed(() => Math.min(page.value * PAGE_SIZE, filtered.value.length));
-watch([search, status], () => (page.value = 1));
-watch(pageCount, (count) => {
-  if (page.value > count) page.value = count;
-});
+
+const statusOptions = computed(() => [
+  { value: '', label: t('onboarding.parents.any') },
+  { value: 'active', label: t('onboarding.active') },
+  { value: 'pending', label: t('onboarding.pending') },
+]);
+const columns = computed(() => [
+  { key: 'name', label: t('onboarding.parents.columns.parent'), sortable: true },
+  { key: 'clients', label: t('onboarding.parents.columns.clients') },
+  { key: 'portal', label: t('onboarding.parents.columns.portal'), sortable: true },
+  { key: 'added', label: t('onboarding.parents.columns.added'), sortable: true },
+  { key: 'actions', label: t('onboarding.parents.columns.actions') },
+]);
+
+/** Portal access as a badge: revoked, active, or pending until a client is linked. */
+function access(parent: ParentAccountSummary): { tone: BadgeTone; label: string } {
+  if (parent.membershipStatus === 'revoked') return { tone: 'neutral', label: t('onboarding.revoked') };
+  return parent.portalStatus === 'active' ? { tone: 'success', label: t('onboarding.active') } : { tone: 'warning', label: t('onboarding.pending') };
+}
+
+const rows = computed(() =>
+  filtered.value.map((parent) => ({ id: parent.userId, name: parent.name, portal: access(parent).label, added: parent.createdAt, parent })),
+);
+const parentOf = (row: Record<string, unknown>) => row.parent as ParentAccountSummary;
+
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const first = (word?: string) => Array.from(word ?? '')[0] ?? '';
+  return (words.length > 1 ? first(words[0]) + first(words[words.length - 1]) : first(words[0])).toLocaleUpperCase() || '?';
+}
+
+function actions(parent: ParentAccountSummary): ActionMenuItem[] {
+  const items: ActionMenuItem[] = [{ key: 'view', label: t('onboarding.view') }];
+  if (parent.membershipStatus === 'active') items.push({ key: 'manage', label: t('onboarding.parents.manage') });
+  return items;
+}
+
+function onAction(parent: ParentAccountSummary, key: string): void {
+  if (key === 'view') viewing.value = parent;
+  else startLinking(parent);
+}
 
 function replace(updated: ParentAccountSummary): void {
   const index = parents.value.findIndex((parent) => parent.userId === updated.userId);
@@ -73,7 +107,7 @@ function startOnboarding(): void {
 async function onboard(): Promise<void> {
   formError.value = '';
   if (form.name.trim().length < 2 || !form.email.includes('@') || form.password.length < 10) {
-    formError.value = 'Enter a name, an email address, and a password of at least 10 characters.';
+    formError.value = t('onboarding.parents.invalid');
     return;
   }
   saving.value = true;
@@ -82,10 +116,10 @@ async function onboard(): Promise<void> {
     replace(created);
     onboarding.value = false;
     toast.push(created.portalStatus === 'active'
-      ? { tone: 'success', title: 'Parent onboarded', message: `${created.name} can sign in with this email and password.` }
-      : { tone: 'info', title: 'Parent onboarded as pending', message: `${created.name} can sign in once a client is linked.` });
+      ? { tone: 'success', title: t('onboarding.parents.onboarded'), message: t('onboarding.parents.onboardedMessage', { name: created.name }) }
+      : { tone: 'info', title: t('onboarding.parents.onboardedPending'), message: t('onboarding.parents.onboardedPendingMessage', { name: created.name }) });
   } catch (onboardError) {
-    formError.value = errorMessage(onboardError, 'The parent could not be onboarded.');
+    formError.value = errorMessage(onboardError, t('onboarding.parents.onboardError'));
   } finally {
     saving.value = false;
   }
@@ -112,11 +146,11 @@ async function saveLinks(): Promise<void> {
     linking.value = null;
     toast.push({
       tone: 'success',
-      title: 'Linked clients updated',
-      message: updated.portalStatus === 'active' ? `${updated.name} can sign in.` : `${updated.name} is pending until a client is linked.`,
+      title: t('onboarding.parents.linksUpdated'),
+      message: updated.portalStatus === 'active' ? t('onboarding.parents.canSignIn', { name: updated.name }) : t('onboarding.parents.pendingUntil', { name: updated.name }),
     });
   } catch (linkError) {
-    toast.push({ tone: 'danger', title: 'Links not saved', message: errorMessage(linkError, 'Try again.') });
+    toast.push({ tone: 'danger', title: t('onboarding.parents.linksNotSaved'), message: errorMessage(linkError, t('errors.generic')) });
   } finally {
     saving.value = false;
   }
@@ -128,244 +162,215 @@ void load();
 <template>
   <PageContainer>
     <OnboardingTabs />
-    <PageHeader title="Parents" description="Parent accounts and the children each one can see in the parent portal.">
+    <PageHeader :title="t('onboarding.parents.title')" :description="t('onboarding.parents.description')">
       <template #actions>
-        <AppButton v-if="canCreate" @click="startOnboarding">Onboard parent</AppButton>
+        <AppButton v-if="canCreate" icon="plus" @click="startOnboarding">{{ t('onboarding.parents.onboard') }}</AppButton>
       </template>
     </PageHeader>
 
     <div class="filter-bar">
-      <AppInput v-model="search" label="Search" placeholder="Parent, email, child or client code" />
-      <AppSelect
-        v-model="status"
-        label="Portal access"
-        :options="[{ value: '', label: 'Any' }, { value: 'active', label: 'Active' }, { value: 'pending', label: 'Pending' }]"
-      />
+      <AppInput v-model="search" type="search" :label="t('onboarding.search')" :placeholder="t('onboarding.parents.searchPlaceholder')" />
+      <AppSelect v-model="status" :label="t('onboarding.parents.portal')" :options="statusOptions" />
     </div>
 
-    <SkeletonBlock v-if="loading" height="240px" />
-    <ErrorState v-else-if="error" title="Parents unavailable" :description="error" @retry="load" />
-    <EmptyState
-      v-else-if="filtered.length === 0"
-      :title="parents.length ? 'No parents match' : 'No parent accounts yet'"
-      :description="parents.length ? 'Adjust the search or filter.' : 'Onboard a parent and link their child to give them portal access.'"
-    />
-    <div v-else class="table-wrap panel">
-      <table>
-        <caption>Parent accounts</caption>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Linked clients</th>
-            <th>Portal access</th>
-            <th>Added</th>
-            <th class="actions-col">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="parent in paged" :key="parent.userId">
-            <td><strong>{{ parent.name }}</strong></td>
-            <td>{{ parent.email }}</td>
-            <td>
-              <span v-if="parent.linkedClients.length === 0" class="muted">None</span>
-              <span v-for="client in parent.linkedClients" v-else :key="client.id" class="client-chip">
-                <RouterLink :to="`/clients/${client.id}`">{{ client.displayName }}</RouterLink> · {{ client.clientCode }}
-              </span>
-            </td>
-            <td>
-              <StatusBadge
-                :tone="parent.membershipStatus === 'revoked' ? 'neutral' : parent.portalStatus === 'active' ? 'success' : 'warning'"
-                :label="parent.membershipStatus === 'revoked' ? 'Revoked' : parent.portalStatus === 'active' ? 'Active' : 'Pending'"
-                :title="parent.portalStatus === 'pending' ? PENDING_HINT : undefined"
-              />
-            </td>
-            <td>{{ formatDateTime(parent.createdAt) }}</td>
-            <td>
-              <div class="row-actions">
-                <AppButton size="sm" variant="secondary" :aria-label="`View ${parent.name}`" @click="viewing = parent">View</AppButton>
-                <AppButton
-                  v-if="parent.membershipStatus === 'active'"
-                  size="sm"
-                  variant="secondary"
-                  :aria-label="`Manage clients for ${parent.name}`"
-                  @click="startLinking(parent)"
-                >
-                  Manage clients
-                </AppButton>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div v-if="!loading && !error && filtered.length > 0" class="pager">
-      <span>Showing {{ rangeStart }}–{{ rangeEnd }} of {{ filtered.length }}</span>
-      <AppButton variant="secondary" size="sm" :disabled="page <= 1" @click="page -= 1">Previous</AppButton>
-      <span>Page {{ page }} of {{ pageCount }}</span>
-      <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="page += 1">Next</AppButton>
-    </div>
-
-    <AppDialog :open="onboarding" title="Onboard parent" size="lg" @close="onboarding = false">
-      <form class="onboard-form" @submit.prevent="onboard">
-        <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
-        <div class="onboard-grid">
-          <AppInput v-model="form.name" label="Name" required />
-          <AppInput v-model="form.email" label="Email" type="email" required autocomplete="off" />
-          <AppInput v-model="form.password" label="Password" type="password" required autocomplete="new-password" hint="At least 10 characters." />
-        </div>
-        <ClientMultiPicker
-          v-model="form.clientIds"
-          label="Link clients (optional)"
-          hint="Without a linked client the account stays pending and the parent cannot sign in. You can link clients later."
+    <ErrorState v-if="error" :title="t('onboarding.parents.unavailable')" :description="error" @retry="load" />
+    <AppTable
+      v-else
+      :caption="t('onboarding.parents.caption')"
+      :columns="columns"
+      :rows="rows"
+      row-key="id"
+      :page-size="20"
+      :searchable="false"
+      :loading="loading"
+    >
+      <template #cell-name="{ row }">
+        <button type="button" class="person" :aria-label="t('onboarding.viewName', { name: row.name })" @click="viewing = parentOf(row)">
+          <span class="person-avatar" aria-hidden="true">{{ initials(String(row.name)) }}</span>
+          <span class="person-text">
+            <strong dir="auto">{{ row.name }}</strong>
+            <small>{{ parentOf(row).email }}</small>
+          </span>
+        </button>
+      </template>
+      <template #cell-clients="{ row }">
+        <span v-if="parentOf(row).linkedClients.length === 0" class="muted">{{ t('onboarding.none') }}</span>
+        <span v-else class="client-chips">
+          <RouterLink v-for="client in parentOf(row).linkedClients" :key="client.id" class="client-chip" :to="`/clients/${client.id}`">
+            <span dir="auto">{{ client.displayName }}</span>
+            <span class="client-chip-code">{{ client.clientCode }}</span>
+          </RouterLink>
+        </span>
+      </template>
+      <template #cell-portal="{ row }">
+        <StatusBadge
+          :tone="access(parentOf(row)).tone"
+          :label="access(parentOf(row)).label"
+          :title="parentOf(row).portalStatus === 'pending' ? t('onboarding.parents.pendingHint') : undefined"
         />
+      </template>
+      <template #cell-added="{ row }">{{ formatDayOf(String(row.added)) }}</template>
+      <template #cell-actions="{ row }">
+        <ActionMenu :label="t('onboarding.actionsFor', { name: row.name })" :items="actions(parentOf(row))" @select="onAction(parentOf(row), $event)" />
+      </template>
+      <template #empty>
+        <EmptyState
+          icon="user"
+          :title="parents.length ? t('onboarding.parents.noMatches') : t('onboarding.parents.empty')"
+          :description="parents.length ? t('onboarding.parents.noMatchesHint') : t('onboarding.parents.emptyHint')"
+        />
+      </template>
+    </AppTable>
+
+    <AppDialog :open="onboarding" :title="t('onboarding.parents.onboardTitle')" size="lg" @close="onboarding = false">
+      <form id="onboard-parent" class="form-stack" novalidate @submit.prevent="onboard">
+        <p v-if="formError" class="form-alert" role="alert"><AppIcon name="alert" :size="16" />{{ formError }}</p>
+        <div class="form-grid">
+          <AppInput v-model="form.name" :label="t('onboarding.parents.name')" required />
+          <AppInput v-model="form.email" :label="t('onboarding.parents.email')" type="email" required autocomplete="off" />
+          <AppInput v-model="form.password" :label="t('onboarding.parents.password')" type="password" required autocomplete="new-password" :hint="t('onboarding.parents.passwordHint')" />
+        </div>
+        <ClientMultiPicker v-model="form.clientIds" :label="t('onboarding.parents.linkLabel')" :hint="t('onboarding.parents.linkHint')" />
       </form>
       <template #footer>
-        <AppButton variant="secondary" @click="onboarding = false">Cancel</AppButton>
-        <AppButton :loading="saving" @click="onboard">{{ form.clientIds.length ? 'Onboard and link' : 'Onboard as pending' }}</AppButton>
+        <AppButton variant="secondary" @click="onboarding = false">{{ t('common.cancel') }}</AppButton>
+        <AppButton type="submit" form="onboard-parent" :loading="saving">
+          {{ form.clientIds.length ? t('onboarding.parents.onboardLink') : t('onboarding.parents.onboardPending') }}
+        </AppButton>
       </template>
     </AppDialog>
 
     <AppDialog :open="viewing !== null" :title="viewing?.name ?? ''" @close="viewing = null">
-      <dl v-if="viewing" class="details">
-        <div><dt>Email</dt><dd>{{ viewing.email }}</dd></div>
+      <dl v-if="viewing" class="detail-list">
+        <div><dt>{{ t('onboarding.parents.email') }}</dt><dd>{{ viewing.email }}</dd></div>
         <div>
-          <dt>Portal access</dt>
-          <dd>{{ viewing.membershipStatus === 'revoked' ? 'Revoked' : viewing.portalStatus === 'active' ? 'Active' : PENDING_HINT }}</dd>
+          <dt>{{ t('onboarding.parents.portal') }}</dt>
+          <dd>
+            <StatusBadge :tone="access(viewing).tone" :label="access(viewing).label" />
+            <p v-if="viewing.membershipStatus !== 'revoked' && viewing.portalStatus === 'pending'" class="muted pending-note">{{ t('onboarding.parents.pendingHint') }}</p>
+          </dd>
         </div>
-        <div><dt>Added</dt><dd>{{ formatDateTime(viewing.createdAt) }}</dd></div>
-        <div><dt>Last active</dt><dd>{{ viewing.lastActiveAt ? formatDateTime(viewing.lastActiveAt) : 'Never' }}</dd></div>
+        <div><dt>{{ t('onboarding.parents.added') }}</dt><dd>{{ formatDateTime(viewing.createdAt) }}</dd></div>
+        <div><dt>{{ t('onboarding.parents.lastActive') }}</dt><dd>{{ formatDateTime(viewing.lastActiveAt, t('onboarding.never')) }}</dd></div>
         <div class="is-wide">
-          <dt>Linked clients</dt>
+          <dt>{{ t('onboarding.parents.linkedClients') }}</dt>
           <dd>
             <ul v-if="viewing.linkedClients.length" class="client-links">
               <li v-for="client in viewing.linkedClients" :key="client.id">
                 <RouterLink :to="`/clients/${client.id}`">{{ client.displayName }}</RouterLink> · {{ client.clientCode }}
               </li>
             </ul>
-            <span v-else>None</span>
+            <span v-else>{{ t('onboarding.none') }}</span>
           </dd>
         </div>
       </dl>
       <template #footer>
-        <AppButton variant="secondary" @click="viewing = null">Close</AppButton>
-        <AppButton v-if="viewing?.membershipStatus === 'active'" @click="viewing && startLinking(viewing)">Manage clients</AppButton>
+        <AppButton variant="secondary" @click="viewing = null">{{ t('onboarding.close') }}</AppButton>
+        <AppButton v-if="viewing?.membershipStatus === 'active'" @click="viewing && startLinking(viewing)">{{ t('onboarding.parents.manage') }}</AppButton>
       </template>
     </AppDialog>
 
-    <AppDialog :open="linking !== null" :title="`Linked clients · ${linking?.name ?? ''}`" size="lg" @close="linking = null">
-      <ClientMultiPicker
-        v-if="linking"
-        v-model="linkIds"
-        label="Clients this parent can see"
-        hint="Unlinking keeps the guardian contact on the client but removes portal access. With no linked client the parent cannot sign in."
-      />
+    <AppDialog :open="linking !== null" :title="t('onboarding.parents.linksTitle', { name: linking?.name ?? '' })" size="lg" @close="linking = null">
+      <ClientMultiPicker v-if="linking" v-model="linkIds" :label="t('onboarding.parents.linksLabel')" :hint="t('onboarding.parents.linksHint')" />
       <template #footer>
-        <AppButton variant="secondary" @click="linking = null">Cancel</AppButton>
-        <AppButton :loading="saving" @click="saveLinks">Save links</AppButton>
+        <AppButton variant="secondary" @click="linking = null">{{ t('common.cancel') }}</AppButton>
+        <AppButton :loading="saving" @click="saveLinks">{{ t('onboarding.parents.saveLinks') }}</AppButton>
       </template>
     </AppDialog>
   </PageContainer>
 </template>
 
 <style scoped>
-.table-wrap {
-  overflow-x: auto;
-  padding: 12px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
+.person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
   text-align: start;
-  vertical-align: middle;
-  padding: 10px 8px;
-  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
 }
 
-caption {
-  text-align: start;
+.person:hover strong,
+.person:focus-visible strong {
+  color: var(--color-primary-ink);
+  text-decoration: underline;
+}
+
+.person-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: 0.75rem;
   font-weight: 700;
-  margin-bottom: 8px;
+  line-height: 1;
 }
 
-.pager {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-top: 12px;
+.person-text {
+  display: grid;
+  min-width: 0;
+}
+
+.person-text strong {
+  color: var(--color-ink);
+}
+
+.person-text small {
+  overflow: hidden;
   color: var(--color-text-muted);
-}
-
-.row-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.actions-col {
-  width: 1%;
-  white-space: nowrap;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
 }
 
 .muted {
   color: var(--color-text-muted);
 }
 
+.client-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .client-chip {
-  display: inline-block;
-  margin: 2px 6px 2px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 2px 10px;
-  border-radius: 999px;
-  background: var(--color-surface-muted);
-  font-size: 0.85rem;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  text-decoration: none;
   white-space: nowrap;
 }
 
-.onboard-form {
-  display: grid;
-  gap: 14px;
+.client-chip:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
 }
 
-.onboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.form-error {
-  margin: 0;
-  color: var(--color-danger);
-}
-
-.details {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 16px;
-  margin: 8px 0 0;
-}
-
-.details .is-wide {
-  grid-column: 1 / -1;
-}
-
-.details dt {
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+.client-chip-code {
   color: var(--color-text-muted);
+  font-size: var(--text-xs);
 }
 
-.details dd {
-  margin: 2px 0 0;
-  color: var(--color-ink);
+.pending-note {
+  margin-top: 4px;
+  font-size: var(--text-sm);
+}
+
+.detail-list .is-wide {
+  grid-column: 1 / -1;
 }
 
 .client-links {

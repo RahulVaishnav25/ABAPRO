@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { INVITABLE_ROLES, ROLE_LABELS, type InvitableRole, type OrganizationDirectoryItem } from '@abapro/shared';
+import { useI18n } from 'vue-i18n';
+import { INVITABLE_ROLES, type InvitableRole, type OrganizationDirectoryItem } from '@abapro/shared';
 import { createOrganizationMemberRequest } from '@/api/resources';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppIcon from '@/components/navigation/AppIcon.vue';
+import { roleName } from '@/i18n';
 import { errorMessage } from '@/lib/loader';
 import { useToastStore } from '@/stores/toast';
 
@@ -16,13 +19,15 @@ const props = withDefaults(
     excludeRoles?: InvitableRole[];
     heading?: string;
   }>(),
-  { excludeRoles: () => [], heading: 'Add a team member' },
+  { excludeRoles: () => [], heading: undefined },
 );
 const emit = defineEmits<{ created: [directory: OrganizationDirectoryItem] }>();
 const toast = useToastStore();
+const { t } = useI18n();
+const title = computed(() => (props.heading === undefined ? t('onboarding.member.heading') : props.heading));
 
 const roleOptions = computed(() =>
-  INVITABLE_ROLES.filter((role) => !props.excludeRoles.includes(role)).map((role) => ({ value: role, label: ROLE_LABELS[role] })),
+  INVITABLE_ROLES.filter((role) => !props.excludeRoles.includes(role)).map((role) => ({ value: role, label: roleName(role) })),
 );
 const name = ref('');
 const email = ref('');
@@ -36,7 +41,7 @@ async function create(): Promise<void> {
   const trimmedName = name.value.trim();
   const trimmedEmail = email.value.trim();
   if (trimmedName.length < 2 || !trimmedEmail.includes('@') || password.value.length < 10) {
-    error.value = 'Enter a name, an email address, and a password of at least 10 characters.';
+    error.value = t('onboarding.member.invalid');
     return;
   }
   creating.value = true;
@@ -51,10 +56,10 @@ async function create(): Promise<void> {
     email.value = '';
     password.value = '';
     role.value = 'organization_admin';
-    toast.push({ tone: 'success', title: 'Team member created', message: `${trimmedName} can sign in with this email and password.` });
+    toast.push({ tone: 'success', title: t('onboarding.member.created'), message: t('onboarding.member.createdMessage', { name: trimmedName }) });
     emit('created', directory);
   } catch (createError) {
-    error.value = errorMessage(createError, 'The team member could not be created.');
+    error.value = errorMessage(createError, t('onboarding.member.error'));
   } finally {
     creating.value = false;
   }
@@ -62,28 +67,30 @@ async function create(): Promise<void> {
 </script>
 
 <template>
-  <form class="member-form" @submit.prevent="create">
-    <h3 v-if="heading">{{ heading }}</h3>
-    <p class="quiet">They sign in with this email and password, and can open this organisation, its clinics, and its clients only.</p>
-    <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-    <div class="member-grid">
-      <AppInput v-model="name" label="Name" required />
-      <AppInput v-model="email" label="Email" type="email" required autocomplete="off" />
-      <AppInput v-model="password" label="Password" type="password" required autocomplete="new-password" hint="At least 10 characters." />
-      <AppSelect v-model="role" label="Role" :options="roleOptions" />
+  <form class="member-form" novalidate @submit.prevent="create">
+    <h3 v-if="title">{{ title }}</h3>
+    <p class="section-desc">{{ t('onboarding.member.intro') }}</p>
+    <p v-if="error" class="form-alert" role="alert"><AppIcon name="alert" :size="16" />{{ error }}</p>
+    <div class="form-grid">
+      <AppInput v-model="name" :label="t('onboarding.member.name')" required />
+      <AppInput v-model="email" :label="t('onboarding.member.email')" type="email" required autocomplete="off" />
+      <AppInput v-model="password" :label="t('onboarding.member.password')" type="password" required autocomplete="new-password" :hint="t('onboarding.member.passwordHint')" />
+      <AppSelect v-model="role" :label="t('onboarding.member.role')" :options="roleOptions" />
     </div>
-    <div class="member-actions">
+    <div class="form-actions">
       <slot name="actions" />
-      <AppButton type="submit" :loading="creating">Create team member</AppButton>
+      <AppButton type="submit" :loading="creating">{{ t('onboarding.member.submit') }}</AppButton>
     </div>
   </form>
 </template>
 
 <style scoped>
-.member-form { display: grid; gap: 12px; }
-.member-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
-.member-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-h3 { margin: 0; font-size: 0.95rem; }
-.quiet { margin: 0; color: var(--color-text-muted); }
-.form-error { color: var(--color-danger); }
+.member-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+h3 {
+  font-size: var(--text-md);
+}
 </style>

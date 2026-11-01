@@ -1,37 +1,38 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { INVITABLE_ROLES, PERMISSIONS, ROLE_LABELS, type InvitableRole, type TeamMember } from '@abapro/shared';
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { INVITABLE_ROLES, PERMISSIONS, type InvitableRole, type TeamMember } from '@abapro/shared';
 import { changeMemberRoleRequest, revokeMemberRequest, teamDirectoryRequest } from '@/api/resources';
 import OnboardingTabs from '@/components/onboarding/OnboardingTabs.vue';
 import TeamMemberForm from '@/components/organization/TeamMemberForm.vue';
-import ActionMenu from '@/components/ui/ActionMenu.vue';
+import ActionMenu, { type ActionMenuItem } from '@/components/ui/ActionMenu.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppTable from '@/components/ui/AppTable.vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
-import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
+import { roleName } from '@/i18n';
 import { formatDateTime } from '@/lib/format';
 import { errorMessage, useLoader } from '@/lib/loader';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 
-const PAGE_SIZE = 20;
 // Parents are onboarded on the Parents tab, with their children.
 const STAFF_ROLES = INVITABLE_ROLES.filter((role) => role !== 'parent');
 
 const auth = useAuthStore();
 const toast = useToastStore();
+const { t } = useI18n();
 const members = ref<TeamMember[]>([]);
 const search = ref('');
 const role = ref('');
 const status = ref('active');
-const page = ref(1);
 
 const canManage = computed(() => auth.can(PERMISSIONS.teamMembershipManage));
 // Creating accounts follows the organisation's member onboarding: administrators only.
@@ -39,27 +40,65 @@ const canCreate = computed(() => Boolean(auth.user?.organization) && (auth.user?
 
 const { loading, error, load } = useLoader(async () => {
   members.value = (await teamDirectoryRequest()).members.filter((member) => member.role !== 'parent');
-}, 'The team could not be loaded.');
+}, t('onboarding.teams.error'));
+
+const memberRole = (member: TeamMember) => roleName(member.role, member.roleLabel);
 
 const filtered = computed(() => {
   const query = search.value.trim().toLowerCase();
   return members.value.filter((member) =>
-    (!query || `${member.name} ${member.email} ${member.roleLabel}`.toLowerCase().includes(query))
+    (!query || `${member.name} ${member.email} ${member.roleLabel} ${memberRole(member)}`.toLowerCase().includes(query))
     && (!role.value || member.role === role.value)
     && (!status.value || member.status === status.value),
   );
 });
-const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)));
-const paged = computed(() => filtered.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE));
-const rangeStart = computed(() => (filtered.value.length === 0 ? 0 : (page.value - 1) * PAGE_SIZE + 1));
-const rangeEnd = computed(() => Math.min(page.value * PAGE_SIZE, filtered.value.length));
-watch([search, role, status], () => (page.value = 1));
-watch(pageCount, (count) => {
-  if (page.value > count) page.value = count;
-});
 
-const roleOptions = [{ value: '', label: 'Any role' }, ...STAFF_ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }))];
-const editableRoles = STAFF_ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }));
+const roleOptions = computed(() => [{ value: '', label: t('onboarding.anyRole') }, ...STAFF_ROLES.map((value) => ({ value, label: roleName(value) }))]);
+const statusOptions = computed(() => [
+  { value: 'active', label: t('onboarding.active') },
+  { value: 'revoked', label: t('onboarding.revoked') },
+  { value: '', label: t('onboarding.anyStatus') },
+]);
+const editableRoles = computed(() => STAFF_ROLES.map((value) => ({ value, label: roleName(value) })));
+const columns = computed(() => [
+  { key: 'name', label: t('onboarding.teams.columns.member'), sortable: true },
+  { key: 'role', label: t('onboarding.teams.columns.role'), sortable: true },
+  { key: 'clients', label: t('onboarding.teams.columns.clients'), sortable: true, align: 'end' as const },
+  { key: 'status', label: t('onboarding.teams.columns.status'), sortable: true },
+  { key: 'lastActive', label: t('onboarding.teams.columns.lastActive'), sortable: true },
+  { key: 'actions', label: t('onboarding.teams.columns.actions') },
+]);
+const rows = computed(() =>
+  filtered.value.map((member) => ({
+    id: member.membershipId,
+    name: member.name,
+    role: memberRole(member),
+    clients: member.assignedClients.length,
+    status: member.status === 'active' ? t('onboarding.active') : t('onboarding.revoked'),
+    lastActive: member.lastActiveAt ?? '',
+    member,
+  })),
+);
+const memberOf = (row: Record<string, unknown>) => row.member as TeamMember;
+
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const first = (word?: string) => Array.from(word ?? '')[0] ?? '';
+  return (words.length > 1 ? first(words[0]) + first(words[words.length - 1]) : first(words[0])).toLocaleUpperCase() || '?';
+}
+
+function actions(member: TeamMember): ActionMenuItem[] {
+  const items: ActionMenuItem[] = [{ key: 'view', label: t('onboarding.view') }];
+  if (canManage.value && member.status === 'active' && member.role !== 'platform_admin') items.push({ key: 'edit', label: t('onboarding.teams.editRole') });
+  if (canManage.value && member.status === 'active' && member.userId !== auth.user?.id) items.push({ key: 'revoke', label: t('onboarding.teams.revoke'), danger: true });
+  return items;
+}
+
+function onAction(member: TeamMember, key: string): void {
+  if (key === 'view') viewing.value = member;
+  else if (key === 'edit') startEdit(member);
+  else if (key === 'revoke') revoking.value = member;
+}
 
 // Create.
 const creating = ref(false);
@@ -85,11 +124,11 @@ async function saveRole(): Promise<void> {
   saving.value = true;
   try {
     await changeMemberRoleRequest(member.membershipId, editRole.value);
-    toast.push({ tone: 'success', title: 'Role updated', message: `${member.name} is now ${ROLE_LABELS[editRole.value]}.` });
+    toast.push({ tone: 'success', title: t('onboarding.teams.roleUpdated'), message: t('onboarding.teams.roleUpdatedMessage', { name: member.name, role: roleName(editRole.value) }) });
     editing.value = null;
     await load();
   } catch (saveError) {
-    toast.push({ tone: 'danger', title: 'Role not changed', message: errorMessage(saveError, 'Try again.') });
+    toast.push({ tone: 'danger', title: t('onboarding.teams.roleNotChanged'), message: errorMessage(saveError, t('errors.generic')) });
   } finally {
     saving.value = false;
   }
@@ -103,15 +142,11 @@ async function revoke(): Promise<void> {
   revoking.value = null;
   try {
     await revokeMemberRequest(member.membershipId);
-    toast.push({ tone: 'success', title: 'Access revoked', message: member.name });
+    toast.push({ tone: 'success', title: t('onboarding.teams.revoked'), message: member.name });
     await load();
   } catch (revokeError) {
-    toast.push({ tone: 'danger', title: 'Access not revoked', message: errorMessage(revokeError, 'Try again.') });
+    toast.push({ tone: 'danger', title: t('onboarding.teams.notRevoked'), message: errorMessage(revokeError, t('errors.generic')) });
   }
-}
-
-function actions(member: TeamMember) {
-  return member.status === 'active' && member.userId !== auth.user?.id ? [{ key: 'revoke', label: 'Revoke access' }] : [];
 }
 
 void load();
@@ -120,121 +155,99 @@ void load();
 <template>
   <PageContainer>
     <OnboardingTabs />
-    <PageHeader title="Teams" description="Everyone on the organisation’s team, their roles and the clients they work with.">
+    <PageHeader :title="t('onboarding.teams.title')" :description="t('onboarding.teams.description')">
       <template #actions>
-        <AppButton v-if="canCreate" @click="creating = true">Create Team</AppButton>
+        <AppButton v-if="canCreate" icon="plus" @click="creating = true">{{ t('onboarding.teams.create') }}</AppButton>
       </template>
     </PageHeader>
 
     <div class="filter-bar">
-      <AppInput v-model="search" label="Search" placeholder="Name, email or role" />
-      <AppSelect v-model="role" label="Role" :options="roleOptions" />
-      <AppSelect v-model="status" label="Status" :options="[{ value: 'active', label: 'Active' }, { value: 'revoked', label: 'Revoked' }, { value: '', label: 'Any status' }]" />
+      <AppInput v-model="search" type="search" :label="t('onboarding.search')" :placeholder="t('onboarding.teams.searchPlaceholder')" />
+      <AppSelect v-model="role" :label="t('onboarding.role')" :options="roleOptions" />
+      <AppSelect v-model="status" :label="t('onboarding.status')" :options="statusOptions" />
     </div>
 
-    <SkeletonBlock v-if="loading" height="240px" />
-    <ErrorState v-else-if="error" title="Team unavailable" :description="error" @retry="load" />
-    <EmptyState
-      v-else-if="filtered.length === 0"
-      :title="members.length ? 'No team members match' : 'No team members yet'"
-      :description="members.length ? 'Adjust the search or filters.' : 'Create a team member to get started.'"
-    />
-    <div v-else class="table-wrap panel">
-      <table>
-        <caption>Team directory</caption>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Clients</th>
-            <th>Status</th>
-            <th>Last active</th>
-            <th class="actions-col">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="member in paged" :key="member.membershipId">
-            <td><strong>{{ member.name }}</strong></td>
-            <td>{{ member.email }}</td>
-            <td>{{ member.roleLabel }}</td>
-            <td>{{ member.assignedClients.length }}</td>
-            <td><StatusBadge :tone="member.status === 'active' ? 'success' : 'neutral'" :label="member.status === 'active' ? 'Active' : 'Revoked'" /></td>
-            <td>{{ member.lastActiveAt ? formatDateTime(member.lastActiveAt) : 'Never' }}</td>
-            <td>
-              <div class="row-actions">
-                <AppButton size="sm" variant="secondary" :aria-label="`View ${member.name}`" @click="viewing = member">View</AppButton>
-                <AppButton
-                  v-if="canManage && member.status === 'active' && member.role !== 'platform_admin'"
-                  size="sm"
-                  variant="secondary"
-                  :aria-label="`Edit ${member.name}`"
-                  @click="startEdit(member)"
-                >
-                  Edit
-                </AppButton>
-                <ActionMenu
-                  v-if="canManage && actions(member).length"
-                  :label="`More actions for ${member.name}`"
-                  :items="actions(member)"
-                  @select="revoking = member"
-                />
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <ErrorState v-if="error" :title="t('onboarding.teams.unavailable')" :description="error" @retry="load" />
+    <AppTable
+      v-else
+      :caption="t('onboarding.teams.caption')"
+      :columns="columns"
+      :rows="rows"
+      row-key="id"
+      :page-size="20"
+      :searchable="false"
+      :loading="loading"
+    >
+      <template #cell-name="{ row }">
+        <button type="button" class="person" :aria-label="t('onboarding.viewName', { name: row.name })" @click="viewing = memberOf(row)">
+          <span class="person-avatar" aria-hidden="true">{{ initials(String(row.name)) }}</span>
+          <span class="person-text">
+            <strong dir="auto">{{ row.name }}</strong>
+            <small>{{ memberOf(row).email }}</small>
+          </span>
+        </button>
+      </template>
+      <template #cell-status="{ row }">
+        <StatusBadge :tone="memberOf(row).status === 'active' ? 'success' : 'neutral'" :label="String(row.status)" />
+      </template>
+      <template #cell-lastActive="{ row }">{{ formatDateTime(String(row.lastActive), t('onboarding.never')) }}</template>
+      <template #cell-actions="{ row }">
+        <ActionMenu :label="t('onboarding.actionsFor', { name: row.name })" :items="actions(memberOf(row))" @select="onAction(memberOf(row), $event)" />
+      </template>
+      <template #empty>
+        <EmptyState
+          icon="team"
+          :title="members.length ? t('onboarding.teams.noMatches') : t('onboarding.teams.empty')"
+          :description="members.length ? t('onboarding.teams.noMatchesHint') : t('onboarding.teams.emptyHint')"
+        />
+      </template>
+    </AppTable>
 
-    <div v-if="!loading && !error && filtered.length > 0" class="pager">
-      <span>Showing {{ rangeStart }}–{{ rangeEnd }} of {{ filtered.length }}</span>
-      <AppButton variant="secondary" size="sm" :disabled="page <= 1" @click="page -= 1">Previous</AppButton>
-      <span>Page {{ page }} of {{ pageCount }}</span>
-      <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="page += 1">Next</AppButton>
-    </div>
-
-    <AppDialog :open="creating" title="Create team member" size="lg" @close="creating = false">
+    <AppDialog :open="creating" :title="t('onboarding.teams.create')" size="lg" @close="creating = false">
       <TeamMemberForm v-if="auth.user?.organization" :organization-id="auth.user.organization.id" :exclude-roles="['parent']" heading="" @created="created">
         <template #actions>
-          <AppButton type="button" variant="secondary" @click="creating = false">Cancel</AppButton>
+          <AppButton type="button" variant="secondary" @click="creating = false">{{ t('common.cancel') }}</AppButton>
         </template>
       </TeamMemberForm>
     </AppDialog>
 
     <AppDialog :open="viewing !== null" :title="viewing?.name ?? ''" @close="viewing = null">
-      <dl v-if="viewing" class="details">
-        <div><dt>Email</dt><dd>{{ viewing.email }}</dd></div>
-        <div><dt>Role</dt><dd>{{ viewing.roleLabel }}</dd></div>
-        <div><dt>Status</dt><dd>{{ viewing.status === 'active' ? 'Active' : 'Revoked' }}</dd></div>
-        <div><dt>Last active</dt><dd>{{ viewing.lastActiveAt ? formatDateTime(viewing.lastActiveAt) : 'Never' }}</dd></div>
+      <dl v-if="viewing" class="detail-list">
+        <div><dt>{{ t('onboarding.teams.email') }}</dt><dd>{{ viewing.email }}</dd></div>
+        <div><dt>{{ t('onboarding.role') }}</dt><dd>{{ memberRole(viewing) }}</dd></div>
+        <div>
+          <dt>{{ t('onboarding.status') }}</dt>
+          <dd><StatusBadge :tone="viewing.status === 'active' ? 'success' : 'neutral'" :label="viewing.status === 'active' ? t('onboarding.active') : t('onboarding.revoked')" /></dd>
+        </div>
+        <div><dt>{{ t('onboarding.teams.columns.lastActive') }}</dt><dd>{{ formatDateTime(viewing.lastActiveAt, t('onboarding.never')) }}</dd></div>
         <div class="is-wide">
-          <dt>Assigned clients</dt>
+          <dt>{{ t('onboarding.teams.assignedClients') }}</dt>
           <dd>
             <ul v-if="viewing.assignedClients.length" class="client-links">
               <li v-for="client in viewing.assignedClients" :key="client.id"><RouterLink :to="`/clients/${client.id}`">{{ client.name }}</RouterLink></li>
             </ul>
-            <span v-else>None</span>
+            <span v-else>{{ t('onboarding.none') }}</span>
           </dd>
         </div>
       </dl>
       <template #footer>
-        <AppButton variant="secondary" @click="viewing = null">Close</AppButton>
+        <AppButton variant="secondary" @click="viewing = null">{{ t('onboarding.close') }}</AppButton>
       </template>
     </AppDialog>
 
-    <AppDialog :open="editing !== null" :title="`Edit ${editing?.name ?? ''}`" @close="editing = null">
-      <AppSelect v-model="editRole" label="Role" :options="editableRoles" />
+    <AppDialog :open="editing !== null" :title="t('onboarding.teams.editTitle', { name: editing?.name ?? '' })" size="sm" @close="editing = null">
+      <AppSelect v-model="editRole" :label="t('onboarding.role')" :options="editableRoles" />
       <template #footer>
-        <AppButton variant="secondary" @click="editing = null">Cancel</AppButton>
-        <AppButton :loading="saving" :disabled="editRole === editing?.role" @click="saveRole">Save role</AppButton>
+        <AppButton variant="secondary" @click="editing = null">{{ t('common.cancel') }}</AppButton>
+        <AppButton :loading="saving" :disabled="editRole === editing?.role" @click="saveRole">{{ t('onboarding.teams.saveRole') }}</AppButton>
       </template>
     </AppDialog>
 
     <ConfirmDialog
       :open="revoking !== null"
-      title="Revoke access"
-      :message="`${revoking?.name ?? ''} will lose access to this organisation.`"
-      confirm-label="Revoke access"
+      :title="t('onboarding.teams.revoke')"
+      :message="t('onboarding.teams.revokeMessage', { name: revoking?.name ?? '' })"
+      :confirm-label="t('onboarding.teams.revoke')"
       tone="danger"
       @confirm="revoke"
       @cancel="revoking = null"
@@ -243,72 +256,58 @@ void load();
 </template>
 
 <style scoped>
-.table-wrap {
-  overflow-x: auto;
-  padding: 12px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
+.person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
   text-align: start;
-  vertical-align: middle;
-  padding: 10px 8px;
-  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
 }
 
-caption {
-  text-align: start;
+.person:hover strong,
+.person:focus-visible strong {
+  color: var(--color-primary-ink);
+  text-decoration: underline;
+}
+
+.person-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
+  font-size: 0.75rem;
   font-weight: 700;
-  margin-bottom: 8px;
+  line-height: 1;
 }
 
-.pager {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-top: 12px;
-  color: var(--color-text-muted);
-}
-
-.row-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.actions-col {
-  width: 1%;
-  white-space: nowrap;
-}
-
-.details {
+.person-text {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 16px;
-  margin: 8px 0 0;
+  min-width: 0;
 }
 
-.details .is-wide {
-  grid-column: 1 / -1;
-}
-
-.details dt {
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-muted);
-}
-
-.details dd {
-  margin: 2px 0 0;
+.person-text strong {
   color: var(--color-ink);
+}
+
+.person-text small {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+}
+
+.detail-list .is-wide {
+  grid-column: 1 / -1;
 }
 
 .client-links {
