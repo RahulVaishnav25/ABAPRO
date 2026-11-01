@@ -33,7 +33,6 @@ const role = ref('');
 const status = ref('active');
 const page = ref(1);
 
-const timeZone = computed(() => auth.user?.organization?.timezone ?? 'UTC');
 const canManage = computed(() => auth.can(PERMISSIONS.teamMembershipManage));
 // Creating accounts follows the organisation's member onboarding: administrators only.
 const canCreate = computed(() => Boolean(auth.user?.organization) && (auth.user?.platformAdmin === true || auth.user?.role === 'organization_admin'));
@@ -161,7 +160,7 @@ void load();
             <td>{{ member.roleLabel }}</td>
             <td>{{ member.assignedClients.length }}</td>
             <td><StatusBadge :tone="member.status === 'active' ? 'success' : 'neutral'" :label="member.status === 'active' ? 'Active' : 'Revoked'" /></td>
-            <td>{{ member.lastActiveAt ? formatDateTime(member.lastActiveAt, timeZone) : 'Never' }}</td>
+            <td>{{ member.lastActiveAt ? formatDateTime(member.lastActiveAt) : 'Never' }}</td>
             <td>
               <div class="row-actions">
                 <AppButton size="sm" variant="secondary" :aria-label="`View ${member.name}`" @click="viewing = member">View</AppButton>
@@ -207,7 +206,7 @@ void load();
         <div><dt>Email</dt><dd>{{ viewing.email }}</dd></div>
         <div><dt>Role</dt><dd>{{ viewing.roleLabel }}</dd></div>
         <div><dt>Status</dt><dd>{{ viewing.status === 'active' ? 'Active' : 'Revoked' }}</dd></div>
-        <div><dt>Last active</dt><dd>{{ viewing.lastActiveAt ? formatDateTime(viewing.lastActiveAt, timeZone) : 'Never' }}</dd></div>
+        <div><dt>Last active</dt><dd>{{ viewing.lastActiveAt ? formatDateTime(viewing.lastActiveAt) : 'Never' }}</dd></div>
         <div class="is-wide">
           <dt>Assigned clients</dt>
           <dd>

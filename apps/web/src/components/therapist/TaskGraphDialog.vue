@@ -9,7 +9,7 @@ import AppSelect from '@/components/ui/AppSelect.vue';
 import AppTable from '@/components/ui/AppTable.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import GraphContainer from '@/components/ui/GraphContainer.vue';
-import { formatShortDate } from '@/lib/format';
+import { formatShortDate, formatTime } from '@/lib/format';
 import { useLoader } from '@/lib/loader';
 
 const RANGE_OPTIONS = [
@@ -66,7 +66,7 @@ const rows = computed(() =>
   (history.value?.records ?? []).map((record) => ({
     id: record.id,
     date: record.recordDate,
-    time: new Date(record.recordedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+    time: formatTime(record.recordedAt),
     session: record.sessionNumber,
     trial: record.trialNumber,
     response: record.promptLevels.length

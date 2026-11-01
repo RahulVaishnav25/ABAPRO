@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 const year = new Date().getFullYear();
 </script>
 
 <template>
   <footer class="copyright">
-    <p>© {{ year }} Techieora Private Limited</p>
+    <p dir="auto">{{ t('shell.footer', { year }) }}</p>
   </footer>
 </template>
 

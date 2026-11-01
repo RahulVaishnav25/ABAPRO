@@ -178,7 +178,6 @@ const goalStatusOptions = [
 ];
 const clientCodePattern = /^[A-Za-z0-9][A-Za-z0-9-]{1,31}$/;
 
-const timeZone = computed(() => profile.value?.timezone || auth.user?.organization?.timezone || 'UTC');
 const canEdit = computed(() => auth.can('clients.edit'));
 const canSensitive = computed(() => auth.can('clients.sensitive.view'));
 const canGuardians = computed(() => auth.can('guardians.manage'));
@@ -210,7 +209,7 @@ const tabs = computed(() => {
   return items;
 });
 function when(value: string | null | undefined): string {
-  return value ? formatDateTime(value, timeZone.value) : 'None';
+  return value ? formatDateTime(value) : 'None';
 }
 
 function recorded(value: string | null | undefined): string {

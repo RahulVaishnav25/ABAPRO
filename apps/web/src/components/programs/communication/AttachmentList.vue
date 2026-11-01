@@ -5,6 +5,7 @@ import { attachmentBlobRequest, formatBytes, saveBlob } from '@/api/communicatio
 import AppButton from '@/components/ui/AppButton.vue';
 import { errorMessage } from '@/lib/loader';
 import { useToastStore } from '@/stores/toast';
+import { formatDateTime } from '@/lib/format';
 
 const props = defineProps<{ programId: string; attachments: ProgramAttachment[]; compact?: boolean }>();
 const toast = useToastStore();
@@ -41,7 +42,7 @@ onBeforeUnmount(() => {
   for (const url of players.value.values()) URL.revokeObjectURL(url);
 });
 
-const uploaded = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const uploaded = (iso: string) => formatDateTime(iso);
 </script>
 
 <template>

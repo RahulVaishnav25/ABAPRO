@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import AppIcon from '@/components/navigation/AppIcon.vue';
@@ -17,6 +18,7 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const toast = useToastStore();
 const router = useRouter();
+const { t } = useI18n();
 const notificationsOpen = ref(false);
 const userOpen = ref(false);
 const confirmOpen = ref(false);
@@ -39,7 +41,7 @@ async function chooseClinic(event: Event): Promise<void> {
   try {
     await auth.switchClinic(clinicId);
   } catch {
-    toast.push({ tone: 'danger', title: 'Clinic not changed', message: 'Try again.' });
+    toast.push({ tone: 'danger', title: t('shell.clinicNotChanged'), message: t('errors.generic') });
   }
 }
 
@@ -84,7 +86,7 @@ async function signOut(): Promise<void> {
   confirmOpen.value = false;
   userOpen.value = false;
   const endSessionUrl = await auth.logout();
-  toast.push({ tone: 'info', title: 'Signed out' });
+  toast.push({ tone: 'info', title: t('shell.signedOut') });
   if (endSessionUrl) {
     window.location.assign(endSessionUrl);
     return;
@@ -102,7 +104,7 @@ async function signOut(): Promise<void> {
       aria-controls="mobile-menu"
       @click="emit('toggle-menu')"
     >
-      <span class="visually-hidden">{{ menuOpen ? 'Close menu' : 'Open menu' }}</span>
+      <span class="visually-hidden">{{ menuOpen ? t('nav.closeMenu') : t('nav.openMenu') }}</span>
       <AppIcon :name="menuOpen ? 'close' : 'menu'" :size="20" />
     </button>
     <div class="topbar-start">
@@ -111,12 +113,12 @@ async function signOut(): Promise<void> {
         <span class="context-org">{{ auth.user.organization.name }}</span>
         <template v-if="clinicOptions.length > 1">
           <span class="context-sep" aria-hidden="true">/</span>
-          <label class="visually-hidden" for="clinic-switch">Clinic</label>
+          <label class="visually-hidden" for="clinic-switch">{{ t('shell.clinic') }}</label>
           <select id="clinic-switch" class="context-clinic" :value="auth.user.clinic?.id ?? ''" :disabled="auth.switching" @change="chooseClinic">
             <option v-for="clinic in clinicOptions" :key="clinic.id" :value="clinic.id">{{ clinic.name }}</option>
           </select>
         </template>
-        <template v-else-if="auth.user.clinic">
+        <template v-else-if="auth.user.clinic && auth.user.clinic.name !== auth.user.organization.name">
           <span class="context-sep" aria-hidden="true">/</span>
           <span class="context-clinic-name">{{ auth.user.clinic.name }}</span>
         </template>
@@ -129,15 +131,15 @@ async function signOut(): Promise<void> {
           class="icon-button"
           aria-haspopup="dialog"
           :aria-expanded="notificationsOpen"
-          aria-label="Notifications"
-          title="Notifications"
+          :aria-label="t('shell.notifications')"
+          :title="t('shell.notifications')"
           @click="notificationsOpen = !notificationsOpen"
         >
           <AppIcon name="notification" />
         </button>
-        <div v-if="notificationsOpen" class="dropdown" role="dialog" aria-label="Notifications">
-          <strong class="dropdown-title">Notifications</strong>
-          <p class="dropdown-empty">You're all caught up. Alerts about clients and tasks will appear here.</p>
+        <div v-if="notificationsOpen" class="dropdown" role="dialog" :aria-label="t('shell.notifications')">
+          <strong class="dropdown-title">{{ t('shell.notifications') }}</strong>
+          <p class="dropdown-empty">{{ t('shell.notificationsEmpty') }}</p>
         </div>
       </div>
       <div ref="userRef" class="menu">
@@ -146,17 +148,17 @@ async function signOut(): Promise<void> {
           class="user-button"
           aria-haspopup="menu"
           :aria-expanded="userOpen"
-          :aria-label="auth.user ? `${auth.user.name}, ${auth.user.roleLabel ?? 'Account'}` : 'Account'"
+          :aria-label="auth.user ? `${auth.user.name}, ${auth.user.roleLabel ?? t('shell.account')}` : t('shell.account')"
           @click="userOpen = !userOpen"
         >
           <span class="avatar" aria-hidden="true">{{ initials }}</span>
           <span class="user-copy">
             <span class="user-name">{{ auth.user?.name }}</span>
-            <span class="user-role">{{ auth.user?.roleLabel ?? 'Account' }}</span>
+            <span class="user-role">{{ auth.user?.roleLabel ?? t('shell.account') }}</span>
           </span>
           <AppIcon name="chevron-down" :size="16" class="user-chevron" />
         </button>
-        <div v-if="userOpen" class="dropdown user-dropdown" role="menu" :aria-label="auth.user?.name ?? 'Account'">
+        <div v-if="userOpen" class="dropdown user-dropdown" role="menu" :aria-label="auth.user?.name ?? t('shell.account')">
           <div class="user-card">
             <span class="avatar avatar-lg" aria-hidden="true">{{ initials }}</span>
             <div>
@@ -173,10 +175,13 @@ async function signOut(): Promise<void> {
               class="menu-item"
               @click="openMyOrganisation"
             >
-              <AppIcon name="organisations" :size="16" /> My Organisation
+              <AppIcon name="organisations" :size="16" /> {{ t('shell.myOrganisation') }}
             </button>
+            <RouterLink to="/preferences" role="menuitem" class="menu-item" @click="userOpen = false">
+              <AppIcon name="globe" :size="16" /> {{ t('shell.preferences') }}
+            </RouterLink>
             <button type="button" role="menuitem" class="menu-item" @click="confirmOpen = true">
-              <AppIcon name="logout" :size="16" class="flip-rtl" /> Sign out
+              <AppIcon name="logout" :size="16" class="flip-rtl" /> {{ t('shell.signOut') }}
             </button>
           </div>
         </div>
@@ -184,9 +189,10 @@ async function signOut(): Promise<void> {
     </div>
     <ConfirmDialog
       :open="confirmOpen"
-      title="Sign out"
-      message="You will need to sign in again to view organization records."
-      confirm-label="Sign out"
+      :title="t('shell.signOut')"
+      :message="t('shell.signOutMessage')"
+      :confirm-label="t('shell.signOut')"
+      :cancel-label="t('common.cancel')"
       tone="danger"
       @confirm="signOut"
       @cancel="confirmOpen = false"
@@ -425,6 +431,7 @@ async function signOut(): Promise<void> {
 }
 
 .menu-item {
+  text-decoration: none;
   display: flex;
   align-items: center;
   gap: 10px;

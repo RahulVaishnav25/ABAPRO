@@ -36,7 +36,6 @@ const direction = ref<'asc' | 'desc'>('asc');
 const staff = ref<StaffOption[]>([]);
 let searchTimer = 0;
 
-const timeZone = computed(() => auth.user?.organization?.timezone ?? 'UTC');
 const canCreate = computed(() => auth.can('clients.create'));
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize + 1));
@@ -74,7 +73,7 @@ function names(people: Array<{ name: string }>): string {
 }
 
 function when(value: string | null): string {
-  return value ? formatDateTime(value, timeZone.value) : 'None';
+  return value ? formatDateTime(value) : 'None';
 }
 
 function toggleSort(key: string): void {

@@ -1,0 +1,190 @@
+{
+  "common": {
+    "save": "حفظ",
+    "saveChanges": "حفظ التغييرات",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "back": "رجوع",
+    "edit": "تعديل",
+    "view": "عرض",
+    "confirm": "تأكيد",
+    "tryAgain": "حاول مرة أخرى",
+    "search": "بحث",
+    "loading": "جارٍ التحميل…",
+    "none": "لا يوجد",
+    "never": "أبدًا",
+    "yes": "نعم",
+    "no": "لا",
+    "previous": "السابق",
+    "next": "التالي",
+    "required": "مطلوب",
+    "optional": "اختياري",
+    "moreActions": "إجراءات أخرى",
+    "useDefault": "استخدام الإعداد الافتراضي",
+    "saved": "تم الحفظ",
+    "notSaved": "لم يتم الحفظ",
+    "dismiss": "إغلاق"
+  },
+  "nav": {
+    "primary": "القائمة الرئيسية",
+    "brandSub": "إدارة العلاج",
+    "groups": {
+      "organisation": "المؤسسة",
+      "care": "الرعاية",
+      "administration": "الإدارة"
+    },
+    "items": {
+      "platform": "لوحة التحكم",
+      "home": "لوحة التحكم",
+      "therapy": "مساحة العلاج",
+      "organisations": "المؤسسات",
+      "organisation": "المؤسسة",
+      "clinics": "العيادات",
+      "children": "العملاء",
+      "programs": "البرامج",
+      "tasks": "المهام",
+      "onboarding": "الإعداد والانضمام",
+      "settings": "الإعدادات"
+    },
+    "collapse": "طي القائمة",
+    "expand": "توسيع القائمة",
+    "openMenu": "فتح القائمة",
+    "closeMenu": "إغلاق القائمة",
+    "breadcrumb": "مسار التنقل"
+  },
+  "shell": {
+    "skipToContent": "الانتقال إلى المحتوى",
+    "clinic": "العيادة",
+    "clinicNotChanged": "لم يتم تغيير العيادة",
+    "notifications": "الإشعارات",
+    "notificationsEmpty": "لا جديد لديك. ستظهر هنا التنبيهات المتعلقة بالعملاء والمهام.",
+    "account": "الحساب",
+    "myOrganisation": "مؤسستي",
+    "preferences": "التفضيلات",
+    "language": "اللغة",
+    "signOut": "تسجيل الخروج",
+    "signOutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى لعرض سجلات المؤسسة.",
+    "signedOut": "تم تسجيل الخروج",
+    "footer": "© {year} Techieora Private Limited"
+  },
+  "states": {
+    "noData": "لا يوجد شيء هنا بعد",
+    "unavailable": "غير متاح"
+  },
+  "table": {
+    "search": "البحث في الجدول",
+    "searchPlaceholder": "ابحث في هذا الجدول",
+    "noMatches": "لا توجد سجلات مطابقة",
+    "noMatchesHint": "جرّب بحثًا أو عامل تصفية مختلفًا.",
+    "showing": "عرض {start}–{end} من {total}",
+    "sortBy": "الترتيب حسب {column}"
+  },
+  "routes": {
+    "login": "تسجيل الدخول",
+    "dashboard": "لوحة التحكم",
+    "platform-dashboard": "لوحة التحكم",
+    "clients": "العملاء",
+    "client-create": "عميل جديد",
+    "client-edit": "تعديل العميل",
+    "client-profile": "العميل",
+    "assessments": "التقييمات",
+    "assessment-new": "تقييم جديد",
+    "assessment-edit": "تعديل التقييم",
+    "assessment-detail": "التقييم",
+    "programs": "البرامج",
+    "program-new": "برنامج جديد",
+    "program-edit": "تعديل البرنامج",
+    "program-detail": "البرنامج",
+    "tasks": "المهام",
+    "task-detail": "معاينة المهمة",
+    "task-edit": "تعديل المهمة",
+    "therapy-workspace": "مساحة العلاج",
+    "onboarding-teams": "الفرق",
+    "onboarding-parents": "أولياء الأمور",
+    "organizations": "المؤسسات",
+    "organization-new": "إنشاء مؤسسة",
+    "organization-detail": "المؤسسة",
+    "clinics": "العيادات",
+    "clinic-detail": "العيادة",
+    "settings": "الإعدادات",
+    "team": "الفريق",
+    "preferences": "التفضيلات",
+    "reports": "التقارير",
+    "maintenance": "المتابعة",
+    "parentPortal": "بوابة أولياء الأمور",
+    "messages": "الرسائل",
+    "no-clinic": "لا توجد عيادة بعد",
+    "forbidden": "تم رفض الوصول",
+    "forgot-password": "نسيت كلمة المرور",
+    "account-access": "هل تحتاج إلى حساب؟",
+    "contact": "اتصل بنا",
+    "onboarding": "إنشاء مؤسسة",
+    "accept-invitation": "قبول الدعوة",
+    "not-found": "الصفحة غير موجودة"
+  },
+  "auth": {
+    "signIn": "تسجيل الدخول",
+    "signInLede": "استخدم البريد الإلكتروني وكلمة المرور الخاصين بحسابك.",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "forgotPassword": "هل نسيت كلمة المرور؟",
+    "needAccount": "هل تحتاج إلى حساب؟",
+    "contactUs": "اتصل بنا",
+    "wrongCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    "parentPending": "حساب ولي الأمر الخاص بك غير مفعّل بعد. يمكنك تسجيل الدخول بعد أن تربط العيادة طفلك بحسابك.",
+    "sessionExpired": "انتهت جلستك. سجّل الدخول مرة أخرى للمتابعة."
+  },
+  "regional": {
+    "language": "اللغة",
+    "languageHint": "لغة القوائم والأزرار والرسائل.",
+    "timezone": "المنطقة الزمنية",
+    "timezoneHint": "تُعرض التواريخ والأوقات بهذه المنطقة الزمنية.",
+    "dateFormat": "تنسيق التاريخ",
+    "timeFormat": "تنسيق الوقت",
+    "currency": "العملة",
+    "currencyHint": "رمز من ثلاثة أحرف، مثل USD أو GBP أو AED.",
+    "region": "المنطقة",
+    "regionHint": "يحدد طريقة كتابة التواريخ والأرقام لهذه اللغة.",
+    "auto": "تلقائي، حسب اللغة",
+    "dateFormats": {
+      "dd/mm/yyyy": "يوم/شهر/سنة (31/12/2026)",
+      "mm/dd/yyyy": "شهر/يوم/سنة (12/31/2026)",
+      "yyyy-mm-dd": "سنة-شهر-يوم (2026-12-31)"
+    },
+    "timeFormats": {
+      "12h": "نظام 12 ساعة (2:30 م)",
+      "24h": "نظام 24 ساعة (14:30)"
+    },
+    "inherit": "استخدام إعداد {level} ({value})",
+    "levels": {
+      "organization": "المؤسسة",
+      "platform": "المنصة",
+      "default": "القياسي"
+    },
+    "source": {
+      "user": "اختيارك",
+      "organization": "من مؤسستك",
+      "platform": "الإعداد الافتراضي للمنصة",
+      "default": "قياسي"
+    },
+    "preview": "معاينة",
+    "invalidCurrency": "استخدم رمز عملة من ثلاثة أحرف، مثل USD."
+  },
+  "preferences": {
+    "title": "التفضيلات",
+    "description": "اختر لغتك ومنطقتك الزمنية وطريقة عرض التواريخ والأوقات. ما تتركه على الإعداد الافتراضي يتبع إعدادات مؤسستك.",
+    "saved": "تم حفظ التفضيلات",
+    "notSaved": "لم يتم حفظ التفضيلات"
+  },
+  "settings": {
+    "regionalTitle": "اللغة والمنطقة",
+    "regionalOrgDescription": "الإعدادات الافتراضية لجميع أعضاء {organisation}. لا يزال بإمكان كل شخص اختيار لغته ومنطقته الزمنية من التفضيلات.",
+    "regionalPlatformTitle": "لغة المنصة ومنطقتها",
+    "regionalPlatformDescription": "الإعدادات الافتراضية لكل مؤسسة لم تحدد إعداداتها الخاصة.",
+    "regionalSaved": "تم حفظ الإعدادات الإقليمية"
+  },
+  "errors": {
+    "generic": "حدث خطأ ما. حاول مرة أخرى.",
+    "unreachable": "تعذر الوصول إلى الخادم. شغّل واجهة البرمجة وحاول مرة أخرى."
+  }
+}

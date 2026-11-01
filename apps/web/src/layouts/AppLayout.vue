@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import CopyrightFooter from '@/components/CopyrightFooter.vue';
@@ -6,6 +7,8 @@ import AppBreadcrumbs from '@/components/navigation/AppBreadcrumbs.vue';
 import SidebarNav from '@/components/navigation/SidebarNav.vue';
 import TopBar from '@/components/navigation/TopBar.vue';
 import { useAuthStore } from '@/stores/auth';
+
+const { t } = useI18n();
 
 const STORAGE_KEY = 'abapro.sidebarCollapsed';
 const auth = useAuthStore();
@@ -36,7 +39,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 
 <template>
   <div class="app-shell" :class="{ 'is-collapsed': collapsed }">
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main">{{ t('shell.skipToContent') }}</a>
     <div id="primary-nav" class="sidebar-slot">
       <SidebarNav collapsible :collapsed="collapsed" @toggle="toggleCollapsed" />
     </div>
@@ -49,8 +52,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
       <CopyrightFooter class="shell-footer" />
     </div>
     <div v-if="menuOpen" class="nav-layer">
-      <button type="button" class="nav-backdrop" aria-label="Close menu" @click="menuOpen = false"></button>
-      <div id="mobile-menu" class="nav-drawer" role="dialog" aria-modal="true" aria-label="Menu">
+      <button type="button" class="nav-backdrop" :aria-label="t('nav.closeMenu')" @click="menuOpen = false"></button>
+      <div id="mobile-menu" class="nav-drawer" role="dialog" aria-modal="true" :aria-label="t('nav.primary')">
         <SidebarNav @navigate="menuOpen = false" />
       </div>
     </div>

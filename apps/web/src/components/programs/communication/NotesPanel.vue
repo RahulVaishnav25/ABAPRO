@@ -7,7 +7,7 @@ import AppDialog from '@/components/ui/AppDialog.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
-import { formatShortDate } from '@/lib/format';
+import { formatDateTime, formatShortDate } from '@/lib/format';
 import { errorMessage } from '@/lib/loader';
 import { useToastStore } from '@/stores/toast';
 import RichTextEditor from './RichTextEditor.vue';
@@ -21,7 +21,7 @@ function today(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-const stamp = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const stamp = (iso: string) => formatDateTime(iso);
 
 // Editor.
 const editing = ref<ProgramNote | null>(null);

@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import AppButton from './AppButton.vue';
 import AppDialog from './AppDialog.vue';
+
+const { t } = useI18n();
 
 withDefaults(
   defineProps<{
@@ -12,8 +15,8 @@ withDefaults(
     tone?: 'primary' | 'danger';
   }>(),
   {
-    confirmLabel: 'Confirm',
-    cancelLabel: 'Cancel',
+    confirmLabel: undefined,
+    cancelLabel: undefined,
     tone: 'primary',
   },
 );
@@ -27,9 +30,9 @@ const emit = defineEmits<{
 <template>
   <AppDialog :open="open" :title="title" :description="message" size="sm" @close="emit('cancel')">
     <template #footer>
-      <AppButton variant="secondary" @click="emit('cancel')">{{ cancelLabel }}</AppButton>
+      <AppButton variant="secondary" @click="emit('cancel')">{{ cancelLabel ?? t('common.cancel') }}</AppButton>
       <AppButton :variant="tone === 'danger' ? 'danger' : 'primary'" @click="emit('confirm')">
-        {{ confirmLabel }}
+        {{ confirmLabel ?? t('common.confirm') }}
       </AppButton>
     </template>
   </AppDialog>

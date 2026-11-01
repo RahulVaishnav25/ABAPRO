@@ -1,38 +1,41 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { routeTitle } from '@/i18n';
 import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
+const { t } = useI18n();
 const auth = useAuthStore();
 const dashboard = computed(() => ({
-  label: 'Dashboard',
+  label: t('routes.dashboard'),
   to: auth.user?.platformAdmin ? '/platform' : '/',
 }));
 
 const crumbs = computed(() => {
-  const label = String(route.meta.breadcrumb ?? route.meta.title ?? 'Page');
+  const label = routeTitle(route) || t('routes.dashboard');
   const root = dashboard.value;
   if (route.name === 'dashboard' || route.name === 'platform-dashboard') {
     return [root];
   }
   if (route.path === '/clinics' || route.path.startsWith('/clinics/')) {
-    const trail = [root, { label: 'Clinics', to: '/clinics' }];
+    const trail = [root, { label: t('routes.clinics'), to: '/clinics' }];
     if (route.name !== 'clinics') trail.push({ label, to: route.path });
     return trail;
   }
   if (route.path === '/organizations' || route.path.startsWith('/organizations/')) {
     if (auth.user?.platformAdmin) {
-      const trail = [root, { label: 'Organisations', to: '/organizations' }];
+      const trail = [root, { label: t('routes.organizations'), to: '/organizations' }];
       if (route.name !== 'organizations') trail.push({ label, to: route.path });
       return trail;
     }
   }
   if (route.path === '/team' || route.path.startsWith('/team/')) {
-    return [root, { label: 'Settings', to: '/settings' }, { label, to: route.path }];
+    return [root, { label: t('routes.settings'), to: '/settings' }, { label, to: route.path }];
   }
   if (route.path === '/programs/tasks' || route.path.startsWith('/programs/tasks/')) {
-    const trail = [root, { label: 'Programs', to: '/programs' }, { label: 'Tasks', to: '/programs/tasks' }];
+    const trail = [root, { label: t('routes.programs'), to: '/programs' }, { label: t('routes.tasks'), to: '/programs/tasks' }];
     if (route.path !== '/programs/tasks') {
       trail.push({ label, to: route.path });
     }
@@ -43,7 +46,7 @@ const crumbs = computed(() => {
 </script>
 
 <template>
-  <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <nav class="breadcrumbs" :aria-label="t('nav.breadcrumb')">
     <ol>
       <li v-for="(crumb, index) in crumbs" :key="crumb.to">
         <RouterLink v-if="index < crumbs.length - 1" :to="crumb.to">{{ crumb.label }}</RouterLink>

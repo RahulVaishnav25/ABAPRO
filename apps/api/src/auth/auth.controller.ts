@@ -1,5 +1,6 @@
+import { platformRegional } from '../organizations/preferences';
 import { Body, Controller, ForbiddenException, Get, HttpCode, HttpException, Inject, Post, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
-import { PARENT_ACCESS_PENDING_MESSAGE, type AuthProviderInfo, type AuthUser, type LogoutResult, type SignInAccount } from '@abapro/shared';
+import { PARENT_ACCESS_PENDING_MESSAGE, resolvePreferences, type AuthProviderInfo, type AuthUser, type LogoutResult, type SignInAccount } from '@abapro/shared';
 import type { Request, Response } from 'express';
 import * as Iron from '@hapi/iron';
 import type { AppConfig } from '../config/app-config';
@@ -46,8 +47,9 @@ export class AuthController {
 
   @Public()
   @Get('config')
-  configInfo(): AuthProviderInfo {
+  async configInfo(): Promise<AuthProviderInfo> {
     return {
+      defaultLanguage: resolvePreferences({ platform: await platformRegional(this.database) }).language,
       passwordResetEnabled: Boolean(this.config.passwordResetUrl),
       embeddedIdentity: this.config.embeddedOidc,
       mailboxUrl:

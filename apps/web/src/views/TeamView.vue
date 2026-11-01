@@ -40,7 +40,6 @@ const confirm = ref<{ title: string; message: string; tone: 'primary' | 'danger'
 
 const canManage = computed(() => auth.can('team.membership.manage'));
 const roleOptions = INVITABLE_ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }));
-const timeZone = computed(() => auth.user?.organization?.timezone ?? 'UTC');
 
 const { loading, error, load } = useLoader(async () => {
   directory.value = await teamDirectoryRequest();
@@ -119,7 +118,7 @@ async function invite(): Promise<void> {
 }
 
 function activity(value: string | null): string {
-  return value ? formatDateTime(value, timeZone.value) : 'No activity yet';
+  return value ? formatDateTime(value) : 'No activity yet';
 }
 
 onMounted(() => {

@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import AppIcon from '@/components/navigation/AppIcon.vue';
 import AppButton from './AppButton.vue';
+
+const { t } = useI18n();
 
 defineProps<{
   title: string;
@@ -19,7 +22,7 @@ const emit = defineEmits<{
     <p v-if="description">{{ description }}</p>
     <div class="state-actions">
       <slot name="actions">
-        <AppButton variant="secondary" @click="emit('retry')">Try again</AppButton>
+        <AppButton variant="secondary" @click="emit('retry')">{{ t('common.tryAgain') }}</AppButton>
       </slot>
     </div>
   </div>

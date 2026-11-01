@@ -1,0 +1,190 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "saveChanges": "Enregistrer les modifications",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "back": "Retour",
+    "edit": "Modifier",
+    "view": "Voir",
+    "confirm": "Confirmer",
+    "tryAgain": "Réessayer",
+    "search": "Rechercher",
+    "loading": "Chargement…",
+    "none": "Aucun",
+    "never": "Jamais",
+    "yes": "Oui",
+    "no": "Non",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "required": "Obligatoire",
+    "optional": "Facultatif",
+    "moreActions": "Plus d'actions",
+    "useDefault": "Utiliser la valeur par défaut",
+    "saved": "Enregistré",
+    "notSaved": "Non enregistré",
+    "dismiss": "Ignorer"
+  },
+  "nav": {
+    "primary": "Principale",
+    "brandSub": "Gestion thérapeutique",
+    "groups": {
+      "organisation": "Organisation",
+      "care": "Soins",
+      "administration": "Administration"
+    },
+    "items": {
+      "platform": "Tableau de bord",
+      "home": "Tableau de bord",
+      "therapy": "Espace de thérapie",
+      "organisations": "Organisations",
+      "organisation": "Organisation",
+      "clinics": "Cliniques",
+      "children": "Clients",
+      "programs": "Programmes",
+      "tasks": "Tâches",
+      "onboarding": "Intégration",
+      "settings": "Paramètres"
+    },
+    "collapse": "Réduire le menu",
+    "expand": "Développer le menu",
+    "openMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu",
+    "breadcrumb": "Fil d'Ariane"
+  },
+  "shell": {
+    "skipToContent": "Aller au contenu",
+    "clinic": "Clinique",
+    "clinicNotChanged": "La clinique n'a pas été changée",
+    "notifications": "Notifications",
+    "notificationsEmpty": "Vous êtes à jour. Les alertes concernant les clients et les tâches apparaîtront ici.",
+    "account": "Compte",
+    "myOrganisation": "Mon organisation",
+    "preferences": "Préférences",
+    "language": "Langue",
+    "signOut": "Se déconnecter",
+    "signOutMessage": "Vous devrez vous reconnecter pour consulter les dossiers de l'organisation.",
+    "signedOut": "Déconnecté",
+    "footer": "© {year} Techieora Private Limited"
+  },
+  "states": {
+    "noData": "Rien pour le moment",
+    "unavailable": "Indisponible"
+  },
+  "table": {
+    "search": "Rechercher dans le tableau",
+    "searchPlaceholder": "Rechercher dans ce tableau",
+    "noMatches": "Aucun enregistrement correspondant",
+    "noMatchesHint": "Essayez une autre recherche ou un autre filtre.",
+    "showing": "{start}–{end} sur {total}",
+    "sortBy": "Trier par {column}"
+  },
+  "routes": {
+    "login": "Connexion",
+    "dashboard": "Tableau de bord",
+    "platform-dashboard": "Tableau de bord",
+    "clients": "Clients",
+    "client-create": "Nouveau client",
+    "client-edit": "Modifier le client",
+    "client-profile": "Client",
+    "assessments": "Évaluations",
+    "assessment-new": "Nouvelle évaluation",
+    "assessment-edit": "Modifier l'évaluation",
+    "assessment-detail": "Évaluation",
+    "programs": "Programmes",
+    "program-new": "Nouveau programme",
+    "program-edit": "Modifier le programme",
+    "program-detail": "Programme",
+    "tasks": "Tâches",
+    "task-detail": "Aperçu de la tâche",
+    "task-edit": "Modifier la tâche",
+    "therapy-workspace": "Espace de thérapie",
+    "onboarding-teams": "Équipes",
+    "onboarding-parents": "Parents",
+    "organizations": "Organisations",
+    "organization-new": "Créer une organisation",
+    "organization-detail": "Organisation",
+    "clinics": "Cliniques",
+    "clinic-detail": "Clinique",
+    "settings": "Paramètres",
+    "team": "Équipe",
+    "preferences": "Préférences",
+    "reports": "Rapports",
+    "maintenance": "Maintien",
+    "parentPortal": "Portail parents",
+    "messages": "Messages",
+    "no-clinic": "Pas encore de clinique",
+    "forbidden": "Accès refusé",
+    "forgot-password": "Mot de passe oublié",
+    "account-access": "Besoin d'un compte ?",
+    "contact": "Nous contacter",
+    "onboarding": "Créer une organisation",
+    "accept-invitation": "Accepter l'invitation",
+    "not-found": "Page introuvable"
+  },
+  "auth": {
+    "signIn": "Se connecter",
+    "signInLede": "Utilisez l'adresse e-mail et le mot de passe de votre compte.",
+    "email": "Adresse e-mail",
+    "password": "Mot de passe",
+    "forgotPassword": "Mot de passe oublié ?",
+    "needAccount": "Besoin d'un compte ?",
+    "contactUs": "Nous contacter",
+    "wrongCredentials": "L'adresse e-mail ou le mot de passe est incorrect.",
+    "parentPending": "Votre compte parent n'est pas encore actif. Vous pourrez vous connecter lorsque la clinique aura associé votre enfant à votre compte.",
+    "sessionExpired": "Votre session a expiré. Reconnectez-vous pour continuer."
+  },
+  "regional": {
+    "language": "Langue",
+    "languageHint": "La langue des menus, des boutons et des messages.",
+    "timezone": "Fuseau horaire",
+    "timezoneHint": "Les dates et heures sont affichées dans ce fuseau horaire.",
+    "dateFormat": "Format de date",
+    "timeFormat": "Format d'heure",
+    "currency": "Devise",
+    "currencyHint": "Un code à trois lettres, comme USD, GBP ou AED.",
+    "region": "Région",
+    "regionHint": "Détermine l'écriture des dates et des nombres pour cette langue.",
+    "auto": "Automatique, selon la langue",
+    "dateFormats": {
+      "dd/mm/yyyy": "Jour/mois/année (31/12/2026)",
+      "mm/dd/yyyy": "Mois/jour/année (12/31/2026)",
+      "yyyy-mm-dd": "Année-mois-jour (2026-12-31)"
+    },
+    "timeFormats": {
+      "12h": "12 heures (2:30 PM)",
+      "24h": "24 heures (14:30)"
+    },
+    "inherit": "Utiliser le réglage {level} ({value})",
+    "levels": {
+      "organization": "de l'organisation",
+      "platform": "de la plateforme",
+      "default": "standard"
+    },
+    "source": {
+      "user": "Votre choix",
+      "organization": "De votre organisation",
+      "platform": "Valeur par défaut de la plateforme",
+      "default": "Standard"
+    },
+    "preview": "Aperçu",
+    "invalidCurrency": "Utilisez un code de devise à trois lettres, comme USD."
+  },
+  "preferences": {
+    "title": "Préférences",
+    "description": "Choisissez votre langue, votre fuseau horaire et l'affichage des dates et heures. Ce que vous laissez par défaut suit votre organisation.",
+    "saved": "Préférences enregistrées",
+    "notSaved": "Préférences non enregistrées"
+  },
+  "settings": {
+    "regionalTitle": "Langue et région",
+    "regionalOrgDescription": "Valeurs par défaut pour toutes les personnes de {organisation}. Chacun peut toujours choisir sa langue et son fuseau horaire dans Préférences.",
+    "regionalPlatformTitle": "Langue et région de la plateforme",
+    "regionalPlatformDescription": "Valeurs par défaut pour les organisations qui n'ont pas défini les leurs.",
+    "regionalSaved": "Paramètres régionaux enregistrés"
+  },
+  "errors": {
+    "generic": "Une erreur s'est produite. Réessayez.",
+    "unreachable": "Impossible de joindre le serveur. Démarrez l'API et réessayez."
+  }
+}

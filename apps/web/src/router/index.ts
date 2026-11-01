@@ -1,3 +1,4 @@
+import { routeTitle } from '@/i18n';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { APP_FEATURES, PERMISSIONS } from '@abapro/shared';
 import { useAuthStore } from '@/stores/auth';
@@ -16,6 +17,7 @@ const AcceptInvitationView = () => import('@/views/AcceptInvitationView.vue');
 const SettingsView = () => import('@/views/SettingsView.vue');
 const TeamView = () => import('@/views/TeamView.vue');
 const TeamsView = () => import('@/views/onboarding/TeamsView.vue');
+const PreferencesView = () => import('@/views/PreferencesView.vue');
 const ParentsView = () => import('@/views/onboarding/ParentsView.vue');
 const ClientsView = () => import('@/views/clients/ClientsView.vue');
 const ClientFormView = () => import('@/views/clients/ClientFormView.vue');
@@ -153,6 +155,12 @@ export const router = createRouter({
         {
           path: 'tasks/:taskId/edit',
           redirect: (to) => `/programs/tasks/${String(to.params.taskId)}/edit`,
+        },
+        {
+          path: 'preferences',
+          name: 'preferences',
+          component: PreferencesView,
+          meta: { title: 'Preferences', breadcrumb: 'Preferences' },
         },
         {
           path: 'onboarding/teams',
@@ -353,7 +361,7 @@ router.beforeEach(async (to) => {
         return true;
       }
     }
-    const directoryPage = to.name === 'settings' || to.name === 'organization-detail' || to.name === 'clinics' || to.name === 'clinic-detail';
+    const directoryPage = to.name === 'settings' || to.name === 'preferences' || to.name === 'organization-detail' || to.name === 'clinics' || to.name === 'clinic-detail';
     const platformPage = auth.user?.platformAdmin && (to.matched.some((record) => record.meta.platformAdmin) || directoryPage);
     const destination = auth.user?.platformAdmin ? 'platform-dashboard' : 'no-clinic';
     if (!platformPage && to.name !== destination) {
@@ -379,6 +387,6 @@ router.beforeEach(async (to) => {
 });
 
 router.afterEach((to) => {
-  const title = to.meta.title;
+  const title = routeTitle(to);
   document.title = title ? `${title} · ABAPro` : 'ABAPro';
 });

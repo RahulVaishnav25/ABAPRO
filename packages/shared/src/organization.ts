@@ -1,7 +1,8 @@
 import type { AuthUser } from './auth';
 import type { Role } from './permissions';
 
-export const LOCALES = ['en', 'en-US', 'en-GB', 'en-CA', 'es', 'es-MX', 'fr', 'fr-CA'] as const;
+/** Organisation locales: a supported language, optionally with a region for date and number formats. */
+export const LOCALES = ['en', 'en-US', 'en-GB', 'en-CA', 'en-AU', 'en-IN', 'es', 'es-MX', 'fr', 'fr-CA', 'ar', 'ar-AE', 'ar-SA', 'he', 'he-IL'] as const;
 
 export type AppLocale = (typeof LOCALES)[number];
 

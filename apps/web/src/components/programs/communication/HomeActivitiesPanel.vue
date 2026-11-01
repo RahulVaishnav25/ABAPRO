@@ -15,6 +15,7 @@ import { useToastStore } from '@/stores/toast';
 import AttachmentList from './AttachmentList.vue';
 import UploadProgress from './UploadProgress.vue';
 import { useUpload } from './useUpload';
+import { formatDayOf } from '@/lib/format';
 
 const ACCEPT = Object.keys(ATTACHMENT_TYPES).join(',');
 const FILTERS: Array<{ value: 'all' | HomeActivityStatus; label: string }> = [
@@ -30,7 +31,7 @@ const toast = useToastStore();
 const filter = ref<'all' | HomeActivityStatus>('active');
 const shown = computed(() => props.data.activities.filter((activity) => filter.value === 'all' || activity.status === filter.value));
 const count = (status: 'all' | HomeActivityStatus) => props.data.activities.filter((activity) => status === 'all' || activity.status === status).length;
-const date = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
+const date = (iso: string) => formatDayOf(iso);
 
 // Form.
 const editing = ref<HomeActivity | null>(null);

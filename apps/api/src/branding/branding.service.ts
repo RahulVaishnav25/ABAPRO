@@ -1,3 +1,4 @@
+import { deleteDocument, getDocument, setDocument } from '../common/documents';
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   DEFAULT_ORGANIZATION_BRANDING,
@@ -18,45 +19,16 @@ const PLATFORM_DOC_ID = 'platform';
 export class BrandingService {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
 
-  /**
-   * Reads a document from the Firestore-backed branding collection.
-   */
-  private async getFirestoreDocument<T>(collectionId: string, documentId: string): Promise<T | null> {
-    const rows = await this.database.query(
-      `SELECT data FROM firestore_documents WHERE collection_id = $1 AND document_id = $2`,
-      [collectionId, documentId],
-    );
-    if (!rows || rows.length === 0) return null;
-    const row = rows[0];
-    return (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) as T;
+  private getFirestoreDocument<T>(collectionId: string, documentId: string): Promise<T | null> {
+    return getDocument<T>(this.database, collectionId, documentId);
   }
 
-  /**
-   * Writes a document to the Firestore-backed branding collection.
-   */
-  private async setFirestoreDocument<T extends Record<string, unknown>>(
-    collectionId: string,
-    documentId: string,
-    data: T,
-  ): Promise<void> {
-    const jsonData = JSON.stringify(data);
-    await this.database.query(
-      `INSERT INTO firestore_documents (collection_id, document_id, data, updated_at)
-       VALUES ($1, $2, $3::jsonb, now())
-       ON CONFLICT (collection_id, document_id)
-       DO UPDATE SET data = $3::jsonb, updated_at = now()`,
-      [collectionId, documentId, jsonData],
-    );
+  private setFirestoreDocument<T extends Record<string, unknown>>(collectionId: string, documentId: string, data: T): Promise<void> {
+    return setDocument(this.database, collectionId, documentId, data);
   }
 
-  /**
-   * Deletes a document from the Firestore-backed branding collection.
-   */
-  private async deleteFirestoreDocument(collectionId: string, documentId: string): Promise<void> {
-    await this.database.query(
-      `DELETE FROM firestore_documents WHERE collection_id = $1 AND document_id = $2`,
-      [collectionId, documentId],
-    );
+  private deleteFirestoreDocument(collectionId: string, documentId: string): Promise<void> {
+    return deleteDocument(this.database, collectionId, documentId);
   }
 
   /**

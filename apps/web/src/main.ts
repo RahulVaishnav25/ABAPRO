@@ -1,8 +1,10 @@
-import { createApp } from 'vue';
+import { createApp, watch } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import { PARENT_ACCESS_PENDING_MESSAGE } from '@abapro/shared';
 import { setUnauthorizedHandler } from './api/client';
+import { authConfigRequest } from './api/resources';
+import { applyPreferences, i18n, routeTitle, setLanguage, startingLanguage } from './i18n';
 import { router } from './router';
 import { useAuthStore } from './stores/auth';
 import { useBrandingStore } from './stores/branding';
@@ -12,6 +14,7 @@ const app = createApp(App);
 const pinia = createPinia();
 app.use(pinia);
 app.use(router);
+app.use(i18n);
 
 const auth = useAuthStore();
 setUnauthorizedHandler((message) => {
@@ -31,7 +34,24 @@ setUnauthorizedHandler((message) => {
 
 async function start(): Promise<void> {
   const branding = useBrandingStore();
+  // Before sign-in: the language last used here, the browser's, or the platform default.
+  const platformDefault = await authConfigRequest().then((config) => config.defaultLanguage).catch(() => undefined);
+  await setLanguage(startingLanguage(platformDefault));
   await Promise.all([auth.restore(), branding.initialize()]);
+  if (auth.user?.preferences) await applyPreferences(auth.user.preferences);
+  // Signed in: the user's resolved language, timezone and formats, applied again whenever they change.
+  watch(
+    () => auth.user?.preferences,
+    (preferences) => {
+      if (preferences) void applyPreferences(preferences);
+    },
+    { deep: true },
+  );
+  // The tab title follows the language too.
+  watch(i18n.global.locale, () => {
+    const title = routeTitle(router.currentRoute.value);
+    document.title = title ? `${title} · ABAPro` : 'ABAPro';
+  });
   await router.isReady();
   app.mount('#app');
 }

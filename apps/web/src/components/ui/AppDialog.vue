@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import AppIcon from '@/components/navigation/AppIcon.vue';
+
+const { t } = useI18n();
 
 const props = withDefaults(
   defineProps<{
@@ -92,7 +95,7 @@ onBeforeUnmount(() => {
       >
         <header class="dialog-header">
           <h2 :id="titleId">{{ title }}</h2>
-          <button type="button" class="btn btn-ghost btn-sm btn-icon dialog-close" aria-label="Close" @click="emit('close')">
+          <button type="button" class="btn btn-ghost btn-sm btn-icon dialog-close" :aria-label="t('common.close')" @click="emit('close')">
             <AppIcon name="close" :size="18" />
           </button>
         </header>

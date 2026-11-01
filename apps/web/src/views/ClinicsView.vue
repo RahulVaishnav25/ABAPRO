@@ -15,6 +15,7 @@ import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useLoader } from '@/lib/loader';
+import { formatRegion } from '@/lib/format';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -28,7 +29,6 @@ const total = ref(0);
 const countries = ref<string[]>([]);
 const organizations = ref<Array<{ id: string; name: string }>>([]);
 const items = ref<ClinicDirectoryItem[]>([]);
-const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 let searchTimer = 0;
 
 const organizationOptions = computed(() => [
@@ -37,7 +37,7 @@ const organizationOptions = computed(() => [
 ]);
 const countryOptions = computed(() => [
   { value: '', label: 'All countries' },
-  ...countries.value.map((code) => ({ value: code, label: regionNames.of(code) ?? code })),
+  ...countries.value.map((code) => ({ value: code, label: formatRegion(code) })),
 ]);
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize + 1));
@@ -138,7 +138,7 @@ onMounted(() => {
                 <td class="location-cell">
                   <span class="location-text" :title="locationLabel(item)">{{ locationLabel(item) }}</span>
                 </td>
-                <td>{{ regionNames.of(item.country) ?? item.country }}</td>
+                <td>{{ formatRegion(item.country) }}</td>
                 <td class="children-cell">{{ childSummary(item.childCount) }}</td>
               </tr>
             </tbody>

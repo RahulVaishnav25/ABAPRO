@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { storeToRefs } from 'pinia';
 import { useToastStore } from '@/stores/toast';
 
 const toastStore = useToastStore();
 const { toasts } = storeToRefs(toastStore);
+const { t } = useI18n();
 </script>
 
 <template>
@@ -13,7 +15,7 @@ const { toasts } = storeToRefs(toastStore);
         <strong>{{ toast.title }}</strong>
         <p v-if="toast.message">{{ toast.message }}</p>
       </div>
-      <button type="button" @click="toastStore.dismiss(toast.id)">Dismiss</button>
+      <button type="button" @click="toastStore.dismiss(toast.id)">{{ t('common.dismiss') }}</button>
     </article>
   </div>
 </template>

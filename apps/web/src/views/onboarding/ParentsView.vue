@@ -29,7 +29,6 @@ const search = ref('');
 const status = ref('');
 const page = ref(1);
 
-const timeZone = computed(() => auth.user?.organization?.timezone ?? 'UTC');
 // Creating accounts follows the organisation's member onboarding: administrators only.
 const canCreate = computed(() => auth.user?.platformAdmin === true || auth.user?.role === 'organization_admin');
 
@@ -181,7 +180,7 @@ void load();
                 :title="parent.portalStatus === 'pending' ? PENDING_HINT : undefined"
               />
             </td>
-            <td>{{ formatDateTime(parent.createdAt, timeZone) }}</td>
+            <td>{{ formatDateTime(parent.createdAt) }}</td>
             <td>
               <div class="row-actions">
                 <AppButton size="sm" variant="secondary" :aria-label="`View ${parent.name}`" @click="viewing = parent">View</AppButton>
@@ -235,8 +234,8 @@ void load();
           <dt>Portal access</dt>
           <dd>{{ viewing.membershipStatus === 'revoked' ? 'Revoked' : viewing.portalStatus === 'active' ? 'Active' : PENDING_HINT }}</dd>
         </div>
-        <div><dt>Added</dt><dd>{{ formatDateTime(viewing.createdAt, timeZone) }}</dd></div>
-        <div><dt>Last active</dt><dd>{{ viewing.lastActiveAt ? formatDateTime(viewing.lastActiveAt, timeZone) : 'Never' }}</dd></div>
+        <div><dt>Added</dt><dd>{{ formatDateTime(viewing.createdAt) }}</dd></div>
+        <div><dt>Last active</dt><dd>{{ viewing.lastActiveAt ? formatDateTime(viewing.lastActiveAt) : 'Never' }}</dd></div>
         <div class="is-wide">
           <dt>Linked clients</dt>
           <dd>

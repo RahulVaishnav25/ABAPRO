@@ -11,7 +11,7 @@ import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatRegion } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth';
 import { errorMessage } from '@/lib/loader';
 
@@ -21,7 +21,6 @@ const router = useRouter();
 const platformView = computed(() => route.name === 'platform-dashboard');
 const dashboard = ref<DashboardResponse | null>(null);
 const portal = ref<PlatformDashboard | null>(null);
-const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 const loading = ref(true);
 const error = ref('');
 const portalMetrics = computed(() => {
@@ -33,10 +32,10 @@ const portalMetrics = computed(() => {
   ];
 });
 const countryOption = computed(() =>
-  portal.value ? clinicsByCountryOption(portal.value.clinicsByCountry, (code) => regionNames.of(code) ?? code) : null,
+  portal.value ? clinicsByCountryOption(portal.value.clinicsByCountry, (code) => formatRegion(code)) : null,
 );
 const countrySummary = computed(() =>
-  (portal.value?.clinicsByCountry ?? []).map((point) => `${regionNames.of(point.country) ?? point.country}: ${point.clinics}`).join('. '),
+  (portal.value?.clinicsByCountry ?? []).map((point) => `${formatRegion(point.country)}: ${point.clinics}`).join('. '),
 );
 async function load(): Promise<void> {
   loading.value = true;
@@ -128,7 +127,7 @@ watch(
         <div>
           <strong>{{ dashboard.scopeLabel }}</strong>
           <p>
-            {{ dashboard.disclaimer }} Generated {{ formatDateTime(dashboard.generatedAt, dashboard.timezone) }} for
+            {{ dashboard.disclaimer }} Generated {{ formatDateTime(dashboard.generatedAt) }} for
             {{ dashboard.organizationName }}.
           </p>
         </div>
@@ -156,7 +155,7 @@ watch(
         <p v-if="dashboard && dashboard.recentActivity.length === 0" class="activity-empty">No recent activity.</p>
         <ul v-else-if="dashboard" class="activity-list">
           <li v-for="item in dashboard.recentActivity" :key="item.id">
-            <time :datetime="item.at">{{ formatDateTime(item.at, dashboard.timezone) }}</time>
+            <time :datetime="item.at">{{ formatDateTime(item.at) }}</time>
             <div>
               <strong>{{ item.actor }}</strong>
               <p>{{ item.summary }}</p>

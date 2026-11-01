@@ -1,3 +1,4 @@
+import { effectivePreferences } from '../organizations/preferences';
 import { Inject, Injectable } from '@nestjs/common';
 import { PERMISSIONS, ROLE_LABELS, type AuthUser, type ClinicSummary, type OrganizationSummary, type Permission, type Role } from '@abapro/shared';
 import { AuthorizationService } from '../access/authorization.service';
@@ -114,6 +115,7 @@ export class AccountService {
       clinic,
       clinics,
       parentAccessPending: !platformAdmin && usable.length === 0 && pendingParent.size > 0,
+      preferences: await effectivePreferences(db, asString(user.id), organization?.id ?? null),
       permissions: role && organization
         ? await this.authorization.permissionsFor(db, organization.id, role, asString(user.id))
         : platformAdmin

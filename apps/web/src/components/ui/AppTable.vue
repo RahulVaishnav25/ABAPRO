@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { computed, ref, watch } from 'vue';
 import type { TableColumn } from './types';
 import AppButton from './AppButton.vue';
 import AppInput from './AppInput.vue';
 import EmptyState from './EmptyState.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
+
+const { t } = useI18n();
 
 const props = withDefaults(
   defineProps<{
@@ -20,7 +23,7 @@ const props = withDefaults(
   }>(),
   {
     searchable: true,
-    searchPlaceholder: 'Search this table',
+    searchPlaceholder: undefined,
     pageSize: 8,
     loading: false,
     density: 'comfortable',
@@ -103,7 +106,7 @@ function rowId(row: Record<string, unknown>): string {
 <template>
   <section class="table-card">
     <div v-if="searchable" class="table-toolbar">
-      <AppInput v-model="search" label="Search table" hide-label :placeholder="searchPlaceholder" />
+      <AppInput v-model="search" :label="t('table.search')" hide-label :placeholder="searchPlaceholder ?? t('table.searchPlaceholder')" />
     </div>
     <div class="table-scroll">
       <table class="data-table is-responsive" :class="{ 'is-compact': density === 'compact' }">
@@ -146,16 +149,16 @@ function rowId(row: Record<string, unknown>): string {
       </table>
       <EmptyState
         v-if="!loading && visibleRows.length === 0"
-        title="No matching records"
-        description="Try a different search or filter."
+        :title="t('table.noMatches')"
+        :description="t('table.noMatchesHint')"
       />
     </div>
     <div class="pager">
-      <p>Showing {{ rangeStart }}–{{ rangeEnd }} of {{ filtered.length }}</p>
+      <p>{{ t('table.showing', { start: rangeStart, end: rangeEnd, total: filtered.length }) }}</p>
       <div v-if="pageCount > 1" class="pager-actions">
-        <AppButton variant="secondary" size="sm" icon="chevron-left" :disabled="page <= 1" @click="page -= 1">Previous</AppButton>
+        <AppButton variant="secondary" size="sm" icon="chevron-left" :disabled="page <= 1" @click="page -= 1">{{ t('common.previous') }}</AppButton>
         <span class="pager-page">{{ page }} / {{ pageCount }}</span>
-        <AppButton variant="secondary" size="sm" icon-end="chevron-right" :disabled="page >= pageCount" @click="page += 1">Next</AppButton>
+        <AppButton variant="secondary" size="sm" icon-end="chevron-right" :disabled="page >= pageCount" @click="page += 1">{{ t('common.next') }}</AppButton>
       </div>
     </div>
   </section>

@@ -1,0 +1,190 @@
+{
+  "common": {
+    "save": "שמירה",
+    "saveChanges": "שמירת השינויים",
+    "cancel": "ביטול",
+    "close": "סגירה",
+    "back": "חזרה",
+    "edit": "עריכה",
+    "view": "הצגה",
+    "confirm": "אישור",
+    "tryAgain": "ניסיון חוזר",
+    "search": "חיפוש",
+    "loading": "טוען…",
+    "none": "אין",
+    "never": "אף פעם",
+    "yes": "כן",
+    "no": "לא",
+    "previous": "הקודם",
+    "next": "הבא",
+    "required": "חובה",
+    "optional": "רשות",
+    "moreActions": "פעולות נוספות",
+    "useDefault": "שימוש בברירת המחדל",
+    "saved": "נשמר",
+    "notSaved": "לא נשמר",
+    "dismiss": "סגירה"
+  },
+  "nav": {
+    "primary": "ניווט ראשי",
+    "brandSub": "ניהול טיפולים",
+    "groups": {
+      "organisation": "ארגון",
+      "care": "טיפול",
+      "administration": "ניהול"
+    },
+    "items": {
+      "platform": "לוח בקרה",
+      "home": "לוח בקרה",
+      "therapy": "סביבת הטיפול",
+      "organisations": "ארגונים",
+      "organisation": "ארגון",
+      "clinics": "מרפאות",
+      "children": "מטופלים",
+      "programs": "תוכניות",
+      "tasks": "משימות",
+      "onboarding": "קליטה",
+      "settings": "הגדרות"
+    },
+    "collapse": "כיווץ התפריט",
+    "expand": "הרחבת התפריט",
+    "openMenu": "פתיחת התפריט",
+    "closeMenu": "סגירת התפריט",
+    "breadcrumb": "נתיב ניווט"
+  },
+  "shell": {
+    "skipToContent": "דילוג לתוכן",
+    "clinic": "מרפאה",
+    "clinicNotChanged": "המרפאה לא הוחלפה",
+    "notifications": "התראות",
+    "notificationsEmpty": "אין עדכונים חדשים. התראות על מטופלים ומשימות יופיעו כאן.",
+    "account": "חשבון",
+    "myOrganisation": "הארגון שלי",
+    "preferences": "העדפות",
+    "language": "שפה",
+    "signOut": "התנתקות",
+    "signOutMessage": "יהיה עליך להתחבר שוב כדי לצפות ברשומות הארגון.",
+    "signedOut": "התנתקת",
+    "footer": "© {year} Techieora Private Limited"
+  },
+  "states": {
+    "noData": "אין כאן עדיין כלום",
+    "unavailable": "לא זמין"
+  },
+  "table": {
+    "search": "חיפוש בטבלה",
+    "searchPlaceholder": "חיפוש בטבלה זו",
+    "noMatches": "אין רשומות תואמות",
+    "noMatchesHint": "כדאי לנסות חיפוש או סינון אחר.",
+    "showing": "מוצגות {start}–{end} מתוך {total}",
+    "sortBy": "מיון לפי {column}"
+  },
+  "routes": {
+    "login": "התחברות",
+    "dashboard": "לוח בקרה",
+    "platform-dashboard": "לוח בקרה",
+    "clients": "מטופלים",
+    "client-create": "מטופל חדש",
+    "client-edit": "עריכת מטופל",
+    "client-profile": "מטופל",
+    "assessments": "הערכות",
+    "assessment-new": "הערכה חדשה",
+    "assessment-edit": "עריכת הערכה",
+    "assessment-detail": "הערכה",
+    "programs": "תוכניות",
+    "program-new": "תוכנית חדשה",
+    "program-edit": "עריכת תוכנית",
+    "program-detail": "תוכנית",
+    "tasks": "משימות",
+    "task-detail": "תצוגה מקדימה של המשימה",
+    "task-edit": "עריכת משימה",
+    "therapy-workspace": "סביבת הטיפול",
+    "onboarding-teams": "צוותים",
+    "onboarding-parents": "הורים",
+    "organizations": "ארגונים",
+    "organization-new": "יצירת ארגון",
+    "organization-detail": "ארגון",
+    "clinics": "מרפאות",
+    "clinic-detail": "מרפאה",
+    "settings": "הגדרות",
+    "team": "צוות",
+    "preferences": "העדפות",
+    "reports": "דוחות",
+    "maintenance": "שימור",
+    "parentPortal": "פורטל הורים",
+    "messages": "הודעות",
+    "no-clinic": "עדיין אין מרפאה",
+    "forbidden": "הגישה נדחתה",
+    "forgot-password": "שכחתי סיסמה",
+    "account-access": "צריכים חשבון?",
+    "contact": "צרו קשר",
+    "onboarding": "יצירת ארגון",
+    "accept-invitation": "אישור הזמנה",
+    "not-found": "הדף לא נמצא"
+  },
+  "auth": {
+    "signIn": "התחברות",
+    "signInLede": "יש להשתמש בכתובת האימייל ובסיסמה של החשבון.",
+    "email": "אימייל",
+    "password": "סיסמה",
+    "forgotPassword": "שכחת את הסיסמה?",
+    "needAccount": "צריכים חשבון?",
+    "contactUs": "צרו קשר",
+    "wrongCredentials": "כתובת האימייל או הסיסמה שגויות.",
+    "parentPending": "חשבון ההורה שלך עדיין לא פעיל. אפשר יהיה להתחבר לאחר שהמרפאה תקשר את ילדך לחשבון.",
+    "sessionExpired": "פג תוקף ההתחברות. יש להתחבר שוב כדי להמשיך."
+  },
+  "regional": {
+    "language": "שפה",
+    "languageHint": "השפה של התפריטים, הכפתורים וההודעות.",
+    "timezone": "אזור זמן",
+    "timezoneHint": "תאריכים ושעות מוצגים לפי אזור זמן זה.",
+    "dateFormat": "תבנית תאריך",
+    "timeFormat": "תבנית שעה",
+    "currency": "מטבע",
+    "currencyHint": "קוד בן שלוש אותיות, כמו USD,‏ GBP או ILS.",
+    "region": "אזור",
+    "regionHint": "קובע איך נכתבים תאריכים ומספרים בשפה זו.",
+    "auto": "אוטומטי, לפי השפה",
+    "dateFormats": {
+      "dd/mm/yyyy": "יום/חודש/שנה (31/12/2026)",
+      "mm/dd/yyyy": "חודש/יום/שנה (12/31/2026)",
+      "yyyy-mm-dd": "שנה-חודש-יום (2026-12-31)"
+    },
+    "timeFormats": {
+      "12h": "12 שעות (2:30 PM)",
+      "24h": "24 שעות (14:30)"
+    },
+    "inherit": "שימוש בהגדרה של {level} ({value})",
+    "levels": {
+      "organization": "הארגון",
+      "platform": "הפלטפורמה",
+      "default": "ברירת המחדל"
+    },
+    "source": {
+      "user": "הבחירה שלך",
+      "organization": "מהארגון שלך",
+      "platform": "ברירת המחדל של הפלטפורמה",
+      "default": "רגיל"
+    },
+    "preview": "תצוגה מקדימה",
+    "invalidCurrency": "יש להשתמש בקוד מטבע בן שלוש אותיות, כמו USD."
+  },
+  "preferences": {
+    "title": "העדפות",
+    "description": "בחירת שפה, אזור זמן ואופן הצגת התאריכים והשעות. מה שיישאר בברירת המחדל יפעל לפי הגדרות הארגון.",
+    "saved": "ההעדפות נשמרו",
+    "notSaved": "ההעדפות לא נשמרו"
+  },
+  "settings": {
+    "regionalTitle": "שפה ואזור",
+    "regionalOrgDescription": "ברירות מחדל לכל חברי {organisation}. כל אחד עדיין יכול לבחור שפה ואזור זמן משלו בהעדפות.",
+    "regionalPlatformTitle": "שפה ואזור של הפלטפורמה",
+    "regionalPlatformDescription": "ברירות מחדל לכל ארגון שלא הגדיר הגדרות משלו.",
+    "regionalSaved": "ההגדרות האזוריות נשמרו"
+  },
+  "errors": {
+    "generic": "משהו השתבש. כדאי לנסות שוב.",
+    "unreachable": "לא ניתן להתחבר לשרת. יש להפעיל את ה-API ולנסות שוב."
+  }
+}

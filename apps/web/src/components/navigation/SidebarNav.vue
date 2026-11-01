@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { navigationFor } from '@abapro/shared';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '@/stores/auth';
 import { useBrandingStore } from '@/stores/branding';
 import appIconUrl from '@/assets/brand/app-icon.png';
@@ -36,13 +37,13 @@ const NAV_ORDER = ['platform', 'home', 'therapy', 'organisations', 'clinics', 'c
 
 /** Labelled groups, in NAV_ORDER. Items without a group sit at the top. */
 const NAV_GROUPS: Record<string, string> = {
-  organisations: 'Organisation',
-  clinics: 'Organisation',
-  children: 'Care',
-  programs: 'Care',
-  tasks: 'Care',
-  onboarding: 'Administration',
-  settings: 'Administration',
+  organisations: 'organisation',
+  clinics: 'organisation',
+  children: 'care',
+  programs: 'care',
+  tasks: 'care',
+  onboarding: 'administration',
+  settings: 'administration',
 };
 
 withDefaults(
@@ -59,6 +60,7 @@ const emit = defineEmits<{
 }>();
 
 const route = useRoute();
+const { t } = useI18n();
 const router = useRouter();
 const auth = useAuthStore();
 const branding = useBrandingStore();
@@ -118,6 +120,12 @@ const sections = computed(() => {
   return result;
 });
 
+/** An organisation member's own organisation is "Organisation"; a super admin's list is "Organisations". */
+function itemTitle(item: SidebarNavItem): string {
+  if (item.key === 'organisations' && item.route !== '/organizations') return t('nav.items.organisation');
+  return t(`nav.items.${item.key}`);
+}
+
 function isItemActive(item: SidebarNavItem, path: string): boolean {
   if (item.key === 'home') return path === '/';
   if (item.key === 'platform') return path === '/platform';
@@ -151,12 +159,12 @@ function follow(event: MouseEvent, path: string): void {
       <img :src="brandLogo" :alt="brandName" class="brand-mark-img" />
       <span v-if="!collapsed" class="brand-text">
         <span class="brand-name">{{ brandName }}</span>
-        <span class="brand-sub">Therapy management</span>
+        <span class="brand-sub">{{ t('nav.brandSub') }}</span>
       </span>
     </div>
-    <nav aria-label="Primary">
+    <nav :aria-label="t('nav.primary')">
       <div v-for="section in sections" :key="section.label || 'main'" class="nav-section">
-        <p v-if="section.label && !collapsed" class="nav-heading">{{ section.label }}</p>
+        <p v-if="section.label && !collapsed" class="nav-heading">{{ t(`nav.groups.${section.label}`) }}</p>
         <hr v-else-if="section.label" class="nav-divider" />
         <ul>
           <li v-for="item in section.items" :key="item.key">
@@ -165,11 +173,11 @@ function follow(event: MouseEvent, path: string): void {
               class="nav-link"
               :class="{ 'is-active': isItemActive(item, route.path) }"
               :aria-current="isItemActive(item, route.path) ? 'page' : undefined"
-              :title="collapsed ? item.title : undefined"
+              :title="collapsed ? itemTitle(item) : undefined"
               @click="follow($event, item.route)"
             >
               <AppIcon :name="item.icon" />
-              <span :class="{ 'visually-hidden': collapsed }">{{ item.title }}</span>
+              <span :class="{ 'visually-hidden': collapsed }">{{ itemTitle(item) }}</span>
             </a>
           </li>
         </ul>
@@ -177,7 +185,7 @@ function follow(event: MouseEvent, path: string): void {
     </nav>
     <button v-if="collapsible" type="button" class="collapse" :aria-expanded="!collapsed" @click="emit('toggle')">
       <AppIcon :name="collapsed ? 'chevron-right' : 'chevron-left'" class="flip-rtl" :size="16" />
-      <span :class="{ 'visually-hidden': collapsed }">{{ collapsed ? 'Expand menu' : 'Collapse menu' }}</span>
+      <span :class="{ 'visually-hidden': collapsed }">{{ collapsed ? t('nav.expand') : t('nav.collapse') }}</span>
     </button>
   </div>
 </template>

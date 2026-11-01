@@ -1,0 +1,190 @@
+{
+  "common": {
+    "save": "Save",
+    "saveChanges": "Save changes",
+    "cancel": "Cancel",
+    "close": "Close",
+    "back": "Back",
+    "edit": "Edit",
+    "view": "View",
+    "confirm": "Confirm",
+    "tryAgain": "Try again",
+    "search": "Search",
+    "loading": "Loading…",
+    "none": "None",
+    "never": "Never",
+    "yes": "Yes",
+    "no": "No",
+    "previous": "Previous",
+    "next": "Next",
+    "required": "Required",
+    "optional": "Optional",
+    "moreActions": "More actions",
+    "useDefault": "Use the default",
+    "saved": "Saved",
+    "notSaved": "Not saved",
+    "dismiss": "Dismiss"
+  },
+  "nav": {
+    "primary": "Primary",
+    "brandSub": "Therapy management",
+    "groups": {
+      "organisation": "Organisation",
+      "care": "Care",
+      "administration": "Administration"
+    },
+    "items": {
+      "platform": "Dashboard",
+      "home": "Dashboard",
+      "therapy": "Therapy Workspace",
+      "organisations": "Organisations",
+      "organisation": "Organisation",
+      "clinics": "Clinics",
+      "children": "Clients",
+      "programs": "Programs",
+      "tasks": "Tasks",
+      "onboarding": "Onboarding",
+      "settings": "Settings"
+    },
+    "collapse": "Collapse menu",
+    "expand": "Expand menu",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "breadcrumb": "Breadcrumb"
+  },
+  "shell": {
+    "skipToContent": "Skip to content",
+    "clinic": "Clinic",
+    "clinicNotChanged": "Clinic not changed",
+    "notifications": "Notifications",
+    "notificationsEmpty": "You're all caught up. Alerts about clients and tasks will appear here.",
+    "account": "Account",
+    "myOrganisation": "My Organisation",
+    "preferences": "Preferences",
+    "language": "Language",
+    "signOut": "Sign out",
+    "signOutMessage": "You will need to sign in again to view organisation records.",
+    "signedOut": "Signed out",
+    "footer": "© {year} Techieora Private Limited"
+  },
+  "states": {
+    "noData": "Nothing here yet",
+    "unavailable": "Unavailable"
+  },
+  "table": {
+    "search": "Search table",
+    "searchPlaceholder": "Search this table",
+    "noMatches": "No matching records",
+    "noMatchesHint": "Try a different search or filter.",
+    "showing": "Showing {start}–{end} of {total}",
+    "sortBy": "Sort by {column}"
+  },
+  "routes": {
+    "login": "Sign in",
+    "dashboard": "Dashboard",
+    "platform-dashboard": "Dashboard",
+    "clients": "Clients",
+    "client-create": "New client",
+    "client-edit": "Edit client",
+    "client-profile": "Client",
+    "assessments": "Assessments",
+    "assessment-new": "New assessment",
+    "assessment-edit": "Edit assessment",
+    "assessment-detail": "Assessment",
+    "programs": "Programs",
+    "program-new": "New program",
+    "program-edit": "Edit program",
+    "program-detail": "Program",
+    "tasks": "Tasks",
+    "task-detail": "Task preview",
+    "task-edit": "Edit task",
+    "therapy-workspace": "Therapy Workspace",
+    "onboarding-teams": "Teams",
+    "onboarding-parents": "Parents",
+    "organizations": "Organisations",
+    "organization-new": "Create organisation",
+    "organization-detail": "Organisation",
+    "clinics": "Clinics",
+    "clinic-detail": "Clinic",
+    "settings": "Settings",
+    "team": "Team",
+    "preferences": "Preferences",
+    "reports": "Reports",
+    "maintenance": "Maintenance",
+    "parentPortal": "Parent portal",
+    "messages": "Messages",
+    "no-clinic": "No clinic yet",
+    "forbidden": "Access denied",
+    "forgot-password": "Forgot password",
+    "account-access": "Need an account?",
+    "contact": "Contact us",
+    "onboarding": "Create organisation",
+    "accept-invitation": "Accept invitation",
+    "not-found": "Page not found"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signInLede": "Use the email and password for your account.",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "needAccount": "Need an account?",
+    "contactUs": "Contact us",
+    "wrongCredentials": "The email or password is incorrect.",
+    "parentPending": "Your parent account is not active yet. You can sign in once the clinic links your child to your account.",
+    "sessionExpired": "Your session has expired. Sign in again to continue."
+  },
+  "regional": {
+    "language": "Language",
+    "languageHint": "The language for menus, buttons and messages.",
+    "timezone": "Timezone",
+    "timezoneHint": "Dates and times are shown in this timezone.",
+    "dateFormat": "Date format",
+    "timeFormat": "Time format",
+    "currency": "Currency",
+    "currencyHint": "A three-letter code, such as USD, GBP or AED.",
+    "region": "Region",
+    "regionHint": "Sets how dates and numbers are written for this language.",
+    "auto": "Automatic, from the language",
+    "dateFormats": {
+      "dd/mm/yyyy": "Day/month/year (31/12/2026)",
+      "mm/dd/yyyy": "Month/day/year (12/31/2026)",
+      "yyyy-mm-dd": "Year-month-day (2026-12-31)"
+    },
+    "timeFormats": {
+      "12h": "12-hour (2:30 PM)",
+      "24h": "24-hour (14:30)"
+    },
+    "inherit": "Use {level} setting ({value})",
+    "levels": {
+      "organization": "the organisation's",
+      "platform": "the platform's",
+      "default": "the standard"
+    },
+    "source": {
+      "user": "Your choice",
+      "organization": "From your organisation",
+      "platform": "Platform default",
+      "default": "Standard"
+    },
+    "preview": "Preview",
+    "invalidCurrency": "Use a three-letter currency code, such as USD."
+  },
+  "preferences": {
+    "title": "Preferences",
+    "description": "Choose your language, timezone and how dates and times are shown. Anything you leave on its default follows your organisation.",
+    "saved": "Preferences saved",
+    "notSaved": "Preferences not saved"
+  },
+  "settings": {
+    "regionalTitle": "Language and region",
+    "regionalOrgDescription": "Defaults for everyone in {organisation}. People can still choose their own language and timezone in Preferences.",
+    "regionalPlatformTitle": "Platform language and region",
+    "regionalPlatformDescription": "Defaults for every organisation that has not set its own.",
+    "regionalSaved": "Regional settings saved"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "unreachable": "The server could not be reached. Start the API and try again."
+  }
+}

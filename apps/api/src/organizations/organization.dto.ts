@@ -1,6 +1,17 @@
 import { ArrayMaxSize, IsArray, IsEmail, IsIn, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { INVITABLE_ROLES, LOCALES, type AppLocale, type InvitableRole } from '@abapro/shared';
+import {
+  DATE_FORMATS,
+  INVITABLE_ROLES,
+  LOCALES,
+  TIME_FORMATS,
+  type AppLocale,
+  type DateFormat,
+  type InvitableRole,
+  type RegionalSettings,
+  type TimeFormat,
+  type UserPreferences,
+} from '@abapro/shared';
 
 export class InvitationDraftDto {
   @IsEmail()
@@ -170,4 +181,31 @@ export class CreateOrganizationMemberDto {
 
   @IsIn(INVITABLE_ROLES)
   role!: InvitableRole;
+}
+
+/** A user's own language, timezone and formats. Leaving a value out uses the organisation's. */
+export class UserPreferencesDto implements UserPreferences {
+  @IsOptional()
+  @IsIn(LOCALES)
+  locale?: AppLocale;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  timezone?: string;
+
+  @IsOptional()
+  @IsIn(DATE_FORMATS)
+  dateFormat?: DateFormat;
+
+  @IsOptional()
+  @IsIn(TIME_FORMATS)
+  timeFormat?: TimeFormat;
+}
+
+/** Organisation or platform language, timezone, formats and currency. */
+export class RegionalSettingsDto extends UserPreferencesDto implements RegionalSettings {
+  @IsOptional()
+  @Matches(/^[A-Z]{3}$/, { message: 'Use a three-letter currency code, such as USD.' })
+  currency?: string;
 }

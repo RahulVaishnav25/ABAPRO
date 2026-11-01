@@ -18,6 +18,7 @@ import ErrorState from '@/components/ui/ErrorState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { useLoader } from '@/lib/loader';
+import { formatDateTime } from '@/lib/format';
 
 const ENTRY_COLUMNS = [
   { key: 'when', label: 'Date and time' },
@@ -89,7 +90,7 @@ function recorded(entry: SessionHistoryEntry): string {
 const entryRows = computed(() =>
   (history.value?.entries ?? []).map((entry) => ({
     id: entry.id,
-    when: new Date(entry.recordedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
+    when: formatDateTime(entry.recordedAt),
     therapist: entry.therapistName,
     client: entry.clientName,
     task: entry.taskTitle,

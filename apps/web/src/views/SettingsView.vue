@@ -18,6 +18,7 @@ import {
   updatePlatformRoleRequest,
 } from '@/api/resources';
 import BrandingForm from '@/components/branding/BrandingForm.vue';
+import RegionalSettingsSection from '@/components/settings/RegionalSettingsSection.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
@@ -228,6 +229,10 @@ onMounted(async () => {
         <BrandingForm scope="organization" />
       </section>
 
+      <!-- Language and region: platform defaults for super admins, organisation defaults for organisation admins. -->
+      <RegionalSettingsSection v-if="auth.user?.platformAdmin" scope="platform" />
+      <RegionalSettingsSection v-if="canManageOrgBranding" scope="organization" />
+
       <!-- 4. ROLE RULES (Super Admins Only) -->
       <section v-if="auth.user?.platformAdmin" class="settings-card">
         <div class="section-heading">
@@ -270,29 +275,6 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 24px;
-}
-
-.settings-card {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 24px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
-
-.section-heading h2 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--color-ink);
-  margin-bottom: 4px;
-}
-
-.section-desc {
-  font-size: 0.9rem;
-  color: var(--color-text-muted);
 }
 
 .subsection-title {

@@ -1,7 +1,9 @@
 import { ref, type Ref } from 'vue';
+import { translateServerMessage } from '@/i18n';
 
+/** A failure's message in the interface language when it is a known server message, else as sent. */
 export function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  return error instanceof Error ? translateServerMessage(error.message) : fallback;
 }
 
 export interface Loader {

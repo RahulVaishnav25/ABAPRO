@@ -1,3 +1,4 @@
+import type { EffectivePreferences } from './regional';
 import type { Permission, Role } from './permissions';
 
 export interface OrganizationSummary {
@@ -33,12 +34,16 @@ export interface AuthUser {
    * the API refuses the sign-in and ends any session it still has.
    */
   parentAccessPending?: boolean;
+  /** Language, timezone and formats in effect for this user. */
+  preferences?: EffectivePreferences;
 }
 
 export const PARENT_ACCESS_PENDING_MESSAGE =
   'Your parent account is not active yet. You can sign in once the clinic links your child to your account.';
 
 export interface AuthProviderInfo {
+  /** The platform's default interface language, for pages shown before sign-in. */
+  defaultLanguage?: string;
   passwordResetEnabled: boolean;
   embeddedIdentity: boolean;
   mailboxUrl: string | null;

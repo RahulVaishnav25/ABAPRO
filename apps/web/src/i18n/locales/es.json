@@ -1,0 +1,190 @@
+{
+  "common": {
+    "save": "Guardar",
+    "saveChanges": "Guardar cambios",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "back": "Volver",
+    "edit": "Editar",
+    "view": "Ver",
+    "confirm": "Confirmar",
+    "tryAgain": "Intentar de nuevo",
+    "search": "Buscar",
+    "loading": "Cargando…",
+    "none": "Ninguno",
+    "never": "Nunca",
+    "yes": "Sí",
+    "no": "No",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "required": "Obligatorio",
+    "optional": "Opcional",
+    "moreActions": "Más acciones",
+    "useDefault": "Usar el valor predeterminado",
+    "saved": "Guardado",
+    "notSaved": "No guardado",
+    "dismiss": "Descartar"
+  },
+  "nav": {
+    "primary": "Principal",
+    "brandSub": "Gestión terapéutica",
+    "groups": {
+      "organisation": "Organización",
+      "care": "Atención",
+      "administration": "Administración"
+    },
+    "items": {
+      "platform": "Panel",
+      "home": "Panel",
+      "therapy": "Espacio de terapia",
+      "organisations": "Organizaciones",
+      "organisation": "Organización",
+      "clinics": "Clínicas",
+      "children": "Clientes",
+      "programs": "Programas",
+      "tasks": "Tareas",
+      "onboarding": "Incorporación",
+      "settings": "Configuración"
+    },
+    "collapse": "Contraer menú",
+    "expand": "Expandir menú",
+    "openMenu": "Abrir menú",
+    "closeMenu": "Cerrar menú",
+    "breadcrumb": "Ruta de navegación"
+  },
+  "shell": {
+    "skipToContent": "Ir al contenido",
+    "clinic": "Clínica",
+    "clinicNotChanged": "No se cambió la clínica",
+    "notifications": "Notificaciones",
+    "notificationsEmpty": "Está todo al día. Aquí aparecerán los avisos sobre clientes y tareas.",
+    "account": "Cuenta",
+    "myOrganisation": "Mi organización",
+    "preferences": "Preferencias",
+    "language": "Idioma",
+    "signOut": "Cerrar sesión",
+    "signOutMessage": "Tendrá que iniciar sesión de nuevo para ver los registros de la organización.",
+    "signedOut": "Sesión cerrada",
+    "footer": "© {year} Techieora Private Limited"
+  },
+  "states": {
+    "noData": "Todavía no hay nada aquí",
+    "unavailable": "No disponible"
+  },
+  "table": {
+    "search": "Buscar en la tabla",
+    "searchPlaceholder": "Buscar en esta tabla",
+    "noMatches": "No hay registros que coincidan",
+    "noMatchesHint": "Pruebe con otra búsqueda o filtro.",
+    "showing": "Mostrando {start}–{end} de {total}",
+    "sortBy": "Ordenar por {column}"
+  },
+  "routes": {
+    "login": "Iniciar sesión",
+    "dashboard": "Panel",
+    "platform-dashboard": "Panel",
+    "clients": "Clientes",
+    "client-create": "Nuevo cliente",
+    "client-edit": "Editar cliente",
+    "client-profile": "Cliente",
+    "assessments": "Evaluaciones",
+    "assessment-new": "Nueva evaluación",
+    "assessment-edit": "Editar evaluación",
+    "assessment-detail": "Evaluación",
+    "programs": "Programas",
+    "program-new": "Nuevo programa",
+    "program-edit": "Editar programa",
+    "program-detail": "Programa",
+    "tasks": "Tareas",
+    "task-detail": "Vista previa de la tarea",
+    "task-edit": "Editar tarea",
+    "therapy-workspace": "Espacio de terapia",
+    "onboarding-teams": "Equipos",
+    "onboarding-parents": "Padres",
+    "organizations": "Organizaciones",
+    "organization-new": "Crear organización",
+    "organization-detail": "Organización",
+    "clinics": "Clínicas",
+    "clinic-detail": "Clínica",
+    "settings": "Configuración",
+    "team": "Equipo",
+    "preferences": "Preferencias",
+    "reports": "Informes",
+    "maintenance": "Mantenimiento",
+    "parentPortal": "Portal para padres",
+    "messages": "Mensajes",
+    "no-clinic": "Aún no hay clínica",
+    "forbidden": "Acceso denegado",
+    "forgot-password": "Contraseña olvidada",
+    "account-access": "¿Necesita una cuenta?",
+    "contact": "Contacto",
+    "onboarding": "Crear organización",
+    "accept-invitation": "Aceptar invitación",
+    "not-found": "Página no encontrada"
+  },
+  "auth": {
+    "signIn": "Iniciar sesión",
+    "signInLede": "Use el correo electrónico y la contraseña de su cuenta.",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "forgotPassword": "¿Olvidó su contraseña?",
+    "needAccount": "¿Necesita una cuenta?",
+    "contactUs": "Contacto",
+    "wrongCredentials": "El correo electrónico o la contraseña no son correctos.",
+    "parentPending": "Su cuenta de padre o madre aún no está activa. Podrá iniciar sesión cuando la clínica vincule a su hijo o hija con su cuenta.",
+    "sessionExpired": "Su sesión ha caducado. Inicie sesión de nuevo para continuar."
+  },
+  "regional": {
+    "language": "Idioma",
+    "languageHint": "El idioma de los menús, botones y mensajes.",
+    "timezone": "Zona horaria",
+    "timezoneHint": "Las fechas y horas se muestran en esta zona horaria.",
+    "dateFormat": "Formato de fecha",
+    "timeFormat": "Formato de hora",
+    "currency": "Moneda",
+    "currencyHint": "Un código de tres letras, como USD, GBP o AED.",
+    "region": "Región",
+    "regionHint": "Define cómo se escriben las fechas y los números en este idioma.",
+    "auto": "Automático, según el idioma",
+    "dateFormats": {
+      "dd/mm/yyyy": "Día/mes/año (31/12/2026)",
+      "mm/dd/yyyy": "Mes/día/año (12/31/2026)",
+      "yyyy-mm-dd": "Año-mes-día (2026-12-31)"
+    },
+    "timeFormats": {
+      "12h": "12 horas (2:30 p. m.)",
+      "24h": "24 horas (14:30)"
+    },
+    "inherit": "Usar la configuración {level} ({value})",
+    "levels": {
+      "organization": "de la organización",
+      "platform": "de la plataforma",
+      "default": "estándar"
+    },
+    "source": {
+      "user": "Su elección",
+      "organization": "De su organización",
+      "platform": "Predeterminado de la plataforma",
+      "default": "Estándar"
+    },
+    "preview": "Vista previa",
+    "invalidCurrency": "Use un código de moneda de tres letras, como USD."
+  },
+  "preferences": {
+    "title": "Preferencias",
+    "description": "Elija su idioma, su zona horaria y cómo se muestran las fechas y horas. Lo que deje en su valor predeterminado seguirá la configuración de su organización.",
+    "saved": "Preferencias guardadas",
+    "notSaved": "No se guardaron las preferencias"
+  },
+  "settings": {
+    "regionalTitle": "Idioma y región",
+    "regionalOrgDescription": "Valores predeterminados para todas las personas de {organisation}. Cada persona puede elegir su propio idioma y zona horaria en Preferencias.",
+    "regionalPlatformTitle": "Idioma y región de la plataforma",
+    "regionalPlatformDescription": "Valores predeterminados para las organizaciones que no hayan definido los suyos.",
+    "regionalSaved": "Configuración regional guardada"
+  },
+  "errors": {
+    "generic": "Algo salió mal. Inténtelo de nuevo.",
+    "unreachable": "No se pudo conectar con el servidor. Inicie la API e inténtelo de nuevo."
+  }
+}

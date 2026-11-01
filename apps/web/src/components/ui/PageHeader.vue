@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import AppIcon from '@/components/navigation/AppIcon.vue';
+
+const { t } = useI18n();
 
 defineProps<{
   title: string;
@@ -15,7 +18,7 @@ defineProps<{
     <div class="page-heading">
       <RouterLink v-if="backTo" class="page-back" :to="backTo">
         <AppIcon name="arrow-left" class="flip-rtl" :size="16" />
-        {{ backLabel ?? 'Back' }}
+        {{ backLabel ?? t('common.back') }}
       </RouterLink>
       <h1>{{ title }}</h1>
       <p v-if="description">{{ description }}</p>
