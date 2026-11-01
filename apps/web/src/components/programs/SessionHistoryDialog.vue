@@ -113,7 +113,7 @@ const filtered = computed(() => Object.values(filters).some(Boolean));
 </script>
 
 <template>
-  <AppDialog :open="open" :title="`Session History · ${programTitle}`" wide @close="emit('close')">
+  <AppDialog :open="open" :title="`Session History · ${programTitle}`" size="lg" @close="emit('close')">
     <p class="history-intro">
       Every response saved on this program’s tasks, newest first. Records are kept as saved and cannot be changed or removed.
     </p>

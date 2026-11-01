@@ -208,7 +208,7 @@ void load();
       <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="page += 1">Next</AppButton>
     </div>
 
-    <AppDialog :open="onboarding" title="Onboard parent" wide @close="onboarding = false">
+    <AppDialog :open="onboarding" title="Onboard parent" size="lg" @close="onboarding = false">
       <form class="onboard-form" @submit.prevent="onboard">
         <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
         <div class="onboard-grid">
@@ -255,7 +255,7 @@ void load();
       </template>
     </AppDialog>
 
-    <AppDialog :open="linking !== null" :title="`Linked clients · ${linking?.name ?? ''}`" wide @close="linking = null">
+    <AppDialog :open="linking !== null" :title="`Linked clients · ${linking?.name ?? ''}`" size="lg" @close="linking = null">
       <ClientMultiPicker
         v-if="linking"
         v-model="linkIds"
@@ -283,14 +283,14 @@ table {
 
 th,
 td {
-  text-align: left;
+  text-align: start;
   vertical-align: middle;
   padding: 10px 8px;
   border-bottom: 1px solid var(--color-border);
 }
 
 caption {
-  text-align: left;
+  text-align: start;
   font-weight: 700;
   margin-bottom: 8px;
 }

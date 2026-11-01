@@ -91,7 +91,7 @@ onMounted(() => void load());
 <style scoped>
 .stack { display: grid; gap: 12px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-.row { display: grid; gap: 4px; text-align: left; padding: 12px; border: 0; border-bottom: 1px solid var(--color-border); background: transparent; cursor: pointer; }
+.row { display: grid; gap: 4px; text-align: start; padding: 12px; border: 0; border-bottom: 1px solid var(--color-border); background: transparent; cursor: pointer; }
 .note { color: var(--color-text-muted); }
 h2 { margin: 0; }
 </style>

@@ -740,7 +740,7 @@ function handleSubmit(): void {
 
 .required-mark {
   color: var(--color-danger, #d9383a);
-  margin-left: 3px;
+  margin-inline-start: 3px;
 }
 
 .control {
@@ -825,7 +825,7 @@ textarea.control {
   border-radius: 50%;
   border-top-color: #ffffff;
   animation: spin 0.7s linear infinite;
-  margin-right: 6px;
+  margin-inline-end: 6px;
 }
 
 @keyframes spin {

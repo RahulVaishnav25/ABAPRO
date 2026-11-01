@@ -34,6 +34,17 @@ const TASKS_NAV_ITEM: SidebarNavItem = {
 /** Every role sees its items in this order; a role only shows the items it has access to. */
 const NAV_ORDER = ['platform', 'home', 'therapy', 'organisations', 'clinics', 'children', 'programs', 'tasks', 'onboarding', 'settings'];
 
+/** Labelled groups, in NAV_ORDER. Items without a group sit at the top. */
+const NAV_GROUPS: Record<string, string> = {
+  organisations: 'Organisation',
+  clinics: 'Organisation',
+  children: 'Care',
+  programs: 'Care',
+  tasks: 'Care',
+  onboarding: 'Administration',
+  settings: 'Administration',
+};
+
 withDefaults(
   defineProps<{
     collapsed?: boolean;
@@ -95,6 +106,18 @@ const items = computed<SidebarNavItem[]>(() => {
   return navItems.sort((a, b) => NAV_ORDER.indexOf(a.key) - NAV_ORDER.indexOf(b.key));
 });
 
+/** The items split into consecutive groups for display. */
+const sections = computed(() => {
+  const result: Array<{ label: string; items: SidebarNavItem[] }> = [];
+  for (const item of items.value) {
+    const label = NAV_GROUPS[item.key] ?? '';
+    const last = result[result.length - 1];
+    if (last && last.label === label) last.items.push(item);
+    else result.push({ label, items: [item] });
+  }
+  return result;
+});
+
 function isItemActive(item: SidebarNavItem, path: string): boolean {
   if (item.key === 'home') return path === '/';
   if (item.key === 'platform') return path === '/platform';
@@ -132,24 +155,28 @@ function follow(event: MouseEvent, path: string): void {
       </span>
     </div>
     <nav aria-label="Primary">
-      <ul>
-        <li v-for="item in items" :key="item.key">
-          <a
-            :href="item.route"
-            class="nav-link"
-            :class="{ 'is-active': isItemActive(item, route.path) }"
-            :aria-current="isItemActive(item, route.path) ? 'page' : undefined"
-            :title="collapsed ? item.title : undefined"
-            @click="follow($event, item.route)"
-          >
-            <AppIcon :name="item.icon" />
-            <span :class="{ 'visually-hidden': collapsed }">{{ item.title }}</span>
-          </a>
-        </li>
-      </ul>
+      <div v-for="section in sections" :key="section.label || 'main'" class="nav-section">
+        <p v-if="section.label && !collapsed" class="nav-heading">{{ section.label }}</p>
+        <hr v-else-if="section.label" class="nav-divider" />
+        <ul>
+          <li v-for="item in section.items" :key="item.key">
+            <a
+              :href="item.route"
+              class="nav-link"
+              :class="{ 'is-active': isItemActive(item, route.path) }"
+              :aria-current="isItemActive(item, route.path) ? 'page' : undefined"
+              :title="collapsed ? item.title : undefined"
+              @click="follow($event, item.route)"
+            >
+              <AppIcon :name="item.icon" />
+              <span :class="{ 'visually-hidden': collapsed }">{{ item.title }}</span>
+            </a>
+          </li>
+        </ul>
+      </div>
     </nav>
     <button v-if="collapsible" type="button" class="collapse" :aria-expanded="!collapsed" @click="emit('toggle')">
-      <span aria-hidden="true">{{ collapsed ? '›' : '‹' }}</span>
+      <AppIcon :name="collapsed ? 'chevron-right' : 'chevron-left'" class="flip-rtl" :size="16" />
       <span :class="{ 'visually-hidden': collapsed }">{{ collapsed ? 'Expand menu' : 'Collapse menu' }}</span>
     </button>
   </div>
@@ -161,8 +188,8 @@ function follow(event: MouseEvent, path: string): void {
   display: flex;
   flex-direction: column;
   background: var(--color-sidebar);
-  border-right: 1px solid var(--color-border);
-  padding: 16px 12px;
+  border-inline-end: 1px solid var(--color-border);
+  padding: var(--space-4) var(--space-3);
   min-height: 0;
 }
 
@@ -170,36 +197,62 @@ nav {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .brand {
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 4px 8px 16px;
+  padding: 2px var(--space-2) var(--space-5);
 }
 
 .brand-mark-img {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
   object-fit: contain;
   flex-shrink: 0;
+}
+
+.brand-text {
+  min-width: 0;
 }
 
 .brand-name,
 .brand-sub {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand-name {
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .brand-sub {
   color: var(--color-text-muted);
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
+}
+
+.nav-heading {
+  margin: 0 0 6px;
+  padding: 0 var(--space-3);
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.nav-divider {
+  margin: 0 var(--space-2) var(--space-2);
+  border: 0;
+  border-top: 1px solid var(--color-border);
 }
 
 ul {
@@ -215,21 +268,25 @@ ul {
   display: flex;
   gap: 10px;
   align-items: center;
-  min-height: 44px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  color: var(--color-text);
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
   text-decoration: none;
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: 500;
+  transition: background-color var(--transition), color var(--transition);
 }
 
 .nav-link:hover {
-  background: var(--color-surface-muted);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
 }
 
 .nav-link.is-active {
   background: var(--color-primary-soft);
   color: var(--color-primary-ink);
+  font-weight: 600;
 }
 
 .is-collapsed .brand {
@@ -245,20 +302,21 @@ ul {
 .collapse {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  margin-top: 8px;
-  padding: 8px 10px;
+  gap: var(--space-2);
+  min-height: 36px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-3);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-muted);
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
 
 .collapse:hover {
-  background: var(--color-surface-muted);
-  color: var(--color-text);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
 }
 
 .is-collapsed .collapse {

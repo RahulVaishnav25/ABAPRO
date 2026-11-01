@@ -83,7 +83,7 @@ const today = computed(() => {
 </script>
 
 <template>
-  <AppDialog :open="open" :title="`Graph · ${task?.name ?? ''}`" wide @close="emit('close')">
+  <AppDialog :open="open" :title="`Graph · ${task?.name ?? ''}`" size="lg" @close="emit('close')">
     <div class="graph-toolbar">
       <p class="graph-context">{{ task?.programTitle }}<template v-if="today"> · {{ today }}</template></p>
       <AppSelect v-model="range" class="graph-range" label="Range" :options="RANGE_OPTIONS" hide-label />

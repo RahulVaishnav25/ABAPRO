@@ -25,7 +25,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <AppDialog :open="open" :title="title" :description="message" @close="emit('cancel')">
+  <AppDialog :open="open" :title="title" :description="message" size="sm" @close="emit('cancel')">
     <template #footer>
       <AppButton variant="secondary" @click="emit('cancel')">{{ cancelLabel }}</AppButton>
       <AppButton :variant="tone === 'danger' ? 'danger' : 'primary'" @click="emit('confirm')">

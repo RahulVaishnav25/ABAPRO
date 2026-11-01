@@ -54,25 +54,41 @@ const crumbs = computed(() => {
 </template>
 
 <style scoped>
+.breadcrumbs {
+  width: min(var(--content-max), 100%);
+  margin: 0 auto var(--space-3);
+}
+
 ol {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   list-style: none;
-  margin: 0 0 12px;
+  margin: 0;
   padding: 0;
   color: var(--color-text-muted);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 li:not(:last-child)::after {
   content: '/';
-  margin-left: 8px;
-  color: var(--color-text-subtle);
+  margin-inline-start: 6px;
+  color: var(--color-border-strong);
 }
 
 a {
+  color: var(--color-text-muted);
   text-decoration: none;
-  font-weight: 600;
+}
+
+a:hover {
+  color: var(--color-ink);
+  text-decoration: underline;
+}
+
+[aria-current='page'] {
+  color: var(--color-ink);
+  font-weight: 500;
 }
 </style>

@@ -108,7 +108,7 @@ async function openHistory(note: ProgramNote): Promise<void> {
       <p class="panel-hint">Written on the program form for the care team. Not shared with parents.</p>
     </details>
 
-    <AppDialog :open="editorOpen" :title="editing ? 'Edit note' : 'New note'" wide @close="editorOpen = false">
+    <AppDialog :open="editorOpen" :title="editing ? 'Edit note' : 'New note'" size="lg" @close="editorOpen = false">
       <div class="note-form">
         <div class="note-form-row">
           <AppInput v-model="form.title" label="Title" :error="errors.title" required />
@@ -123,7 +123,7 @@ async function openHistory(note: ProgramNote): Promise<void> {
       </template>
     </AppDialog>
 
-    <AppDialog :open="historyNote !== null" :title="`History · ${historyNote?.title ?? ''}`" wide @close="historyNote = null">
+    <AppDialog :open="historyNote !== null" :title="`History · ${historyNote?.title ?? ''}`" size="lg" @close="historyNote = null">
       <SkeletonBlock v-if="!history" height="160px" />
       <ol v-else class="history-list">
         <li v-for="version in history" :key="version.version" class="history-item">

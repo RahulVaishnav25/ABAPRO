@@ -1,5 +1,5 @@
-export type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'mastered';
+export type ButtonVariant = 'primary' | 'secondary' | 'subtle' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface TableColumn {
@@ -22,6 +22,9 @@ export interface SelectGroup {
 export interface TabItem {
   id: string;
   label: string;
+  /** A route: the tabs become page links. */
+  to?: string;
+  count?: number;
 }
 
 export interface RadioOption {

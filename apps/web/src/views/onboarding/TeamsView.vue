@@ -4,7 +4,7 @@ import { INVITABLE_ROLES, PERMISSIONS, ROLE_LABELS, type InvitableRole, type Tea
 import { changeMemberRoleRequest, revokeMemberRequest, teamDirectoryRequest } from '@/api/resources';
 import OnboardingTabs from '@/components/onboarding/OnboardingTabs.vue';
 import TeamMemberForm from '@/components/organization/TeamMemberForm.vue';
-import ActionMenu from '@/components/therapist/ActionMenu.vue';
+import ActionMenu from '@/components/ui/ActionMenu.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import AppInput from '@/components/ui/AppInput.vue';
@@ -194,7 +194,7 @@ void load();
       <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="page += 1">Next</AppButton>
     </div>
 
-    <AppDialog :open="creating" title="Create team member" wide @close="creating = false">
+    <AppDialog :open="creating" title="Create team member" size="lg" @close="creating = false">
       <TeamMemberForm v-if="auth.user?.organization" :organization-id="auth.user.organization.id" :exclude-roles="['parent']" heading="" @created="created">
         <template #actions>
           <AppButton type="button" variant="secondary" @click="creating = false">Cancel</AppButton>
@@ -256,14 +256,14 @@ table {
 
 th,
 td {
-  text-align: left;
+  text-align: start;
   vertical-align: middle;
   padding: 10px 8px;
   border-bottom: 1px solid var(--color-border);
 }
 
 caption {
-  text-align: left;
+  text-align: start;
   font-weight: 700;
   margin-bottom: 8px;
 }

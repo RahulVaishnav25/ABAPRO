@@ -24,7 +24,7 @@ import {
 import { createTaskRequest, toTask, type CreateTaskInput, type TaskItem } from '@/api/tasks';
 import AppIcon from '@/components/navigation/AppIcon.vue';
 import CreateTaskModal from '@/components/programs/CreateTaskModal.vue';
-import type { ActionMenuItem } from '@/components/therapist/ActionMenu.vue';
+import type { ActionMenuItem } from '@/components/ui/ActionMenu.vue';
 import ProgramCard from '@/components/therapist/ProgramCard.vue';
 import RecordDialog from '@/components/therapist/RecordDialog.vue';
 import StatusChangeDialog from '@/components/therapist/StatusChangeDialog.vue';

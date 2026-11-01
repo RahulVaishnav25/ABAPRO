@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import AppButton from './AppButton.vue';
 
 defineProps<{
@@ -13,6 +14,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="error-state" role="alert">
+    <span class="state-icon" aria-hidden="true"><AppIcon name="alert" :size="22" /></span>
     <h2>{{ title }}</h2>
     <p v-if="description">{{ description }}</p>
     <div class="state-actions">

@@ -30,15 +30,39 @@ const icons: Record<string, string[]> = {
   'status-mastered': ['M8 4h8v5a4 4 0 0 1-8 0z', 'M8 6H5a3 3 0 0 0 3 4', 'M16 6h3a3 3 0 0 1-3 4', 'M12 13v4', 'M9 20h6'],
   notification: ['M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9', 'M13.73 21a2 2 0 0 1-3.46 0'],
   bell: ['M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9', 'M13.73 21a2 2 0 0 1-3.46 0'],
+  // General interface icons.
+  close: ['M6 6l12 12', 'M18 6 6 18'],
+  'arrow-left': ['M19 12H5', 'M11 18l-6-6 6-6'],
+  'arrow-right': ['M5 12h14', 'M13 6l6 6-6 6'],
+  'chevron-down': ['M6 9l6 6 6-6'],
+  'chevron-right': ['M9 6l6 6-6 6'],
+  'chevron-left': ['M15 6l-6 6 6 6'],
+  plus: ['M12 5v14', 'M5 12h14'],
+  minus: ['M5 12h14'],
+  check: ['M5 12.5l4.5 4.5L19 7'],
+  search: ['M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z', 'M20 20l-4.8-4.8'],
+  more: ['M12 6.5h.01', 'M12 12h.01', 'M12 17.5h.01'],
+  alert: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 7.5v5', 'M12 16.2h.01'],
+  info: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 11v5', 'M12 7.8h.01'],
+  inbox: ['M4 13h4l1.5 2.5h5L16 13h4', 'M5.5 6h13L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5z'],
+  user: ['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M4.5 20c1.3-3.4 4.1-5 7.5-5s6.2 1.6 7.5 5'],
+  logout: ['M15 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3', 'M10 16l-4-4 4-4', 'M6 12h10'],
+  globe: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M3.5 12h17', 'M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3z'],
+  calendar: ['M5 6h14v14H5z', 'M5 10h14', 'M9 4v4', 'M15 4v4'],
+  file: ['M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z', 'M14 3v5h5'],
+  upload: ['M12 16V4', 'M7 9l5-5 5 5', 'M5 20h14'],
+  menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
 };
 
 defineProps<{
   name: string;
+  /** Pixel size; icons default to 18px. */
+  size?: number;
 }>();
 </script>
 
 <template>
-  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" :style="size ? { width: `${size}px`, height: `${size}px` } : undefined">
     <path
       v-for="(path, index) in icons[name] ?? icons.dashboard"
       :key="index"

@@ -171,7 +171,7 @@ async function uploadFile(activity: HomeActivity): Promise<void> {
       </div>
     </article>
 
-    <AppDialog :open="formOpen" :title="editing ? 'Edit home activity' : 'New home activity'" wide @close="formOpen = false">
+    <AppDialog :open="formOpen" :title="editing ? 'Edit home activity' : 'New home activity'" size="lg" @close="formOpen = false">
       <div class="activity-form">
         <AppInput v-model="form.title" label="Activity title" :error="errors.title" required />
         <AppTextarea v-model="form.instructions" label="Instructions" :rows="4" :error="errors.instructions" placeholder="Step by step, what the parent does with the child." required />
@@ -249,13 +249,13 @@ async function uploadFile(activity: HomeActivity): Promise<void> {
   gap: 12px;
   padding: 14px 16px;
   border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-primary);
+  border-inline-start: 4px solid var(--color-primary);
   border-radius: var(--radius-md, 10px);
   background: var(--color-surface);
 }
 
 .activity-card.is-completed {
-  border-left-color: var(--color-border-strong, var(--color-border));
+  border-inline-start-color: var(--color-border-strong, var(--color-border));
 }
 
 .activity-head {

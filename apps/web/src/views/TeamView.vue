@@ -251,14 +251,14 @@ table {
 }
 
 th, td {
-  text-align: left;
+  text-align: start;
   vertical-align: top;
   padding: 10px 8px;
   border-bottom: 1px solid var(--color-border);
 }
 
 caption {
-  text-align: left;
+  text-align: start;
   font-weight: 700;
   margin-bottom: 8px;
 }

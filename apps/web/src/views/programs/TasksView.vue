@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { careStatusLabel, type ProgramSummary } from '@abapro/shared';
 import { createTaskRequest, tasksRequest, updateTaskRequest, type CreateTaskInput, type TaskItem } from '@/api/tasks';
 import CreateTaskModal from '@/components/programs/CreateTaskModal.vue';
+import ProgramModuleTabs from '@/components/programs/ProgramModuleTabs.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
@@ -200,14 +201,7 @@ onMounted(() => void load());
 <template>
   <PageContainer>
     <!-- Module Tabs under Programs -->
-    <nav class="program-module-tabs" aria-label="Programs navigation">
-      <RouterLink to="/programs" class="module-tab-link">
-        Programs
-      </RouterLink>
-      <RouterLink to="/programs/tasks" class="module-tab-link is-active">
-        Tasks
-      </RouterLink>
-    </nav>
+    <ProgramModuleTabs />
 
     <!-- Page Header with "Create Task" button -->
     <PageHeader
@@ -341,35 +335,6 @@ onMounted(() => void load());
 </template>
 
 <style scoped>
-.program-module-tabs {
-  display: flex;
-  gap: 8px;
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: 20px;
-}
-
-.module-tab-link {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 16px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.module-tab-link:hover {
-  color: var(--color-ink);
-}
-
-.module-tab-link.is-active {
-  color: var(--color-primary-ink);
-  border-bottom-color: var(--color-primary);
-}
-
 .table-wrap {
   overflow-x: auto;
   padding: 12px;
@@ -382,7 +347,7 @@ table {
 
 th,
 td {
-  text-align: left;
+  text-align: start;
   vertical-align: middle;
   padding: 12px 10px;
   border-bottom: 1px solid var(--color-border);
@@ -404,7 +369,7 @@ th button:hover {
 }
 
 caption {
-  text-align: left;
+  text-align: start;
   font-weight: 700;
   padding: 4px 0 12px;
   color: var(--color-text-muted);
@@ -423,7 +388,7 @@ caption {
   padding: 0;
   font: inherit;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
 }
 
 .task-title-link:hover .task-title {

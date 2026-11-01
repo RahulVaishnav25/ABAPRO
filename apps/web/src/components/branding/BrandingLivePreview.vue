@@ -414,7 +414,7 @@ const previewStyles = computed(() => {
 .mock-sidebar {
   width: 190px;
   background: #ffffff;
-  border-right: 1px solid #e2e8f0;
+  border-inline-end: 1px solid #e2e8f0;
   padding: 14px 10px;
   display: flex;
   flex-direction: column;
@@ -475,7 +475,7 @@ const previewStyles = computed(() => {
 .mock-nav-item.active {
   background: var(--preview-primary-soft);
   color: var(--preview-primary);
-  border-left: 3px solid var(--preview-primary);
+  border-inline-start: 3px solid var(--preview-primary);
 }
 
 .mock-nav-icon {

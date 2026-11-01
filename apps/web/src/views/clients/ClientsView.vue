@@ -212,9 +212,9 @@ onMounted(async () => {
 <style scoped>
 .table-wrap { overflow-x: auto; padding: 12px; }
 table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--color-border); }
+th, td { text-align: start; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--color-border); }
 th button { border: 0; background: transparent; font-weight: 700; padding: 0; }
-caption { text-align: left; font-weight: 700; margin-bottom: 8px; }
+caption { text-align: start; font-weight: 700; margin-bottom: 8px; }
 .person { display: flex; gap: 10px; align-items: center; text-decoration: none; color: inherit; }
 .person small, .pager { color: var(--color-text-muted); }
 .person span { display: grid; }

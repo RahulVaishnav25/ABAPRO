@@ -233,7 +233,7 @@ onMounted(() => void load());
 .alert-info {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-primary);
+  border-inline-start: 4px solid var(--color-primary);
   color: var(--color-ink);
 }
 

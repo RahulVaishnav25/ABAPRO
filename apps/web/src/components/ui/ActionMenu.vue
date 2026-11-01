@@ -4,6 +4,8 @@ import { nextTick, onBeforeUnmount, ref } from 'vue';
 export interface ActionMenuItem {
   key: string;
   label: string;
+  /** Destructive items are shown in red, after a divider. */
+  danger?: boolean;
 }
 
 const props = defineProps<{ label: string; items: ActionMenuItem[] }>();
@@ -21,7 +23,15 @@ function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
     close();
     trigger.value?.focus();
+    return;
   }
+  // Arrow keys, Home and End move between the items.
+  const items = [...(root.value?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
+  const index = items.indexOf(document.activeElement as HTMLButtonElement);
+  const next = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: items.length - 1 }[event.key];
+  if (next === undefined || items.length === 0) return;
+  event.preventDefault();
+  items[(next + items.length) % items.length]?.focus();
 }
 
 async function toggle(): Promise<void> {
@@ -74,6 +84,7 @@ onBeforeUnmount(close);
         type="button"
         role="menuitem"
         class="menu-item"
+        :class="{ 'is-danger': item.danger }"
         @click="choose(item.key)"
       >
         {{ item.label }}
@@ -110,14 +121,15 @@ onBeforeUnmount(close);
 .menu {
   position: absolute;
   top: calc(100% + 4px);
-  right: 0;
+  inset-inline-end: 0;
   z-index: 30;
   min-width: 200px;
   padding: 6px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 10px);
-  box-shadow: var(--shadow-md, 0 10px 24px rgba(18, 28, 36, 0.14));
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  animation: dialog-in 0.12s ease;
 }
 
 .menu-item {
@@ -129,14 +141,33 @@ onBeforeUnmount(close);
   background: transparent;
   color: var(--color-ink);
   font: inherit;
-  font-size: 0.9rem;
-  text-align: left;
+  font-size: var(--text-base);
+  text-align: start;
   cursor: pointer;
 }
 
 .menu-item:hover,
 .menu-item:focus-visible {
-  background: var(--color-primary-soft);
+  background: var(--color-surface-sunken);
   outline: none;
+}
+
+.menu-item.is-danger {
+  color: var(--color-danger);
+}
+
+.menu-item.is-danger:first-of-type {
+  margin-top: 0;
+}
+
+.menu-item:not(.is-danger) + .menu-item.is-danger {
+  margin-top: 6px;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+.menu-item.is-danger:hover,
+.menu-item.is-danger:focus-visible {
+  background: var(--color-danger-soft);
 }
 </style>

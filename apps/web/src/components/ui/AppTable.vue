@@ -106,7 +106,7 @@ function rowId(row: Record<string, unknown>): string {
       <AppInput v-model="search" label="Search table" hide-label :placeholder="searchPlaceholder" />
     </div>
     <div class="table-scroll">
-      <table class="data-table" :class="{ 'is-compact': density === 'compact' }">
+      <table class="data-table is-responsive" :class="{ 'is-compact': density === 'compact' }">
         <caption class="visually-hidden">
           {{ caption }}
         </caption>
@@ -136,7 +136,7 @@ function rowId(row: Record<string, unknown>): string {
         </tbody>
         <tbody v-else-if="visibleRows.length > 0">
           <tr v-for="row in visibleRows" :key="rowId(row)">
-            <td v-for="column in columns" :key="column.key" :class="{ 'align-end': column.align === 'end' }">
+            <td v-for="column in columns" :key="column.key" :data-label="column.label" :class="{ 'align-end': column.align === 'end' }">
               <slot :name="`cell-${column.key}`" :row="row" :value="row[column.key]">
                 {{ row[column.key] }}
               </slot>
@@ -152,9 +152,10 @@ function rowId(row: Record<string, unknown>): string {
     </div>
     <div class="pager">
       <p>Showing {{ rangeStart }}–{{ rangeEnd }} of {{ filtered.length }}</p>
-      <div class="pager-actions">
-        <AppButton variant="secondary" size="sm" :disabled="page <= 1" @click="page -= 1">Previous</AppButton>
-        <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="page += 1">Next</AppButton>
+      <div v-if="pageCount > 1" class="pager-actions">
+        <AppButton variant="secondary" size="sm" icon="chevron-left" :disabled="page <= 1" @click="page -= 1">Previous</AppButton>
+        <span class="pager-page">{{ page }} / {{ pageCount }}</span>
+        <AppButton variant="secondary" size="sm" icon-end="chevron-right" :disabled="page >= pageCount" @click="page += 1">Next</AppButton>
       </div>
     </div>
   </section>

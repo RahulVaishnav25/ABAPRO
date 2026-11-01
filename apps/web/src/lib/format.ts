@@ -43,5 +43,6 @@ export function careStatusTone(status: string): BadgeTone {
   if (status === 'in_treatment') return 'success';
   if (status === 'maintenance') return 'info';
   if (status === 'on_hold') return 'warning';
+  if (status === 'mastered') return 'mastered';
   return 'neutral';
 }

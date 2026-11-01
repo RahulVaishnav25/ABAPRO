@@ -65,7 +65,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 }
 
 .app-shell.is-collapsed {
-  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-columns: 72px minmax(0, 1fr);
 }
 
 .sidebar-slot {
@@ -83,7 +83,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 
 .main-body {
   flex: 1;
-  padding: 20px 24px 32px;
+  padding: var(--space-6) var(--space-7) var(--space-9);
 }
 
 .nav-layer {
@@ -101,7 +101,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
   }
 
   .main-body {
-    padding: 16px 16px 24px;
+    padding: var(--space-4) var(--space-4) var(--space-7);
   }
 
   .nav-layer {
@@ -115,21 +115,21 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
     position: absolute;
     inset: 0;
     border: 0;
-    background: rgba(16, 24, 32, 0.4);
+    background: var(--color-overlay);
   }
 
   .nav-drawer {
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 0;
+    inset-inline-start: 0;
     width: min(320px, 86vw);
     background: var(--color-sidebar);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-lg);
   }
 
   .nav-drawer :deep(.sidebar) {
-    border-right: 0;
+    border-inline-end: 0;
   }
 }
 </style>

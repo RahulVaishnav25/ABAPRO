@@ -266,6 +266,10 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+[dir='rtl'] .dropdown-select {
+  background-position: left 8px center;
+}
+
 .dropdown-select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -280,12 +284,12 @@ onBeforeUnmount(() => {
 
 .combobox-input {
   width: 100%;
-  padding-right: 36px;
+  padding-inline-end: 36px;
 }
 
 .combobox-toggle {
   position: absolute;
-  right: 6px;
+  inset-inline-end: 6px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -323,8 +327,8 @@ onBeforeUnmount(() => {
 .combobox-menu {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
   z-index: 50;
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);

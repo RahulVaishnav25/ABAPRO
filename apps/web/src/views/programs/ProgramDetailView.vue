@@ -573,7 +573,7 @@ dd {
 .protocol-card {
   background: var(--color-surface-muted, #f7f9fa);
   border: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-primary);
+  border-inline-start: 3px solid var(--color-primary);
   border-radius: var(--radius-sm);
   padding: 14px 18px;
 }
@@ -596,7 +596,7 @@ dd {
 }
 
 .criteria-card {
-  border-left-color: var(--color-border-strong);
+  border-inline-start-color: var(--color-border-strong);
 }
 
 .criteria-hint {
@@ -639,7 +639,7 @@ dd {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.92rem;
-  text-align: left;
+  text-align: start;
 }
 
 .tasks-table th,
@@ -678,7 +678,7 @@ dd {
   padding: 0;
   font: inherit;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
 }
 
 .task-title-link:hover .task-title {

@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { careStatusLabel, RECORDABLE_STATUSES, type ProgramSummary, type TaskRecordingStatus } from '@abapro/shared';
 import type { TaskItem } from '@/api/tasks';
 import AppIcon from '@/components/navigation/AppIcon.vue';
-import ActionMenu, { type ActionMenuItem } from '@/components/therapist/ActionMenu.vue';
+import ActionMenu, { type ActionMenuItem } from '@/components/ui/ActionMenu.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { careStatusTone } from '@/lib/format';
@@ -98,7 +98,7 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
   padding: 12px;
   background: var(--status-soft);
   border: 1px solid var(--color-border);
-  border-left: 4px solid var(--status-accent);
+  border-inline-start: 4px solid var(--status-accent);
   border-radius: var(--radius-lg);
 }
 
@@ -204,7 +204,7 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
 .is-vertical .task-area {
   flex-direction: column;
   gap: 6px;
-  padding-left: 18px;
+  padding-inline-start: 18px;
 }
 
 .connector {
@@ -258,8 +258,8 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
   position: absolute;
   top: -8px;
   bottom: 0;
-  left: -14px;
-  border-left: 2px solid var(--color-border-strong);
+  inset-inline-start: -14px;
+  border-inline-start: 2px solid var(--color-border-strong);
 }
 
 .is-vertical .task-card:last-child::before {
@@ -270,7 +270,7 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
   content: '';
   position: absolute;
   top: 50%;
-  left: -14px;
+  inset-inline-start: -14px;
   width: 13px;
   border-top: 2px solid var(--color-border-strong);
 }

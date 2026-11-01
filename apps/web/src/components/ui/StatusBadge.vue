@@ -11,5 +11,6 @@ withDefaults(
 </script>
 
 <template>
+  <!-- The text always names the status; the colour and dot only support it. -->
   <span class="badge" :class="`badge-${tone}`">{{ label }}</span>
 </template>
