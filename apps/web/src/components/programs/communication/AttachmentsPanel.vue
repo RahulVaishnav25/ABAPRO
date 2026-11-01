@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ATTACHMENT_TYPES, type ProgramCommunication } from '@abapro/shared';
 import AppButton from '@/components/ui/AppButton.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
@@ -14,6 +15,7 @@ const ACCEPT = [...Object.keys(ATTACHMENT_TYPES), '.doc', '.docx', '.xls', '.xls
 const props = defineProps<{ data: ProgramCommunication }>();
 const emit = defineEmits<{ updated: [data: ProgramCommunication] }>();
 
+const { t } = useI18n();
 const files = ref<File[]>([]);
 const recorder = ref<InstanceType<typeof AudioRecorder> | null>(null);
 const { progress, uploading, upload } = useUpload(() => props.data.programId, (data) => emit('updated', data));
@@ -32,28 +34,31 @@ async function saveRecording(recording: Blob, fileName: string): Promise<void> {
 <template>
   <div class="panel-stack">
     <div v-if="data.canUpload" class="upload-grid">
-      <div class="upload-card">
+      <section class="upload-card">
+        <h3 class="upload-title">{{ t('comms.attachments.uploadTitle') }}</h3>
         <FileUpload
           v-model="files"
-          label="Upload a file"
-          hint="PDF, Word, Excel, PowerPoint, text, CSV, images or audio, up to 10 MB."
+          :label="t('comms.attachments.uploadTitle')"
+          :hint="t('comms.attachments.uploadHint')"
           :accept="ACCEPT"
           :max-size-mb="10"
           :disabled="uploading"
+          class="upload-field"
         />
         <UploadProgress :progress="progress" />
         <div class="upload-actions">
-          <AppButton :disabled="files.length === 0" :loading="uploading" @click="uploadFile">Upload</AppButton>
+          <AppButton icon="upload" :disabled="files.length === 0" :loading="uploading" @click="uploadFile">{{ t('comms.attachments.upload') }}</AppButton>
         </div>
-      </div>
+      </section>
       <AudioRecorder ref="recorder" :saving="uploading" @save="saveRecording" />
     </div>
-    <p v-else-if="data.canWrite" class="panel-hint">Your role cannot upload files. An administrator can allow it under Upload documents.</p>
+    <p v-else-if="data.canWrite" class="panel-hint">{{ t('comms.attachments.noUpload') }}</p>
 
     <EmptyState
       v-if="data.attachments.length === 0"
-      title="No attachments yet"
-      :description="data.canUpload ? 'Upload a document or record audio above.' : 'Files shared by the care team appear here.'"
+      icon="file"
+      :title="t('comms.attachments.empty')"
+      :description="data.canUpload ? t('comms.attachments.emptyUploader') : t('comms.attachments.emptyReader')"
     />
     <AttachmentList v-else :program-id="data.programId" :attachments="data.attachments" />
   </div>
@@ -62,23 +67,39 @@ async function saveRecording(recording: Blob, fileName: string): Promise<void> {
 <style scoped>
 .panel-stack {
   display: grid;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .upload-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
-  align-items: start;
+  gap: var(--space-4);
+  align-items: stretch;
 }
 
 .upload-card {
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
+}
+
+.upload-title {
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+/* The card heading names the zone, so its own label is only for screen readers. */
+.upload-field :deep(> .field-label) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .upload-actions {
@@ -87,8 +108,7 @@ async function saveRecording(recording: Blob, fileName: string): Promise<void> {
 }
 
 .panel-hint {
-  margin: 0;
-  font-size: 0.88rem;
   color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 </style>

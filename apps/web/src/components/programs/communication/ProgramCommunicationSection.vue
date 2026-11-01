@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { ProgramCommunication } from '@abapro/shared';
 import { communicationRequest } from '@/api/communication';
 import AppTabs from '@/components/ui/AppTabs.vue';
@@ -13,19 +14,20 @@ import NotesPanel from './NotesPanel.vue';
 /** Notes, attachments and home activities for one program, shared with the child's parents. */
 const props = defineProps<{ programId: string; legacyNotes: string }>();
 
+const { t } = useI18n();
 const tab = ref('notes');
 const data = ref<ProgramCommunication | null>(null);
 const loader = useLoader(async () => {
   data.value = await communicationRequest(props.programId);
-}, 'Notes and attachments could not be loaded.');
+}, t('comms.error'));
 
 const attachmentCount = computed(() =>
   (data.value?.attachments.length ?? 0) + (data.value?.activities.reduce((sum, activity) => sum + activity.attachments.length, 0) ?? 0),
 );
 const tabs = computed(() => [
-  { id: 'notes', label: `Notes (${data.value?.notes.length ?? 0})` },
-  { id: 'attachments', label: `Attachments (${attachmentCount.value})` },
-  { id: 'activities', label: `Home Activities (${data.value?.activities.filter((activity) => activity.status === 'active').length ?? 0} active)` },
+  { id: 'notes', label: t('comms.tabs.notes'), count: data.value?.notes.length ?? 0 },
+  { id: 'attachments', label: t('comms.tabs.attachments'), count: attachmentCount.value },
+  { id: 'activities', label: t('comms.tabs.activities'), count: data.value?.activities.filter((activity) => activity.status === 'active').length ?? 0 },
 ]);
 
 onMounted(() => void loader.load());
@@ -33,10 +35,10 @@ onMounted(() => void loader.load());
 
 <template>
   <div class="communication">
-    <ErrorState v-if="loader.error.value" title="Notes and attachments unavailable" :description="loader.error.value" @retry="loader.load" />
+    <ErrorState v-if="loader.error.value" :title="t('comms.unavailable')" :description="loader.error.value" @retry="loader.load" />
     <SkeletonBlock v-else-if="!data" height="220px" />
     <template v-else>
-      <AppTabs v-model="tab" :tabs="tabs" label="Notes, attachments and home activities" />
+      <AppTabs v-model="tab" :tabs="tabs" :label="t('comms.tabsLabel')" />
       <div :id="`panel-${tab}`" class="communication-panel" role="tabpanel" :aria-labelledby="`tab-${tab}`">
         <NotesPanel v-if="tab === 'notes'" :data="data" :legacy-notes="legacyNotes" @updated="data = $event" />
         <AttachmentsPanel v-else-if="tab === 'attachments'" :data="data" @updated="data = $event" />
@@ -49,7 +51,7 @@ onMounted(() => void loader.load());
 <style scoped>
 .communication {
   display: grid;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .communication-panel {

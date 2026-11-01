@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { MAX_ATTACHMENT_BYTES } from '@abapro/shared';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import FieldError from '@/components/ui/FieldError.vue';
 
 const props = defineProps<{ saving: boolean }>();
 const emit = defineEmits<{ save: [recording: Blob, fileName: string] }>();
+const { t } = useI18n();
 
 /** Recordings stop on their own at this length, which keeps them well under the upload limit. */
 const MAX_SECONDS = 10 * 60;
@@ -26,12 +29,17 @@ let recorder: MediaRecorder | null = null;
 let stream: MediaStream | null = null;
 let timer: number | undefined;
 
-const clock = computed(() => `${Math.floor(seconds.value / 60)}:${String(seconds.value % 60).padStart(2, '0')}`);
+const clockOf = (total: number) => `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+const clock = computed(() => clockOf(seconds.value));
+const maxClock = clockOf(MAX_SECONDS);
 
 function defaultName(): string {
   const now = new Date();
   const pad = (value: number) => String(value).padStart(2, '0');
-  return `Recording ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}.${pad(now.getMinutes())}`;
+  return t('comms.recorder.defaultName', {
+    date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    time: `${pad(now.getHours())}.${pad(now.getMinutes())}`,
+  });
 }
 
 async function start(): Promise<void> {
@@ -39,7 +47,7 @@ async function start(): Promise<void> {
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch {
-    error.value = 'Allow microphone access in the browser to record.';
+    error.value = t('comms.recorder.micDenied');
     return;
   }
   const mimeType = TYPES.find((type) => MediaRecorder.isTypeSupported(type));
@@ -52,7 +60,7 @@ async function start(): Promise<void> {
     const blob = new Blob(chunks, { type: recorder?.mimeType || mimeType || 'audio/webm' });
     releaseMicrophone();
     if (blob.size > MAX_ATTACHMENT_BYTES) {
-      error.value = 'That recording is larger than 10 MB. Record a shorter one.';
+      error.value = t('comms.recorder.tooLarge');
       state.value = 'idle';
       return;
     }
@@ -106,87 +114,189 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="recorder">
-    <div class="recorder-head">
-      <div>
-        <strong class="recorder-title">Record audio</strong>
-        <p class="recorder-hint">Record a voice note or session audio, then listen back before saving it.</p>
-      </div>
-      <template v-if="supported">
-        <AppButton v-if="state === 'idle'" variant="secondary" @click="start">
-          <span class="rec-dot" aria-hidden="true"></span> Start recording
-        </AppButton>
-        <AppButton v-else-if="state === 'recording'" variant="danger" @click="stop">Stop · {{ clock }}</AppButton>
-      </template>
+  <section class="recorder" :class="`is-${state}`">
+    <h3 class="recorder-title">{{ t('comms.recorder.title') }}</h3>
+    <p class="recorder-hint">{{ supported ? t('comms.recorder.hint') : t('comms.recorder.unsupported') }}</p>
+
+    <!-- Ready to record -->
+    <div v-if="supported && state === 'idle'" class="recorder-stage">
+      <button type="button" class="record-button" @click="start">
+        <span class="record-button-icon" aria-hidden="true"><AppIcon name="mic" :size="24" /></span>
+        <span>{{ t('comms.recorder.start') }}</span>
+      </button>
+      <span class="recorder-limit">{{ t('comms.recorder.limit', { max: maxClock }) }}</span>
     </div>
-    <p v-if="!supported" class="recorder-hint">This browser cannot record audio. Upload an audio file instead.</p>
-    <p v-if="state === 'recording'" class="recorder-live" aria-live="polite">
-      <span class="rec-dot is-live" aria-hidden="true"></span> Recording… {{ clock }} of 10:00
-    </p>
-    <div v-if="state === 'recorded'" class="recorder-review">
+
+    <!-- Recording -->
+    <div v-else-if="state === 'recording'" class="recorder-stage">
+      <p class="recorder-live" aria-live="polite">
+        <span class="rec-dot" aria-hidden="true"></span>
+        {{ t('comms.recorder.recording') }}
+        <span class="recorder-clock">{{ clock }}</span>
+        <span class="recorder-limit">{{ t('comms.recorder.limit', { max: maxClock }) }}</span>
+      </p>
+      <div class="recorder-track" aria-hidden="true">
+        <span class="recorder-fill" :style="{ inlineSize: `${(seconds / MAX_SECONDS) * 100}%` }"></span>
+      </div>
+      <AppButton variant="danger" @click="stop">
+        <span class="stop-square" aria-hidden="true"></span>
+        {{ t('comms.recorder.stop') }} · {{ clock }}
+      </AppButton>
+    </div>
+
+    <!-- Listen back, name and save -->
+    <div v-else-if="state === 'recorded'" class="recorder-review">
+      <p class="recorder-ready"><AppIcon name="check" :size="16" />{{ t('comms.recorder.ready') }}</p>
       <audio controls :src="previewUrl" class="recorder-player"></audio>
-      <AppInput v-model="name" label="Recording name" />
+      <AppInput v-model="name" :label="t('comms.recorder.name')" />
       <div class="recorder-actions">
-        <AppButton variant="secondary" :disabled="props.saving" @click="discard">Discard</AppButton>
-        <AppButton :loading="props.saving" @click="save">Save recording</AppButton>
+        <AppButton variant="ghost" :disabled="props.saving" @click="discard">{{ t('comms.recorder.discard') }}</AppButton>
+        <AppButton icon="upload" :loading="props.saving" @click="save">{{ t('comms.recorder.save') }}</AppButton>
       </div>
     </div>
     <FieldError :message="error" />
-  </div>
+  </section>
 </template>
 
 <style scoped>
 .recorder {
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
-.recorder-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
+.recorder.is-recording {
+  border-color: #f1b3ad;
+  background: #fffafa;
 }
 
 .recorder-title {
   color: var(--color-ink);
+  font-size: var(--text-base);
+  font-weight: 600;
 }
 
 .recorder-hint {
-  margin: 2px 0 0;
-  font-size: 0.85rem;
   color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.recorder-stage {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0 var(--space-2);
+}
+
+.record-button {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.record-button-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #b42318;
+  color: #ffffff;
+  box-shadow: 0 0 0 6px #fdecea;
+  transition: transform 0.12s ease, box-shadow var(--transition);
+}
+
+.record-button:hover .record-button-icon {
+  box-shadow: 0 0 0 9px #fdecea;
+}
+
+.record-button:active .record-button-icon {
+  transform: scale(0.96);
+}
+
+.record-button:focus-visible {
+  outline: none;
+}
+
+.record-button:focus-visible .record-button-icon {
+  box-shadow: 0 0 0 6px #fdecea, var(--focus);
+}
+
+.recorder-limit {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 
 .recorder-live {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-weight: 600;
+  justify-content: center;
+  gap: 4px var(--space-2);
   color: #b42318;
+  font-weight: 600;
+}
+
+.recorder-clock {
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.recorder-track {
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: #fbd9d5;
+}
+
+.recorder-fill {
+  display: block;
+  block-size: 100%;
+  background: #b42318;
+  transition: inline-size 1s linear;
 }
 
 .rec-dot {
-  display: inline-block;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: #b42318;
+  animation: pulse 1s ease-in-out infinite;
 }
 
-.rec-dot.is-live {
-  animation: pulse 1s ease-in-out infinite;
+.stop-square {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: currentColor;
 }
 
 .recorder-review {
   display: grid;
-  gap: 10px;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.recorder-ready {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-success);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
 .recorder-player {
@@ -196,7 +306,7 @@ onBeforeUnmount(() => {
 .recorder-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 @keyframes pulse {
@@ -206,8 +316,12 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rec-dot.is-live {
+  .rec-dot {
     animation: none;
+  }
+
+  .recorder-fill {
+    transition: none;
   }
 }
 </style>

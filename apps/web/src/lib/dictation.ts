@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { onBeforeUnmount, ref } from 'vue';
 
 // The Web Speech API is not in TypeScript's DOM library yet; these are the parts used here.
@@ -27,10 +28,10 @@ function recognizerClass(): SpeechRecognizerClass | null {
 }
 
 const ERRORS: Record<string, string> = {
-  'not-allowed': 'Allow microphone access in the browser to dictate.',
-  'service-not-allowed': 'Allow microphone access in the browser to dictate.',
-  'audio-capture': 'No microphone was found.',
-  network: 'Dictation needs a network connection in this browser.',
+  'not-allowed': 'dictation.notAllowed',
+  'service-not-allowed': 'dictation.notAllowed',
+  'audio-capture': 'dictation.noMicrophone',
+  network: 'dictation.network',
 };
 
 /**
@@ -63,7 +64,7 @@ export function useDictation(onText: (text: string) => void) {
       interim.value = pending;
     };
     recognizer.onerror = (event) => {
-      if (event.error !== 'no-speech' && event.error !== 'aborted') error.value = ERRORS[event.error] ?? 'Dictation stopped. Try again.';
+      if (event.error !== 'no-speech' && event.error !== 'aborted') error.value = i18n.global.t(ERRORS[event.error] ?? 'dictation.stopped');
     };
     recognizer.onend = () => {
       listening.value = false;

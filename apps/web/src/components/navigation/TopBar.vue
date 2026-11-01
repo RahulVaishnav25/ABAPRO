@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import AppIcon from '@/components/navigation/AppIcon.vue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue';
+import { roleName } from '@/i18n';
 
 defineProps<{
   menuOpen?: boolean;
@@ -18,7 +19,7 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const toast = useToastStore();
 const router = useRouter();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const notificationsOpen = ref(false);
 const userOpen = ref(false);
 const confirmOpen = ref(false);
@@ -36,6 +37,13 @@ const initials = computed(() => {
   return (letters || first(auth.user?.email) || '?').toLocaleUpperCase();
 });
 const clinicOptions = computed(() => auth.user?.clinics ?? []);
+/** The user's role in the current language; recomputed when the language changes. */
+const roleText = computed(() => {
+  void locale.value;
+  const user = auth.user;
+  if (!user) return '';
+  return roleName(user.platformAdmin ? 'platform_admin' : user.role, user.roleLabel ?? '');
+});
 
 async function chooseClinic(event: Event): Promise<void> {
   const clinicId = (event.target as HTMLSelectElement).value;
@@ -150,13 +158,13 @@ async function signOut(): Promise<void> {
           class="user-button"
           aria-haspopup="menu"
           :aria-expanded="userOpen"
-          :aria-label="auth.user ? `${auth.user.name}, ${auth.user.roleLabel ?? t('shell.account')}` : t('shell.account')"
+          :aria-label="auth.user ? `${auth.user.name}, ${roleText || t('shell.account')}` : t('shell.account')"
           @click="userOpen = !userOpen"
         >
           <span class="avatar" aria-hidden="true">{{ initials }}</span>
           <span class="user-copy">
             <span class="user-name">{{ auth.user?.name }}</span>
-            <span class="user-role">{{ auth.user?.roleLabel ?? t('shell.account') }}</span>
+            <span class="user-role">{{ roleText || t('shell.account') }}</span>
           </span>
           <AppIcon name="chevron-down" :size="16" class="user-chevron" />
         </button>
@@ -166,7 +174,7 @@ async function signOut(): Promise<void> {
             <div class="user-card-text">
               <strong class="user-card-name">{{ auth.user?.name }}</strong>
               <span v-if="auth.user?.email" class="user-card-detail" :title="auth.user.email">{{ auth.user.email }}</span>
-              <span v-if="auth.user?.roleLabel" class="user-card-role">{{ auth.user.roleLabel }}</span>
+              <span v-if="roleText" class="user-card-role">{{ roleText }}</span>
             </div>
           </div>
           <div class="menu-items">

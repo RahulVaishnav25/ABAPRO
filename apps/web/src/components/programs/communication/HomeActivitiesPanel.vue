@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
-import { ATTACHMENT_TYPES, ROLE_LABELS, type HomeActivity, type HomeActivityStatus, type ProgramCommunication } from '@abapro/shared';
+import { useI18n } from 'vue-i18n';
+import { ATTACHMENT_TYPES, type HomeActivity, type HomeActivityStatus, type ProgramCommunication } from '@abapro/shared';
 import { saveActivityRequest } from '@/api/communication';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import AppInput from '@/components/ui/AppInput.vue';
@@ -15,18 +17,24 @@ import { useToastStore } from '@/stores/toast';
 import AttachmentList from './AttachmentList.vue';
 import UploadProgress from './UploadProgress.vue';
 import { useUpload } from './useUpload';
+import { roleName } from '@/i18n';
 import { formatDayOf } from '@/lib/format';
 
 const ACCEPT = Object.keys(ATTACHMENT_TYPES).join(',');
-const FILTERS: Array<{ value: 'all' | HomeActivityStatus; label: string }> = [
-  { value: 'active', label: 'Active' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'all', label: 'All' },
-];
+const FILTERS: Array<'all' | HomeActivityStatus> = ['active', 'completed', 'all'];
 
 const props = defineProps<{ data: ProgramCommunication }>();
 const emit = defineEmits<{ updated: [data: ProgramCommunication] }>();
 const toast = useToastStore();
+const { t } = useI18n();
+const statusOptions = computed(() => [
+  { value: 'active', label: t('comms.activities.active') },
+  { value: 'completed', label: t('comms.activities.completed') },
+]);
+const emptyTitle = computed(() => {
+  if (props.data.activities.length === 0) return t('comms.activities.emptyAll');
+  return filter.value === 'completed' ? t('comms.activities.emptyCompleted') : t('comms.activities.emptyActive');
+});
 
 const filter = ref<'all' | HomeActivityStatus>('active');
 const shown = computed(() => props.data.activities.filter((activity) => filter.value === 'all' || activity.status === filter.value));
@@ -56,7 +64,7 @@ async function persist(body: typeof form, activity: HomeActivity | null, success
     toast.push({ tone: 'success', title: success, message: body.title.trim() });
     return true;
   } catch (saveError) {
-    toast.push({ tone: 'danger', title: 'Activity was not saved', message: errorMessage(saveError, 'Try again.') });
+    toast.push({ tone: 'danger', title: t('comms.activities.notSaved'), message: errorMessage(saveError, t('errors.generic')) });
     return false;
   } finally {
     saving.value = false;
@@ -64,16 +72,16 @@ async function persist(body: typeof form, activity: HomeActivity | null, success
 }
 
 async function save(): Promise<void> {
-  errors.title = form.title.trim() ? '' : 'Give the activity a title.';
-  errors.instructions = form.instructions.trim() ? '' : 'Add instructions for the parent.';
+  errors.title = form.title.trim() ? '' : t('comms.activities.errors.title');
+  errors.instructions = form.instructions.trim() ? '' : t('comms.activities.errors.instructions');
   if (errors.title || errors.instructions) return;
-  if (await persist(form, editing.value, editing.value ? 'Activity updated' : 'Activity added')) formOpen.value = false;
+  if (await persist(form, editing.value, editing.value ? t('comms.activities.savedEdit') : t('comms.activities.savedNew'))) formOpen.value = false;
 }
 
 function toggleStatus(activity: HomeActivity): void {
   const status: HomeActivityStatus = activity.status === 'active' ? 'completed' : 'active';
   const { title, instructions, purpose, frequency, guidance } = activity;
-  void persist({ title, instructions, purpose, frequency, guidance, status }, activity, status === 'completed' ? 'Marked completed' : 'Marked active');
+  void persist({ title, instructions, purpose, frequency, guidance, status }, activity, status === 'completed' ? t('comms.activities.markedCompleted') : t('comms.activities.markedActive'));
 }
 
 // Supporting files, one activity at a time.
@@ -98,99 +106,107 @@ async function uploadFile(activity: HomeActivity): Promise<void> {
 <template>
   <div class="panel-stack">
     <div class="panel-bar">
-      <div class="activity-filters" role="group" aria-label="Show activities">
+      <div class="activity-filters" role="group" :aria-label="t('comms.activities.show')">
         <button
           v-for="option in FILTERS"
-          :key="option.value"
+          :key="option"
           type="button"
           class="activity-filter"
-          :class="{ 'is-active': filter === option.value }"
-          :aria-pressed="filter === option.value"
-          @click="filter = option.value"
+          :class="{ 'is-active': filter === option }"
+          :aria-pressed="filter === option"
+          @click="filter = option"
         >
-          {{ option.label }} <span class="activity-count">{{ count(option.value) }}</span>
+          {{ t(`comms.activities.filters.${option}`) }} <span class="activity-count">{{ count(option) }}</span>
         </button>
       </div>
-      <AppButton v-if="data.canWrite" @click="openForm(null)">New activity</AppButton>
+      <AppButton v-if="data.canWrite" icon="plus" @click="openForm(null)">{{ t('comms.activities.new') }}</AppButton>
     </div>
-    <p class="panel-hint">Activities for parents to practise with their child at home. Parents see every activity here.</p>
+    <p class="panel-hint">{{ t('comms.activities.hint') }}</p>
 
     <EmptyState
       v-if="shown.length === 0"
-      :title="data.activities.length === 0 ? 'No home activities yet' : `No ${filter === 'completed' ? 'completed' : 'active'} activities`"
-      :description="data.activities.length === 0 && data.canWrite ? 'Add an activity with instructions parents can follow.' : 'Activities appear here when the care team adds them.'"
+      icon="inbox"
+      :title="emptyTitle"
+      :description="data.activities.length === 0 && data.canWrite ? t('comms.activities.emptyWriter') : t('comms.activities.emptyReader')"
     />
 
     <article v-for="activity in shown" :key="activity.id" class="activity-card" :class="`is-${activity.status}`">
       <header class="activity-head">
-        <div>
-          <h3 class="activity-title">{{ activity.title }}</h3>
+        <div class="activity-heading">
+          <h3 class="activity-title" dir="auto">{{ activity.title }}</h3>
           <p class="activity-meta">
-            {{ activity.createdByName }}, {{ ROLE_LABELS[activity.creatorRole] ?? activity.creatorRole }} · Added {{ date(activity.createdAt) }}
-            <template v-if="activity.completedAt"> · Completed {{ date(activity.completedAt) }}</template>
+            <span>{{ activity.createdByName }}, {{ roleName(activity.creatorRole) }}</span>
+            <span>{{ t('comms.activities.added', { date: date(activity.createdAt) }) }}</span>
+            <span v-if="activity.completedAt">{{ t('comms.activities.completedOn', { date: date(activity.completedAt) }) }}</span>
           </p>
         </div>
-        <StatusBadge :tone="activity.status === 'active' ? 'success' : 'neutral'" :label="activity.status === 'active' ? 'Active' : 'Completed'" />
+        <StatusBadge
+          :tone="activity.status === 'active' ? 'success' : 'neutral'"
+          :label="activity.status === 'active' ? t('comms.activities.active') : t('comms.activities.completed')"
+        />
       </header>
 
-      <dl class="activity-details">
-        <div class="activity-detail is-wide">
-          <dt>Instructions</dt>
-          <dd>{{ activity.instructions }}</dd>
+      <div class="activity-instructions">
+        <span class="activity-label">{{ t('comms.activities.instructions') }}</span>
+        <p dir="auto">{{ activity.instructions }}</p>
+      </div>
+      <dl v-if="activity.purpose || activity.frequency || activity.guidance" class="activity-details">
+        <div v-if="activity.purpose">
+          <dt>{{ t('comms.activities.purpose') }}</dt>
+          <dd dir="auto">{{ activity.purpose }}</dd>
         </div>
-        <div v-if="activity.purpose" class="activity-detail">
-          <dt>Purpose</dt>
-          <dd>{{ activity.purpose }}</dd>
+        <div v-if="activity.frequency">
+          <dt>{{ t('comms.activities.frequency') }}</dt>
+          <dd dir="auto">{{ activity.frequency }}</dd>
         </div>
-        <div v-if="activity.frequency" class="activity-detail">
-          <dt>How often</dt>
-          <dd>{{ activity.frequency }}</dd>
-        </div>
-        <div v-if="activity.guidance" class="activity-detail is-wide">
-          <dt>Guidance</dt>
-          <dd>{{ activity.guidance }}</dd>
+        <div v-if="activity.guidance" class="is-wide">
+          <dt>{{ t('comms.activities.guidance') }}</dt>
+          <dd dir="auto">{{ activity.guidance }}</dd>
         </div>
       </dl>
 
       <AttachmentList v-if="activity.attachments.length" compact :program-id="data.programId" :attachments="activity.attachments" />
 
       <div v-if="uploadFor === activity.id" class="activity-upload">
-        <FileUpload v-model="files" label="Supporting file" :accept="ACCEPT" :max-size-mb="10" :disabled="uploading" />
+        <FileUpload v-model="files" :label="t('comms.activities.supportingFile')" :accept="ACCEPT" :max-size-mb="10" :disabled="uploading" />
         <UploadProgress :progress="progress" />
         <div class="activity-actions">
-          <AppButton size="sm" variant="secondary" :disabled="uploading" @click="openUpload(activity)">Cancel</AppButton>
-          <AppButton size="sm" :disabled="files.length === 0" :loading="uploading" @click="uploadFile(activity)">Upload</AppButton>
+          <AppButton size="sm" variant="ghost" :disabled="uploading" @click="openUpload(activity)">{{ t('common.cancel') }}</AppButton>
+          <AppButton size="sm" icon="upload" :disabled="files.length === 0" :loading="uploading" @click="uploadFile(activity)">{{ t('comms.activities.upload') }}</AppButton>
         </div>
       </div>
 
-      <div v-if="data.canWrite" class="activity-actions">
-        <AppButton v-if="data.canUpload && uploadFor !== activity.id" size="sm" variant="ghost" @click="openUpload(activity)">Add file</AppButton>
-        <AppButton size="sm" variant="secondary" @click="openForm(activity)">Edit</AppButton>
-        <AppButton size="sm" variant="secondary" :disabled="saving" @click="toggleStatus(activity)">
-          {{ activity.status === 'active' ? 'Mark completed' : 'Mark active' }}
+      <footer v-if="data.canWrite" class="activity-actions is-footer">
+        <AppButton v-if="data.canUpload && uploadFor !== activity.id" size="sm" variant="ghost" icon="upload" @click="openUpload(activity)">{{ t('comms.activities.addFile') }}</AppButton>
+        <AppButton size="sm" variant="ghost" icon="edit" @click="openForm(activity)">{{ t('comms.activities.edit') }}</AppButton>
+        <AppButton size="sm" variant="secondary" :icon="activity.status === 'active' ? 'check' : undefined" :disabled="saving" @click="toggleStatus(activity)">
+          {{ activity.status === 'active' ? t('comms.activities.markCompleted') : t('comms.activities.markActive') }}
         </AppButton>
-      </div>
+      </footer>
     </article>
 
-    <AppDialog :open="formOpen" :title="editing ? 'Edit home activity' : 'New home activity'" size="lg" @close="formOpen = false">
+    <AppDialog :open="formOpen" :title="editing ? t('comms.activities.editTitle') : t('comms.activities.newTitle')" size="lg" @close="formOpen = false">
       <div class="activity-form">
-        <AppInput v-model="form.title" label="Activity title" :error="errors.title" required />
-        <AppTextarea v-model="form.instructions" label="Instructions" :rows="4" :error="errors.instructions" placeholder="Step by step, what the parent does with the child." required />
-        <AppTextarea v-model="form.purpose" label="Purpose or expected outcome" :rows="2" />
+        <AppInput v-model="form.title" :label="t('comms.activities.title')" :error="errors.title" required />
+        <AppTextarea
+          v-model="form.instructions"
+          :label="t('comms.activities.instructions')"
+          :rows="4"
+          :error="errors.instructions"
+          :placeholder="t('comms.activities.instructionsPlaceholder')"
+          required
+        />
+        <AppTextarea v-model="form.purpose" :label="t('comms.activities.purposeLabel')" :rows="2" />
         <div class="activity-form-row">
-          <AppInput v-model="form.frequency" label="How often or how long" placeholder="e.g. Daily, 10 minutes" />
-          <AppSelect
-            v-model="form.status"
-            label="Status"
-            :options="[{ value: 'active', label: 'Active' }, { value: 'completed', label: 'Completed' }]"
-          />
+          <AppInput v-model="form.frequency" :label="t('comms.activities.frequencyLabel')" :placeholder="t('comms.activities.frequencyPlaceholder')" />
+          <AppSelect v-model="form.status" :label="t('comms.activities.status')" :options="statusOptions" />
         </div>
-        <AppTextarea v-model="form.guidance" label="Additional guidance" :rows="3" placeholder="Tips, what to praise, what to avoid." />
-        <p v-if="!editing && data.canUpload" class="panel-hint">Add supporting files after saving, with Add file on the activity.</p>
+        <AppTextarea v-model="form.guidance" :label="t('comms.activities.guidanceLabel')" :rows="3" :placeholder="t('comms.activities.guidancePlaceholder')" />
+        <p v-if="!editing && data.canUpload" class="panel-hint"><AppIcon name="info" :size="14" />{{ t('comms.activities.filesAfterSave') }}</p>
       </div>
       <template #footer>
-        <AppButton variant="secondary" @click="formOpen = false">Cancel</AppButton>
-        <AppButton :loading="saving" @click="save">{{ editing ? 'Save changes' : 'Save activity' }}</AppButton>
+        <AppButton variant="secondary" @click="formOpen = false">{{ t('common.cancel') }}</AppButton>
+        <AppButton :loading="saving" @click="save">{{ editing ? t('comms.activities.saveChanges') : t('comms.activities.save') }}</AppButton>
       </template>
     </AppDialog>
   </div>
@@ -199,7 +215,7 @@ async function uploadFile(activity: HomeActivity): Promise<void> {
 <style scoped>
 .panel-stack {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .panel-bar {
@@ -207,56 +223,70 @@ async function uploadFile(activity: HomeActivity): Promise<void> {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 16px;
+  gap: var(--space-2) var(--space-4);
 }
 
 .panel-hint {
-  margin: 0;
-  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
+/* Segmented filter */
 .activity-filters {
   display: inline-flex;
-  gap: 6px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
 }
 
 .activity-filter {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-weight: 600;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
   cursor: pointer;
 }
 
 .activity-filter.is-active {
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
-  color: var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
 }
 
 .activity-count {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  text-align: center;
 }
 
 .activity-card {
   display: grid;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
-  border-inline-start: 4px solid var(--color-primary);
-  border-radius: var(--radius-md, 10px);
+  border-inline-start: 3px solid var(--color-success);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
 .activity-card.is-completed {
-  border-inline-start-color: var(--color-border-strong, var(--color-border));
+  border-inline-start-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
 }
 
 .activity-head {
@@ -264,52 +294,77 @@ async function uploadFile(activity: HomeActivity): Promise<void> {
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
+}
+
+.activity-heading {
+  min-width: 0;
 }
 
 .activity-title {
-  margin: 0;
-  font-size: 1rem;
   color: var(--color-ink);
+  font-size: var(--text-md);
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .activity-meta {
-  margin: 2px 0 0;
-  font-size: 0.82rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  margin-top: 2px;
   color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.activity-instructions {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+}
+
+.is-completed .activity-instructions {
+  background: var(--color-surface);
+}
+
+.activity-instructions p {
+  color: var(--color-ink);
+  white-space: pre-line;
+}
+
+.activity-label,
+.activity-details dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 
 .activity-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px 16px;
+  gap: var(--space-3) var(--space-4);
   margin: 0;
 }
 
-.activity-detail.is-wide {
+.activity-details .is-wide {
   grid-column: 1 / -1;
 }
 
-.activity-detail dt {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.activity-detail dd {
+.activity-details dd {
   margin: 2px 0 0;
-  white-space: pre-line;
   color: var(--color-ink);
+  white-space: pre-line;
 }
 
 .activity-upload {
   display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md, 10px);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
 }
 
 .activity-actions {
@@ -319,15 +374,20 @@ async function uploadFile(activity: HomeActivity): Promise<void> {
   gap: 6px;
 }
 
+.activity-actions.is-footer {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
 .activity-form {
   display: grid;
-  gap: 12px;
+  gap: var(--space-4);
 }
 
 .activity-form-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 200px;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 @media (max-width: 600px) {

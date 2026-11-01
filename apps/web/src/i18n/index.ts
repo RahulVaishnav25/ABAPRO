@@ -97,3 +97,9 @@ export function translateServerMessage(message: string): string {
   const key = SERVER_MESSAGES[message];
   return key ? i18n.global.t(key) : message;
 }
+
+/** A role's name in the current language, falling back to the label the server sent. */
+export function roleName(role: string | null | undefined, fallback = ''): string {
+  const key = `roles.${role ?? ''}`;
+  return role && i18n.global.te(key) ? i18n.global.t(key) : fallback || role || '';
+}

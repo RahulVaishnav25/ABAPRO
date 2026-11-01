@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { attachmentTypeLabel, type ProgramAttachment } from '@abapro/shared';
 import { attachmentBlobRequest, formatBytes, saveBlob } from '@/api/communication';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import { errorMessage } from '@/lib/loader';
 import { useToastStore } from '@/stores/toast';
@@ -9,6 +11,22 @@ import { formatDateTime } from '@/lib/format';
 
 const props = defineProps<{ programId: string; attachments: ProgramAttachment[]; compact?: boolean }>();
 const toast = useToastStore();
+const { t, te } = useI18n();
+
+function typeName(attachment: ProgramAttachment): string {
+  const label = attachment.kind === 'audio' ? 'Audio' : attachmentTypeLabel(attachment.contentType);
+  return te(`comms.attachments.types.${label}`) ? t(`comms.attachments.types.${label}`) : label;
+}
+
+/** Icon colour group for a file. */
+function family(attachment: ProgramAttachment): string {
+  if (attachment.kind === 'audio') return 'audio';
+  const type = attachment.contentType;
+  if (type.includes('pdf')) return 'pdf';
+  if (type.startsWith('image/')) return 'image';
+  if (type.includes('sheet') || type.includes('excel') || type.includes('csv')) return 'sheet';
+  return 'doc';
+}
 
 const busy = ref('');
 /** Object URLs of audio loaded for playing, by attachment. */
@@ -19,7 +37,7 @@ async function download(attachment: ProgramAttachment): Promise<void> {
   try {
     saveBlob(await attachmentBlobRequest(props.programId, attachment), attachment.fileName);
   } catch (downloadError) {
-    toast.push({ tone: 'danger', title: 'Download failed', message: errorMessage(downloadError, 'Try again.') });
+    toast.push({ tone: 'danger', title: t('comms.attachments.downloadFailed'), message: errorMessage(downloadError, t('errors.generic')) });
   } finally {
     busy.value = '';
   }
@@ -32,7 +50,7 @@ async function play(attachment: ProgramAttachment): Promise<void> {
     const url = URL.createObjectURL(await attachmentBlobRequest(props.programId, attachment));
     players.value = new Map(players.value).set(attachment.id, url);
   } catch (playError) {
-    toast.push({ tone: 'danger', title: 'Recording could not be loaded', message: errorMessage(playError, 'Try again.') });
+    toast.push({ tone: 'danger', title: t('comms.attachments.playFailed'), message: errorMessage(playError, t('errors.generic')) });
   } finally {
     busy.value = '';
   }
@@ -48,19 +66,16 @@ const uploaded = (iso: string) => formatDateTime(iso);
 <template>
   <ul class="attachment-list" :class="{ 'is-compact': compact }">
     <li v-for="attachment in attachments" :key="attachment.id" class="attachment">
-      <span class="attachment-icon" :class="`is-${attachment.kind}`" aria-hidden="true">
-        <svg v-if="attachment.kind === 'audio'" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-        </svg>
-        <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" />
-        </svg>
+      <span class="attachment-icon" :class="`is-${family(attachment)}`" aria-hidden="true">
+        <AppIcon :name="attachment.kind === 'audio' ? 'mic' : 'file'" :size="18" />
       </span>
       <div class="attachment-body">
-        <strong class="attachment-name">{{ attachment.fileName }}</strong>
+        <strong class="attachment-name" dir="auto">{{ attachment.fileName }}</strong>
         <span class="attachment-meta">
-          {{ attachment.kind === 'audio' ? 'Audio' : attachmentTypeLabel(attachment.contentType) }} · {{ formatBytes(attachment.byteSize) }} ·
-          {{ uploaded(attachment.uploadedAt) }} · {{ attachment.uploadedByName }}
+          <span>{{ typeName(attachment) }}</span>
+          <span>{{ formatBytes(attachment.byteSize) }}</span>
+          <span>{{ uploaded(attachment.uploadedAt) }}</span>
+          <span>{{ attachment.uploadedByName }}</span>
         </span>
         <audio v-if="players.get(attachment.id)" class="attachment-player" controls autoplay :src="players.get(attachment.id)"></audio>
       </div>
@@ -69,14 +84,22 @@ const uploaded = (iso: string) => formatDateTime(iso);
           v-if="attachment.kind === 'audio' && !players.has(attachment.id)"
           size="sm"
           variant="secondary"
+          icon="play"
           :loading="busy === attachment.id"
-          :aria-label="`Play ${attachment.fileName}`"
+          :aria-label="t('comms.attachments.playName', { name: attachment.fileName })"
           @click="play(attachment)"
         >
-          Play
+          {{ t('comms.attachments.play') }}
         </AppButton>
-        <AppButton size="sm" variant="secondary" :disabled="busy === attachment.id" :aria-label="`Download ${attachment.fileName}`" @click="download(attachment)">
-          Download
+        <AppButton
+          size="sm"
+          variant="secondary"
+          icon="download"
+          :disabled="busy === attachment.id"
+          :aria-label="t('comms.attachments.downloadName', { name: attachment.fileName })"
+          @click="download(attachment)"
+        >
+          {{ t('comms.attachments.download') }}
         </AppButton>
       </div>
     </li>
@@ -86,7 +109,7 @@ const uploaded = (iso: string) => formatDateTime(iso);
 <style scoped>
 .attachment-list {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -96,30 +119,54 @@ const uploaded = (iso: string) => formatDateTime(iso);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 12px;
-  padding: 10px 12px;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.attachment:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-xs);
 }
 
 .is-compact .attachment {
-  padding: 8px 10px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-muted);
 }
 
 .attachment-icon {
   display: grid;
   place-items: center;
   flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: var(--color-surface-muted);
-  color: var(--color-primary);
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
+}
+
+/* Each kind of file keeps its colour; the name and type below say what it is. */
+.attachment-icon.is-pdf {
+  background: #fdecea;
+  color: #b42318;
+}
+
+.attachment-icon.is-sheet {
+  background: #e7f6ec;
+  color: #1b6b3a;
+}
+
+.attachment-icon.is-image {
+  background: #eef0fd;
+  color: #3a46b3;
 }
 
 .attachment-icon.is-audio {
-  color: #b45309;
+  background: #fdf3e2;
+  color: #8a4b05;
 }
 
 .attachment-body {
@@ -132,11 +179,15 @@ const uploaded = (iso: string) => formatDateTime(iso);
 .attachment-name {
   overflow-wrap: anywhere;
   color: var(--color-ink);
+  font-weight: 600;
 }
 
 .attachment-meta {
-  font-size: 0.82rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
   color: var(--color-text-muted);
+  font-size: var(--text-xs);
 }
 
 .attachment-player {
