@@ -867,6 +867,10 @@ table.data-table {
   padding: var(--space-4) var(--space-6) var(--space-5);
 }
 
+.dialog-footer.is-centered {
+  justify-content: center;
+}
+
 .dialog-footer:empty {
   padding: 0 0 var(--space-4);
 }

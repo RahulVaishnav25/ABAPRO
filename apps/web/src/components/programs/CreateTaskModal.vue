@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
-import { CARE_STATUS_OPTIONS, careStatusLabel, type CareStatus, type ProgramSummary } from '@abapro/shared';
+import { computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { CARE_STATUSES, type CareStatus, type ProgramSummary } from '@abapro/shared';
 import { taskCriteriaChanged, type CreateTaskInput, type TaskItem } from '@/api/tasks';
+import AppButton from '@/components/ui/AppButton.vue';
 import AppCheckbox from '@/components/ui/AppCheckbox.vue';
+import AppDialog from '@/components/ui/AppDialog.vue';
+import StatusBadge from '@/components/ui/StatusBadge.vue';
+import { careStatusTone } from '@/lib/format';
 
 const props = withDefaults(
   defineProps<{
@@ -13,6 +18,8 @@ const props = withDefaults(
     defaultSd?: string;
     /** When set, creating a task asks which of these programs it belongs to. */
     programs?: ProgramSummary[] | null;
+    /** Whether the preview offers Edit; people without permission to edit programs only view. */
+    canEdit?: boolean;
   }>(),
   {
     mode: 'create',
@@ -20,6 +27,7 @@ const props = withDefaults(
     submitting: false,
     defaultSd: '',
     programs: null,
+    canEdit: true,
   },
 );
 
@@ -29,7 +37,9 @@ const emit = defineEmits<{
   edit: [task: TaskItem];
 }>();
 
+const { t } = useI18n();
 const taskNameInput = ref<HTMLInputElement | null>(null);
+const formId = `task-form-${Math.random().toString(36).slice(2, 8)}`;
 
 const form = reactive<CreateTaskInput & { programId: string; changeReason: string; status: CareStatus; promptUsed: boolean }>({
   name: '',
@@ -66,10 +76,12 @@ const choosesProgram = computed(() => props.mode === 'create' && props.programs 
 const needsReason = computed(() => props.mode === 'edit' && props.task !== null && taskCriteriaChanged(props.task, form));
 
 const modalTitle = computed(() => {
-  if (props.mode === 'edit') return 'Edit Task';
-  if (props.mode === 'preview') return 'Task Preview';
-  return 'Create Task';
+  if (props.mode === 'edit') return t('tasks.modal.editTitle');
+  if (props.mode === 'preview') return t('tasks.modal.previewTitle');
+  return t('tasks.modal.createTitle');
 });
+const phaseName = (phase: string) => (['Baseline', 'Treatment', 'Maintenance', 'Mastered'].includes(phase) ? t(`phases.${phase}`) : phase);
+const programName = computed(() => props.task?.programTitle ?? '');
 
 function clearErrors(): void {
   for (const key of Object.keys(errors) as Array<keyof typeof errors>) errors[key] = '';
@@ -121,34 +133,17 @@ watch(
   },
 );
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && props.open) {
-    event.preventDefault();
-    emit('close');
-  }
-}
-
 watch(
   () => props.open,
-  async (isOpen) => {
-    if (isOpen) {
-      if ((props.mode === 'edit' || props.mode === 'preview') && props.task) {
-        populateFromTask(props.task);
-      } else {
-        resetForm();
-        if (props.defaultSd) {
-          form.sd = props.defaultSd;
-        }
-      }
-      document.addEventListener('keydown', onKeydown);
-      document.body.style.overflow = 'hidden';
-      await nextTick();
-      if (props.mode !== 'preview') {
-        taskNameInput.value?.focus();
-      }
+  (isOpen) => {
+    if (!isOpen) return;
+    if ((props.mode === 'edit' || props.mode === 'preview') && props.task) {
+      populateFromTask(props.task);
     } else {
-      document.removeEventListener('keydown', onKeydown);
-      document.body.style.overflow = '';
+      resetForm();
+      if (props.defaultSd) {
+        form.sd = props.defaultSd;
+      }
     }
   },
   // The task pages mount the modal already open.
@@ -164,11 +159,6 @@ watch(
   },
 );
 
-onBeforeUnmount(() => {
-  document.removeEventListener('keydown', onKeydown);
-  document.body.style.overflow = '';
-});
-
 function handleSubmit(): void {
   if (props.mode === 'preview') return;
 
@@ -177,23 +167,23 @@ function handleSubmit(): void {
   let valid = true;
 
   if (choosesProgram.value && !form.programId) {
-    errors.programId = 'Choose a program.';
+    errors.programId = t('tasks.modal.errors.program');
     valid = false;
   }
 
   if (!form.name.trim()) {
-    errors.name = 'Task Name is required.';
+    errors.name = t('tasks.modal.errors.name');
     valid = false;
     taskNameInput.value?.focus();
   }
 
   if (form.desiredTrials === null || form.desiredTrials === undefined || form.desiredTrials < 1 || form.desiredTrials > 30) {
-    errors.desiredTrials = 'Must be 1 to 30.';
+    errors.desiredTrials = t('tasks.modal.errors.trials');
     valid = false;
   }
 
   if (form.masterySessions === null || form.masterySessions === undefined || form.masterySessions < 1) {
-    errors.masterySessions = 'Must be at least 1.';
+    errors.masterySessions = t('tasks.modal.errors.sessions');
     valid = false;
   }
 
@@ -203,7 +193,7 @@ function handleSubmit(): void {
     form.masteryProbe < 0 ||
     form.masteryProbe > 100
   ) {
-    errors.masteryProbe = 'Must be 0 to 100.';
+    errors.masteryProbe = t('tasks.modal.errors.probe');
     valid = false;
   }
 
@@ -214,7 +204,7 @@ function handleSubmit(): void {
       String(form.baselineSessions).trim() !== '' &&
       Number(form.baselineSessions) < 1
     ) {
-      errors.baselineSessions = 'Must be at least 1.';
+      errors.baselineSessions = t('tasks.modal.errors.sessions');
       valid = false;
     }
 
@@ -224,13 +214,13 @@ function handleSubmit(): void {
       String(form.baselineProbe).trim() !== '' &&
       (Number(form.baselineProbe) < 0 || Number(form.baselineProbe) > 100)
     ) {
-      errors.baselineProbe = 'Must be 0 to 100.';
+      errors.baselineProbe = t('tasks.modal.errors.probe');
       valid = false;
     }
   }
 
   if (needsReason.value && form.changeReason.trim().length < 12) {
-    errors.changeReason = 'Explain the change in at least 12 characters.';
+    errors.changeReason = t('tasks.modal.errors.reason');
     valid = false;
   }
 
@@ -270,577 +260,305 @@ function handleSubmit(): void {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div
-      v-if="open"
-      class="modal-backdrop"
-      role="presentation"
-      @mousedown.self="emit('close')"
-    >
-      <div
-        class="modal-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modal-title"
-      >
-        <!-- Modal Header with Close Icon at Top-Right -->
-        <div class="modal-header">
-          <h2 id="modal-title" class="modal-title">{{ modalTitle }}</h2>
-          <button
-            type="button"
-            class="close-button"
-            aria-label="Close"
-            @click="emit('close')"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+  <AppDialog :open="open" :title="modalTitle" size="md" @close="emit('close')">
+    <!-- Preview: the saved values as a read-only summary. -->
+    <div v-if="mode === 'preview'" class="task-preview">
+      <div class="preview-head">
+        <h3 class="preview-name">{{ form.name }}</h3>
+        <StatusBadge :tone="careStatusTone(form.status)" :label="t(`status.${form.status}`)" />
+      </div>
+      <p v-if="programName" class="preview-program">{{ programName }}</p>
+      <dl class="detail-list">
+        <div>
+          <dt>{{ t('tasks.modal.phase') }}</dt>
+          <dd>{{ phaseName(form.phase) }}</dd>
         </div>
-
-        <form class="modal-form" novalidate @submit.prevent="handleSubmit">
-          <template v-if="choosesProgram">
-            <div class="field-group">
-              <div class="field">
-                <label class="field-label" for="task-program">
-                  Program<span class="required-mark" aria-hidden="true">*</span>
-                </label>
-                <select
-                  id="task-program"
-                  v-model="form.programId"
-                  class="control"
-                  required
-                  :aria-invalid="errors.programId ? 'true' : undefined"
-                  :aria-describedby="errors.programId ? 'task-program-error' : undefined"
-                >
-                  <option value="" disabled>Choose a program</option>
-                  <option v-for="program in programs" :key="program.id" :value="program.id">
-                    {{ program.title }} · {{ program.clientName }}
-                  </option>
-                </select>
-                <p v-if="errors.programId" id="task-program-error" class="field-error">{{ errors.programId }}</p>
-              </div>
-            </div>
-
-            <div class="field-divider" aria-hidden="true"></div>
-          </template>
-
-          <!-- Field Group 1: Task Name (Full-width text field; required) -->
-          <div class="field-group">
-            <div class="field">
-              <label class="field-label" for="task-name">
-                Task Name<span v-if="mode !== 'preview'" class="required-mark" aria-hidden="true">*</span>
-              </label>
-              <input
-                v-if="mode !== 'preview'"
-                id="task-name"
-                ref="taskNameInput"
-                v-model="form.name"
-                type="text"
-                class="control"
-                placeholder="Enter task name"
-                required
-                :aria-invalid="errors.name ? 'true' : undefined"
-                :aria-describedby="errors.name ? 'task-name-error' : undefined"
-              />
-              <input
-                v-else
-                id="task-name"
-                :value="form.name"
-                type="text"
-                class="control"
-                readonly
-              />
-              <p v-if="errors.name && mode !== 'preview'" id="task-name-error" class="field-error">{{ errors.name }}</p>
-            </div>
+        <div>
+          <dt>{{ t('tasks.modal.desiredTrials') }}</dt>
+          <dd>{{ form.desiredTrials }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('tasks.modal.masterySessions') }}</dt>
+          <dd>{{ form.masterySessions }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('tasks.modal.masteryProbe') }}</dt>
+          <dd>{{ form.masteryProbe }}%</dd>
+        </div>
+        <template v-if="form.phase === 'Baseline'">
+          <div>
+            <dt>{{ t('tasks.modal.baselineSessions') }}</dt>
+            <dd>{{ form.baselineSessions ?? '—' }}</dd>
           </div>
-
-          <div class="field-divider" aria-hidden="true"></div>
-
-          <!-- Field Group 2: Desired Trials and Phase (Side by Side) -->
-          <div class="field-group side-by-side">
-            <div class="field">
-              <label class="field-label" for="desired-trials">Desired Trials</label>
-              <input
-                v-if="mode !== 'preview'"
-                id="desired-trials"
-                v-model.number="form.desiredTrials"
-                type="number"
-                min="1"
-                max="30"
-                step="1"
-                class="control"
-                :aria-invalid="errors.desiredTrials ? 'true' : undefined"
-              />
-              <input
-                v-else
-                id="desired-trials"
-                :value="form.desiredTrials"
-                type="text"
-                class="control"
-                readonly
-              />
-              <p v-if="errors.desiredTrials && mode !== 'preview'" class="field-error">{{ errors.desiredTrials }}</p>
-            </div>
-
-            <div class="field">
-              <label class="field-label" for="task-phase">Phase</label>
-              <select
-                v-if="mode !== 'preview'"
-                id="task-phase"
-                v-model="form.phase"
-                class="control"
-              >
-                <option value="Treatment">Treatment</option>
-                <option value="Baseline">Baseline</option>
-                <option v-if="extraPhase" :value="extraPhase">{{ extraPhase }}</option>
-              </select>
-              <input
-                v-else
-                id="task-phase"
-                :value="form.phase"
-                type="text"
-                class="control"
-                readonly
-              />
-            </div>
+          <div>
+            <dt>{{ t('tasks.modal.baselineProbe') }}</dt>
+            <dd>{{ form.baselineProbe ?? 100 }}%</dd>
           </div>
-
-          <template v-if="mode !== 'create'">
-            <div class="field-divider" aria-hidden="true"></div>
-
-            <div class="field-group">
-              <div class="field">
-                <label class="field-label" for="task-status">Status</label>
-                <select
-                  v-if="mode === 'edit'"
-                  id="task-status"
-                  v-model="form.status"
-                  class="control"
-                >
-                  <option v-for="option in CARE_STATUS_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
-                </select>
-                <input
-                  v-else
-                  id="task-status"
-                  :value="careStatusLabel(form.status)"
-                  type="text"
-                  class="control"
-                  readonly
-                />
-              </div>
-            </div>
-          </template>
-
-          <!-- Conditional Baseline Fields (When Phase = Baseline) -->
-          <template v-if="form.phase === 'Baseline'">
-            <div class="field-divider" aria-hidden="true"></div>
-
-            <div class="field-group side-by-side">
-              <div class="field">
-                <label class="field-label" for="baseline-sessions">Baseline Sessions</label>
-                <input
-                  v-if="mode !== 'preview'"
-                  id="baseline-sessions"
-                  v-model.number="form.baselineSessions"
-                  type="number"
-                  min="1"
-                  step="1"
-                  class="control"
-                  placeholder="e.g. 3"
-                  :aria-invalid="errors.baselineSessions ? 'true' : undefined"
-                />
-                <input
-                  v-else
-                  id="baseline-sessions"
-                  :value="form.baselineSessions ?? '—'"
-                  type="text"
-                  class="control"
-                  readonly
-                />
-                <p v-if="errors.baselineSessions && mode !== 'preview'" class="field-error">{{ errors.baselineSessions }}</p>
-              </div>
-
-              <div class="field">
-                <label class="field-label" for="baseline-probe">Baseline Probe %</label>
-                <input
-                  v-if="mode !== 'preview'"
-                  id="baseline-probe"
-                  v-model.number="form.baselineProbe"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  class="control"
-                  :aria-invalid="errors.baselineProbe ? 'true' : undefined"
-                />
-                <input
-                  v-else
-                  id="baseline-probe"
-                  :value="form.baselineProbe !== undefined ? form.baselineProbe + '%' : '100%'"
-                  type="text"
-                  class="control"
-                  readonly
-                />
-                <p v-if="errors.baselineProbe && mode !== 'preview'" class="field-error">{{ errors.baselineProbe }}</p>
-              </div>
-            </div>
-          </template>
-
-          <div class="field-divider" aria-hidden="true"></div>
-
-          <!-- Field Group 3: Mastery Sessions and Mastery Probe % (Side by Side) -->
-          <div class="field-group side-by-side">
-            <div class="field">
-              <label class="field-label" for="mastery-sessions">Mastery Sessions</label>
-              <input
-                v-if="mode !== 'preview'"
-                id="mastery-sessions"
-                v-model.number="form.masterySessions"
-                type="number"
-                min="1"
-                step="1"
-                class="control"
-                :aria-invalid="errors.masterySessions ? 'true' : undefined"
-              />
-              <input
-                v-else
-                id="mastery-sessions"
-                :value="form.masterySessions"
-                type="text"
-                class="control"
-                readonly
-              />
-              <p v-if="errors.masterySessions && mode !== 'preview'" class="field-error">{{ errors.masterySessions }}</p>
-            </div>
-
-            <div class="field">
-              <label class="field-label" for="mastery-probe">Mastery Probe %</label>
-              <input
-                v-if="mode !== 'preview'"
-                id="mastery-probe"
-                v-model.number="form.masteryProbe"
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                class="control"
-                :aria-invalid="errors.masteryProbe ? 'true' : undefined"
-              />
-              <input
-                v-else
-                id="mastery-probe"
-                :value="form.masteryProbe !== undefined ? form.masteryProbe + '%' : '100%'"
-                type="text"
-                class="control"
-                readonly
-              />
-              <p v-if="errors.masteryProbe && mode !== 'preview'" class="field-error">{{ errors.masteryProbe }}</p>
-            </div>
-          </div>
-
-          <div class="field-divider" aria-hidden="true"></div>
-
-          <!-- Field Group 4: SD (Full-width multiline text field with helper text) -->
-          <div class="field-group">
-            <div class="field">
-              <label class="field-label" for="task-sd">SD</label>
-              <textarea
-                v-if="mode !== 'preview'"
-                id="task-sd"
-                v-model="form.sd"
-                rows="3"
-                class="control"
-                placeholder="Enter discriminative stimulus instructions"
-                aria-describedby="task-sd-hint"
-              ></textarea>
-              <textarea
-                v-else
-                id="task-sd"
-                :value="form.sd || 'No discriminative stimulus specified.'"
-                rows="3"
-                class="control"
-                readonly
-                aria-describedby="task-sd-hint"
-              ></textarea>
-              <p id="task-sd-hint" class="field-hint">Based on current target.</p>
-            </div>
-          </div>
-
-          <div class="field-divider" aria-hidden="true"></div>
-
-          <div class="field-group">
-            <AppCheckbox v-model="form.promptUsed" label="Prompt Used" :disabled="mode === 'preview'" />
-          </div>
-
-          <template v-if="needsReason">
-            <div class="field-divider" aria-hidden="true"></div>
-
-            <div class="field-group">
-              <div class="field">
-                <label class="field-label" for="task-change-reason">
-                  Reason for change<span class="required-mark" aria-hidden="true">*</span>
-                </label>
-                <textarea
-                  id="task-change-reason"
-                  v-model="form.changeReason"
-                  rows="2"
-                  class="control"
-                  placeholder="Why are the trials, mastery criteria or status changing?"
-                  :aria-invalid="errors.changeReason ? 'true' : undefined"
-                  aria-describedby="task-change-reason-hint"
-                ></textarea>
-                <p v-if="errors.changeReason" class="field-error">{{ errors.changeReason }}</p>
-                <p id="task-change-reason-hint" class="field-hint">Saved with the target's configuration history.</p>
-              </div>
-            </div>
-          </template>
-
-          <div class="field-divider" aria-hidden="true"></div>
-
-          <!-- Centered Red Submit / Action Button -->
-          <div class="modal-actions-center">
-            <button
-              v-if="mode !== 'preview'"
-              type="submit"
-              class="btn btn-danger btn-submit-red"
-              :disabled="submitting"
-            >
-              <span v-if="submitting" class="spinner" aria-hidden="true"></span>
-              {{ mode === 'edit' ? 'Save Changes' : 'Submit' }}
-            </button>
-            <button
-              v-else-if="props.task"
-              type="button"
-              class="btn btn-danger btn-submit-red"
-              @click="emit('edit', props.task)"
-            >
-              Edit Task
-            </button>
-            <button
-              v-else
-              type="button"
-              class="btn btn-danger btn-submit-red"
-              @click="emit('close')"
-            >
-              Close
-            </button>
-          </div>
-        </form>
+        </template>
+        <div>
+          <dt>{{ t('tasks.modal.promptUsed') }}</dt>
+          <dd>{{ form.promptUsed ? t('tasks.modal.yes') : t('tasks.modal.no') }}</dd>
+        </div>
+      </dl>
+      <div class="preview-sd">
+        <span class="preview-label">{{ t('tasks.modal.sd') }}</span>
+        <p>{{ form.sd || t('tasks.modal.noSd') }}</p>
       </div>
     </div>
-  </Teleport>
+
+    <form v-else :id="formId" class="task-form" novalidate @submit.prevent="handleSubmit">
+      <section class="task-section">
+        <h3 class="task-section-title">{{ t('tasks.modal.basics') }}</h3>
+        <div v-if="choosesProgram" class="field">
+          <label class="field-label" for="task-program">
+            {{ t('tasks.modal.program') }}<span class="required-mark" aria-hidden="true">*</span>
+          </label>
+          <select
+            id="task-program"
+            v-model="form.programId"
+            class="control"
+            required
+            :aria-invalid="errors.programId ? 'true' : undefined"
+            :aria-describedby="errors.programId ? 'task-program-error' : undefined"
+          >
+            <option value="" disabled>{{ t('tasks.modal.chooseProgram') }}</option>
+            <option v-for="program in programs" :key="program.id" :value="program.id">{{ program.title }} · {{ program.clientName }}</option>
+          </select>
+          <p v-if="errors.programId" id="task-program-error" class="field-error">{{ errors.programId }}</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="task-name">{{ t('tasks.modal.name') }}<span class="required-mark" aria-hidden="true">*</span></label>
+          <input
+            id="task-name"
+            ref="taskNameInput"
+            v-model="form.name"
+            type="text"
+            class="control"
+            :placeholder="t('tasks.modal.namePlaceholder')"
+            required
+            :aria-invalid="errors.name ? 'true' : undefined"
+            :aria-describedby="errors.name ? 'task-name-error' : undefined"
+          />
+          <p v-if="errors.name" id="task-name-error" class="field-error">{{ errors.name }}</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="task-sd">{{ t('tasks.modal.sd') }}</label>
+          <textarea id="task-sd" v-model="form.sd" rows="2" class="control" :placeholder="t('tasks.modal.sdPlaceholder')" aria-describedby="task-sd-hint"></textarea>
+          <p id="task-sd-hint" class="field-hint">{{ t('tasks.modal.sdHint') }}</p>
+        </div>
+      </section>
+
+      <section class="task-section">
+        <h3 class="task-section-title">{{ t('tasks.modal.trialsSection') }}</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label" for="desired-trials">{{ t('tasks.modal.desiredTrials') }}</label>
+            <input
+              id="desired-trials"
+              v-model.number="form.desiredTrials"
+              type="number"
+              min="1"
+              max="30"
+              step="1"
+              class="control"
+              :aria-invalid="errors.desiredTrials ? 'true' : undefined"
+              :aria-describedby="errors.desiredTrials ? 'desired-trials-error' : 'desired-trials-hint'"
+            />
+            <p v-if="errors.desiredTrials" id="desired-trials-error" class="field-error">{{ errors.desiredTrials }}</p>
+            <p v-else id="desired-trials-hint" class="field-hint">{{ t('tasks.modal.desiredTrialsHint') }}</p>
+          </div>
+          <div class="field">
+            <label class="field-label" for="task-phase">{{ t('tasks.modal.phase') }}</label>
+            <select id="task-phase" v-model="form.phase" class="control">
+              <option value="Treatment">{{ phaseName('Treatment') }}</option>
+              <option value="Baseline">{{ phaseName('Baseline') }}</option>
+              <option v-if="extraPhase" :value="extraPhase">{{ phaseName(extraPhase) }}</option>
+            </select>
+          </div>
+          <div v-if="mode === 'edit'" class="field">
+            <label class="field-label" for="task-status">{{ t('tasks.modal.status') }}</label>
+            <select id="task-status" v-model="form.status" class="control">
+              <option v-for="value in CARE_STATUSES" :key="value" :value="value">{{ t(`status.${value}`) }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="prompt-used">
+          <AppCheckbox v-model="form.promptUsed" :label="t('tasks.modal.promptUsed')" />
+          <p class="field-hint">{{ t('tasks.modal.promptUsedHint') }}</p>
+        </div>
+      </section>
+
+      <section class="task-section">
+        <h3 class="task-section-title">{{ t('tasks.modal.masterySection') }}</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label" for="mastery-sessions">{{ t('tasks.modal.masterySessions') }}</label>
+            <input
+              id="mastery-sessions"
+              v-model.number="form.masterySessions"
+              type="number"
+              min="1"
+              step="1"
+              class="control"
+              :aria-invalid="errors.masterySessions ? 'true' : undefined"
+              :aria-describedby="errors.masterySessions ? 'mastery-sessions-error' : undefined"
+            />
+            <p v-if="errors.masterySessions" id="mastery-sessions-error" class="field-error">{{ errors.masterySessions }}</p>
+          </div>
+          <div class="field">
+            <label class="field-label" for="mastery-probe">{{ t('tasks.modal.masteryProbe') }}</label>
+            <input
+              id="mastery-probe"
+              v-model.number="form.masteryProbe"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              class="control"
+              :aria-invalid="errors.masteryProbe ? 'true' : undefined"
+              :aria-describedby="errors.masteryProbe ? 'mastery-probe-error' : undefined"
+            />
+            <p v-if="errors.masteryProbe" id="mastery-probe-error" class="field-error">{{ errors.masteryProbe }}</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Revealed only for Baseline tasks. -->
+      <section v-if="form.phase === 'Baseline'" class="task-section is-revealed">
+        <h3 class="task-section-title">{{ t('tasks.modal.baselineSection') }}</h3>
+        <p class="field-hint">{{ t('tasks.modal.baselineHint') }}</p>
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label" for="baseline-sessions">{{ t('tasks.modal.baselineSessions') }}</label>
+            <input
+              id="baseline-sessions"
+              v-model.number="form.baselineSessions"
+              type="number"
+              min="1"
+              step="1"
+              class="control"
+              placeholder="3"
+              :aria-invalid="errors.baselineSessions ? 'true' : undefined"
+              :aria-describedby="errors.baselineSessions ? 'baseline-sessions-error' : undefined"
+            />
+            <p v-if="errors.baselineSessions" id="baseline-sessions-error" class="field-error">{{ errors.baselineSessions }}</p>
+          </div>
+          <div class="field">
+            <label class="field-label" for="baseline-probe">{{ t('tasks.modal.baselineProbe') }}</label>
+            <input
+              id="baseline-probe"
+              v-model.number="form.baselineProbe"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              class="control"
+              :aria-invalid="errors.baselineProbe ? 'true' : undefined"
+              :aria-describedby="errors.baselineProbe ? 'baseline-probe-error' : undefined"
+            />
+            <p v-if="errors.baselineProbe" id="baseline-probe-error" class="field-error">{{ errors.baselineProbe }}</p>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="needsReason" class="task-section is-revealed">
+        <div class="field">
+          <label class="field-label" for="task-change-reason">
+            {{ t('tasks.modal.changeReason') }}<span class="required-mark" aria-hidden="true">*</span>
+          </label>
+          <textarea
+            id="task-change-reason"
+            v-model="form.changeReason"
+            rows="2"
+            class="control"
+            :placeholder="t('tasks.modal.changeReasonPlaceholder')"
+            :aria-invalid="errors.changeReason ? 'true' : undefined"
+            aria-describedby="task-change-reason-hint"
+          ></textarea>
+          <p v-if="errors.changeReason" class="field-error">{{ errors.changeReason }}</p>
+          <p id="task-change-reason-hint" class="field-hint">{{ t('tasks.modal.changeReasonHint') }}</p>
+        </div>
+      </section>
+    </form>
+
+    <template #footer>
+      <AppButton type="button" variant="secondary" @click="emit('close')">{{ mode === 'preview' ? t('common.close') : t('common.cancel') }}</AppButton>
+      <AppButton v-if="mode === 'preview' && props.task && canEdit" type="button" icon="edit" @click="emit('edit', props.task)">{{ t('tasks.modal.editTask') }}</AppButton>
+      <AppButton v-else-if="mode !== 'preview'" type="submit" :form="formId" :loading="submitting">
+        {{ mode === 'edit' ? t('tasks.modal.save') : t('tasks.modal.submit') }}
+      </AppButton>
+    </template>
+  </AppDialog>
 </template>
 
 <style scoped>
-/* Dimmed backdrop behind the modal */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgba(18, 28, 36, 0.48);
+.task-form {
   display: grid;
-  place-items: center;
-  padding: 16px;
-  overflow-y: auto;
+  gap: var(--space-5);
 }
 
-/* White modal with rounded corners and padding */
-.modal-card {
-  width: min(520px, 100%);
-  background: #ffffff;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 16px 36px rgba(18, 28, 36, 0.16), 0 4px 12px rgba(18, 28, 36, 0.08);
-  padding: 24px 28px;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  margin: auto;
+.task-section {
+  display: grid;
+  gap: var(--space-3);
 }
 
-/* Header with close icon at top-right */
-.modal-header {
+.task-section + .task-section {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.task-section.is-revealed {
+  animation: reveal 0.18s ease;
+}
+
+.task-section-title {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.prompt-used .field-hint {
+  margin-top: 2px;
+  padding-inline-start: 28px;
+}
+
+.task-preview {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.preview-head {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  gap: var(--space-2);
 }
 
-.modal-title {
-  margin: 0;
-  font-size: 1.28rem;
-  font-weight: 700;
-  color: var(--color-ink);
+.preview-name {
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
 }
 
-.close-button {
-  background: transparent;
-  border: 0;
-  padding: 6px;
-  cursor: pointer;
+.preview-program,
+.preview-label {
   color: var(--color-text-muted);
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  font-size: var(--text-sm);
 }
 
-.close-button:hover {
-  color: var(--color-ink);
-  background-color: var(--color-surface-muted);
-}
-
-.close-button:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.modal-form {
-  display: flex;
-  flex-direction: column;
-}
-
-.field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* Side by side layout for specified inputs */
-.field-group.side-by-side {
+.preview-sd {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  white-space: pre-wrap;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field-label {
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.required-mark {
-  color: var(--color-danger, #d9383a);
-  margin-inline-start: 3px;
-}
-
-.control {
-  width: 100%;
-  padding: 9px 12px;
-  font-size: 0.95rem;
-  color: var(--color-ink);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm, 6px);
-  font-family: inherit;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.control:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft, #e7f4f2);
-}
-
-select.control {
-  cursor: pointer;
-}
-
-textarea.control {
-  resize: vertical;
-  min-height: 72px;
-}
-
-.control[readonly] {
-  background-color: var(--color-surface-muted, #f8fafc);
-  color: var(--color-ink);
-  cursor: default;
-  border-color: var(--color-border);
-}
-
-.control[readonly]:focus {
-  border-color: var(--color-border);
-  box-shadow: none;
-  outline: none;
-}
-
-.field-hint {
-  margin: 2px 0 0;
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-}
-
-.field-error {
-  margin: 2px 0 0;
-  font-size: 0.82rem;
-  color: var(--color-danger, #d9383a);
-  font-weight: 600;
-}
-
-/* Subtle dividers between field groups */
-.field-divider {
-  height: 1px;
-  background-color: var(--color-border-subtle, #edf2f7);
-  margin: 16px 0;
-}
-
-/* Centered red submit button */
-.modal-actions-center {
-  display: flex;
-  justify-content: center;
-  margin-top: 4px;
-}
-
-.btn-submit-red {
-  min-width: 140px;
-  padding: 10px 24px;
-  font-weight: 600;
-  border-radius: var(--radius-sm, 6px);
-}
-
-.spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-radius: 50%;
-  border-top-color: #ffffff;
-  animation: spin 0.7s linear infinite;
-  margin-inline-end: 6px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 540px) {
-  .field-group.side-by-side {
-    grid-template-columns: 1fr;
-  }
-
-  .modal-card {
-    padding: 20px 16px;
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 </style>

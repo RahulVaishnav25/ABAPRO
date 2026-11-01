@@ -12,8 +12,10 @@ const props = withDefaults(
     description?: string;
     /** sm for confirmations, md for most forms, lg for graphs, tables and long forms. The body scrolls when tall. */
     size?: 'sm' | 'md' | 'lg';
+    /** Centre the footer actions, for a single main action. */
+    footerAlign?: 'end' | 'center';
   }>(),
-  { description: undefined, size: 'md' },
+  { description: undefined, size: 'md', footerAlign: 'end' },
 );
 
 const emit = defineEmits<{
@@ -55,9 +57,13 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
+// Pages may mount a dialog already open, so this also runs once at mount.
+let opened = false;
 watch(
   () => props.open,
   async (open) => {
+    if (!open && !opened) return;
+    opened = open;
     if (open) {
       previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       document.addEventListener('keydown', onKeydown);
@@ -72,6 +78,7 @@ watch(
     document.body.style.overflow = '';
     previousFocus?.focus();
   },
+  { immediate: true },
 );
 
 onBeforeUnmount(() => {
@@ -103,7 +110,7 @@ onBeforeUnmount(() => {
           <p v-if="description" :id="`${titleId}-description`" class="dialog-description">{{ description }}</p>
           <slot />
         </div>
-        <footer v-if="$slots.footer" class="dialog-footer">
+        <footer v-if="$slots.footer" class="dialog-footer" :class="{ 'is-centered': footerAlign === 'center' }">
           <slot name="footer" />
         </footer>
       </div>

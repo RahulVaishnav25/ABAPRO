@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { RECORDABLE_STATUSES, type ProgramSummary, type RecordResponse, type TaskRecordingStatus } from '@abapro/shared';
+import { RECORDABLE_STATUSES, type ProgramSummary, type TaskRecordingStatus } from '@abapro/shared';
 import type { TaskItem } from '@/api/tasks';
 import AppIcon from '@/components/navigation/AppIcon.vue';
 import ActionMenu, { type ActionMenuItem } from '@/components/ui/ActionMenu.vue';
@@ -22,16 +22,14 @@ const props = defineProps<{
   taskActions: (task: TaskItem) => ActionMenuItem[];
   /** Today's shared recording capacity for a task, once loaded. */
   recording: (task: TaskItem) => TaskRecordingStatus | undefined;
-  /** Tasks with a record being saved. */
-  saving?: ReadonlySet<string>;
 }>();
 const emit = defineEmits<{
   programAction: [key: string];
   taskAction: [task: TaskItem, key: string];
-  /** Opens the record dialog, for tasks recorded with prompt levels. */
+  /** Opens the record dialog: Yes or No, or prompt levels when the task uses them. */
   record: [task: TaskItem];
-  /** Saves a Yes or No straight from the card. */
-  quickRecord: [task: TaskItem, response: RecordResponse];
+  /** Opens the task over the current page. */
+  openTask: [task: TaskItem];
   expand: [];
 }>();
 
@@ -40,6 +38,13 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
 
 function canRecord(task: TaskItem): boolean {
   return Boolean(props.recording(task)?.mayRecord) && RECORDABLE_STATUSES.includes(task.status);
+}
+
+/** A plain click opens the task here; modified clicks keep the link, so it can open in a new tab. */
+function onTaskLink(event: MouseEvent, task: TaskItem): void {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  emit('openTask', task);
 }
 
 function progress(status: TaskRecordingStatus): number {
@@ -73,7 +78,9 @@ function progress(status: TaskRecordingStatus): number {
           <div class="task-top">
             <span class="status-icon task-icon" :title="t(`status.${task.status}`)"><AppIcon :name="`status-${task.status}`" :size="16" /></span>
             <strong class="task-name">
-              <RouterLink class="card-link" :to="`/programs/tasks/${task.id}`">{{ task.name }}</RouterLink>
+              <RouterLink v-slot="{ href }" :to="`/programs/tasks/${task.id}`" custom>
+                <a class="card-link" :href="href" @click="onTaskLink($event, task)">{{ task.name }}</a>
+              </RouterLink>
             </strong>
             <ActionMenu :label="t('workspace.taskActions', { name: task.name })" :items="taskActions(task)" @select="emit('taskAction', task, $event)" />
           </div>
@@ -106,7 +113,6 @@ function progress(status: TaskRecordingStatus): number {
 
             <div v-if="canRecord(task)" class="task-actions">
               <AppButton
-                v-if="recording(task)!.promptUsed"
                 size="sm"
                 icon="plus"
                 :disabled="recording(task)!.remainingToday === 0"
@@ -115,26 +121,6 @@ function progress(status: TaskRecordingStatus): number {
               >
                 {{ t('card.record') }}
               </AppButton>
-              <template v-else>
-                <button
-                  type="button"
-                  class="quick quick-yes"
-                  :disabled="recording(task)!.remainingToday === 0 || saving?.has(task.id)"
-                  :aria-label="t('card.recordYes', { name: task.name })"
-                  @click="emit('quickRecord', task, 'yes')"
-                >
-                  <AppIcon name="plus" :size="16" /> {{ t('graph.yes') }}
-                </button>
-                <button
-                  type="button"
-                  class="quick quick-no"
-                  :disabled="recording(task)!.remainingToday === 0 || saving?.has(task.id)"
-                  :aria-label="t('card.recordNo', { name: task.name })"
-                  @click="emit('quickRecord', task, 'no')"
-                >
-                  <AppIcon name="minus" :size="16" /> {{ t('graph.no') }}
-                </button>
-              </template>
             </div>
           </template>
         </li>
@@ -325,47 +311,12 @@ function progress(status: TaskRecordingStatus): number {
 
 .task-actions {
   display: flex;
-  gap: var(--space-2);
-}
-
-/* One tap records a Yes or a No. Large targets, labelled with the task name for screen readers. */
-.quick {
-  display: inline-flex;
-  flex: 1;
-  align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-height: 36px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
+  padding-top: 2px;
 }
 
-.quick:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.quick-yes:hover:not(:disabled) {
-  border-color: var(--color-success);
-  background: var(--color-success-soft);
-  color: var(--color-success);
-}
-
-.quick-no:hover:not(:disabled) {
-  border-color: var(--color-danger);
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-}
-
-.quick:focus-visible {
-  outline: none;
-  box-shadow: var(--focus);
+.task-actions :deep(.btn) {
+  min-width: 132px;
 }
 
 .no-tasks {

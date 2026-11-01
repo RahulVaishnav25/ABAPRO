@@ -20,7 +20,7 @@ import {
   setTaskStatusRequest,
   targetsRequest,
 } from '@/api/programs';
-import { createTaskRequest, toTask, type CreateTaskInput, type TaskItem } from '@/api/tasks';
+import { createTaskRequest, toTask, updateTaskRequest, type CreateTaskInput, type TaskItem } from '@/api/tasks';
 import AppIcon from '@/components/navigation/AppIcon.vue';
 import CreateTaskModal from '@/components/programs/CreateTaskModal.vue';
 import type { ActionMenuItem } from '@/components/ui/ActionMenu.vue';
@@ -32,6 +32,7 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { errorMessage, useLoader } from '@/lib/loader';
+import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 
 type StatusFilter = 'all' | CareStatus;
@@ -48,6 +49,7 @@ const VIEW_OPTIONS: Array<{ value: ViewMode; icon: string }> = [
 const route = useRoute();
 const router = useRouter();
 const toast = useToastStore();
+const auth = useAuthStore();
 const { t } = useI18n();
 const statusName = (status: CareStatus) => t(`status.${status}`);
 const filterLabel = (filter: StatusFilter) => (filter === 'all' ? t('workspace.all') : statusName(filter));
@@ -302,15 +304,35 @@ async function saveRecord(value: RecordedValue): Promise<void> {
   recordingSaving.value = false;
 }
 
-/** One tap on a task card saves a Yes or a No; each tap is its own record. */
-const quickSaving = ref(new Set<string>());
-async function quickRecord(task: TaskItem, response: RecordResponse): Promise<void> {
-  if (quickSaving.value.has(task.id)) return;
-  quickSaving.value = new Set(quickSaving.value).add(task.id);
-  await submitRecord(task, { response }, crypto.randomUUID());
-  const next = new Set(quickSaving.value);
-  next.delete(task.id);
-  quickSaving.value = next;
+// A task opened from its card shows over the workspace, so closing it stays here.
+const openedTask = ref<TaskItem | null>(null);
+const openedMode = ref<'preview' | 'edit'>('preview');
+const savingTask = ref(false);
+
+function openTask(task: TaskItem): void {
+  openedMode.value = 'preview';
+  openedTask.value = task;
+}
+
+function editOpenedTask(task: TaskItem): void {
+  openedMode.value = 'edit';
+  openedTask.value = task;
+}
+
+async function saveOpenedTask(input: CreateTaskInput): Promise<void> {
+  const task = openedTask.value;
+  if (!task) return;
+  savingTask.value = true;
+  try {
+    const updated = await updateTaskRequest(task.id, input);
+    toast.push({ tone: 'success', title: t('tasks.updated'), message: t('tasks.updatedMessage', { name: updated.name }) });
+    openedTask.value = null;
+    await workspaceLoader.load();
+  } catch (saveError) {
+    toast.push({ tone: 'danger', title: t('tasks.updateFailed'), message: errorMessage(saveError, t('tasks.checkInputs')) });
+  } finally {
+    savingTask.value = false;
+  }
 }
 
 const graphTask = ref<TaskItem | null>(null);
@@ -439,11 +461,10 @@ onMounted(async () => {
           :program-actions="programActions(program)"
           :task-actions="taskActions"
           :recording="(task) => recording.get(task.id)"
-          :saving="quickSaving"
           @program-action="onProgramAction(program, $event)"
           @task-action="onTaskAction"
           @record="openRecord"
-          @quick-record="quickRecord"
+          @open-task="openTask"
           @expand="expand(program.id)"
         />
       </div>
@@ -474,6 +495,17 @@ onMounted(async () => {
       :saving="recordingSaving"
       @submit="saveRecord"
       @close="recordTask = null"
+    />
+
+    <CreateTaskModal
+      :open="openedTask !== null"
+      :mode="openedMode"
+      :task="openedTask"
+      :submitting="savingTask"
+      :can-edit="auth.can('programs.edit')"
+      @close="openedTask = null"
+      @edit="editOpenedTask"
+      @submit="saveOpenedTask"
     />
 
     <TaskGraphDialog :open="graphTask !== null" :task="graphTask" @close="graphTask = null" />

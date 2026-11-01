@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import {
-  careStatusLabel,
-  promptLevelLabel,
   RECORD_PHASE_OPTIONS,
   type RecordPhaseGroup,
   type SessionHistory,
@@ -18,26 +17,27 @@ import ErrorState from '@/components/ui/ErrorState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
 import { useLoader } from '@/lib/loader';
-import { formatDateTime } from '@/lib/format';
-
-const ENTRY_COLUMNS = [
-  { key: 'when', label: 'Date and time' },
-  { key: 'therapist', label: 'Therapist' },
-  { key: 'client', label: 'Client' },
-  { key: 'task', label: 'Task' },
-  { key: 'phase', label: 'Phase' },
-  { key: 'trial', label: 'Trial', align: 'end' as const },
-  { key: 'recorded', label: 'Response' },
-  { key: 'saved', label: 'Saved data' },
-];
-const TOTAL_COLUMNS = [
-  { key: 'task', label: 'Task', sortable: true },
-  { key: 'therapist', label: 'Therapist', sortable: true },
-  { key: 'trials', label: 'Trials recorded', sortable: true, align: 'end' as const },
-];
+import { formatDate, formatDateTime } from '@/lib/format';
 
 const props = defineProps<{ open: boolean; programId: string | null; programTitle: string }>();
 const emit = defineEmits<{ close: [] }>();
+const { t } = useI18n();
+const col = (key: string) => t(`programs.history.columns.${key}`);
+const entryColumns = computed(() => [
+  { key: 'when', label: col('when') },
+  { key: 'therapist', label: col('therapist') },
+  { key: 'client', label: col('client') },
+  { key: 'task', label: col('task') },
+  { key: 'phase', label: col('phase') },
+  { key: 'trial', label: col('trial'), align: 'end' as const },
+  { key: 'recorded', label: col('recorded') },
+  { key: 'saved', label: col('saved') },
+]);
+const totalColumns = computed(() => [
+  { key: 'task', label: col('task'), sortable: true },
+  { key: 'therapist', label: col('therapist'), sortable: true },
+  { key: 'trials', label: col('trials'), sortable: true, align: 'end' as const },
+]);
 
 const filters = reactive({ taskId: '', therapistId: '', phase: '', from: '', to: '' });
 const history = ref<SessionHistory | null>(null);
@@ -52,7 +52,7 @@ const loader = useLoader(async () => {
     from: filters.from || undefined,
     to: filters.to || undefined,
   });
-}, 'Session history could not be loaded.', false);
+}, t('programs.history.error'), false);
 
 watch(
   () => props.open,
@@ -69,22 +69,25 @@ watch(
   () => ({ ...filters }),
   () => {
     if (!props.open) return;
-    dateError.value = filters.from && filters.to && filters.from > filters.to ? 'The start date is after the end date.' : '';
+    dateError.value = filters.from && filters.to && filters.from > filters.to ? t('programs.history.dateOrder') : '';
     if (!dateError.value) void loader.load();
   },
 );
 
-const taskOptions = computed(() => [{ value: '', label: 'All tasks' }, ...(history.value?.tasks ?? []).map((task) => ({ value: task.id, label: task.title }))]);
+const taskOptions = computed(() => [{ value: '', label: t('programs.history.allTasks') }, ...(history.value?.tasks ?? []).map((task) => ({ value: task.id, label: task.title }))]);
 const therapistOptions = computed(() => [
-  { value: '', label: 'All therapists' },
+  { value: '', label: t('programs.history.allTherapists') },
   ...(history.value?.therapists ?? []).map((therapist) => ({ value: therapist.id, label: therapist.name })),
 ]);
-const phaseOptions = [{ value: '', label: 'All phases' }, ...RECORD_PHASE_OPTIONS];
-const phaseLabel = (phase: RecordPhaseGroup) => RECORD_PHASE_OPTIONS.find((option) => option.value === phase)?.label ?? phase;
+const phaseLabel = (phase: RecordPhaseGroup) => t(`programs.history.phases.${phase}`);
+const phaseOptions = computed(() => [
+  { value: '', label: t('programs.history.allPhases') },
+  ...RECORD_PHASE_OPTIONS.map((option) => ({ value: option.value, label: phaseLabel(option.value) })),
+]);
 
 function recorded(entry: SessionHistoryEntry): string {
-  if (entry.promptLevels.length) return entry.promptLevels.map(promptLevelLabel).join(', ');
-  return entry.response === 'yes' ? '+ Yes' : '− No';
+  if (entry.promptLevels.length) return entry.promptLevels.map((level) => t(`promptLevels.${level}`)).join(', ');
+  return entry.response === 'yes' ? t('graph.plusYes') : t('graph.minusNo');
 }
 
 const entryRows = computed(() =>
@@ -95,10 +98,15 @@ const entryRows = computed(() =>
     client: entry.clientName,
     task: entry.taskTitle,
     phase: phaseLabel(entry.phase),
-    trial: `${entry.trialNumber} of ${entry.trialsPerSession}`,
+    trial: t('programs.history.trialOf', { n: entry.trialNumber, total: entry.trialsPerSession }),
     recorded: recorded(entry),
     // Only records saved under the earlier session-based limit have more than one session a day.
-    saved: `${entry.sessionsPerDay > 1 ? `Session ${entry.sessionNumber} of ${entry.sessionsPerDay} on ` : ''}${entry.recordDate} · Task ${careStatusLabel(entry.taskStatus)} · Program ${careStatusLabel(entry.programStatus)}`,
+    saved: [
+      entry.sessionsPerDay > 1
+        ? t('programs.history.sessionOf', { n: entry.sessionNumber, total: entry.sessionsPerDay, date: formatDate(entry.recordDate) })
+        : formatDate(entry.recordDate),
+      t('programs.history.savedStatus', { task: t(`status.${entry.taskStatus}`), program: t(`status.${entry.programStatus}`) }),
+    ].join(' · '),
     onHold: entry.taskStatus === 'on_hold' || entry.programStatus === 'on_hold',
   })),
 );
@@ -114,32 +122,32 @@ const filtered = computed(() => Object.values(filters).some(Boolean));
 </script>
 
 <template>
-  <AppDialog :open="open" :title="`Session History · ${programTitle}`" size="lg" @close="emit('close')">
+  <AppDialog :open="open" :title="t('programs.history.title', { program: programTitle })" size="lg" @close="emit('close')">
     <p class="history-intro">
-      Every response saved on this program’s tasks, newest first. Records are kept as saved and cannot be changed or removed.
+      {{ t('programs.history.intro') }}
     </p>
 
-    <div class="history-filters" role="group" aria-label="Filter session history">
-      <AppSelect v-model="filters.taskId" label="Task" :options="taskOptions" />
-      <AppSelect v-model="filters.therapistId" label="Therapist" :options="therapistOptions" />
-      <AppSelect v-model="filters.phase" label="Phase" :options="phaseOptions" />
-      <AppInput v-model="filters.from" label="From" type="date" />
-      <AppInput v-model="filters.to" label="To" type="date" :error="dateError" />
+    <div class="history-filters" role="group" :aria-label="t('programs.history.filters')">
+      <AppSelect v-model="filters.taskId" :label="t('programs.history.task')" :options="taskOptions" />
+      <AppSelect v-model="filters.therapistId" :label="t('programs.history.therapist')" :options="therapistOptions" />
+      <AppSelect v-model="filters.phase" :label="t('programs.history.phase')" :options="phaseOptions" />
+      <AppInput v-model="filters.from" :label="t('programs.history.from')" type="date" />
+      <AppInput v-model="filters.to" :label="t('programs.history.to')" type="date" :error="dateError" />
     </div>
 
-    <ErrorState v-if="loader.error.value" title="Session history unavailable" :description="loader.error.value" @retry="loader.load" />
+    <ErrorState v-if="loader.error.value" :title="t('programs.history.unavailable')" :description="loader.error.value" @retry="loader.load" />
     <SkeletonBlock v-else-if="!history" height="240px" />
     <EmptyState
       v-else-if="history.total === 0"
-      :title="filtered ? 'No matching records' : 'No records yet'"
-      :description="filtered ? 'Change the filters to see more records.' : 'Records saved on this program’s tasks appear here.'"
+      :title="filtered ? t('programs.history.noMatches') : t('programs.history.noRecords')"
+      :description="filtered ? t('programs.history.noMatchesHint') : t('programs.history.noRecordsHint')"
     />
     <div v-else class="history-body" :class="{ 'is-refreshing': loader.loading.value }" :aria-busy="loader.loading.value">
       <section aria-labelledby="history-totals-title">
-        <h3 id="history-totals-title" class="history-heading">Trials by therapist</h3>
+        <h3 id="history-totals-title" class="history-heading">{{ t('programs.history.totals') }}</h3>
         <AppTable
-          caption="Trials each therapist recorded on each task"
-          :columns="TOTAL_COLUMNS"
+          :caption="t('programs.history.totalsCaption')"
+          :columns="totalColumns"
           :rows="totalRows"
           row-key="id"
           :page-size="6"
@@ -150,11 +158,11 @@ const filtered = computed(() => Object.values(filters).some(Boolean));
 
       <section aria-labelledby="history-log-title">
         <h3 id="history-log-title" class="history-heading">
-          Activity log <span class="history-count">{{ history.total }} record{{ history.total === 1 ? '' : 's' }}</span>
+          {{ t('programs.history.log') }} <span class="history-count">{{ t('programs.history.count', history.total) }}</span>
         </h3>
         <AppTable
-          caption="Recording activity, newest first"
-          :columns="ENTRY_COLUMNS"
+          :caption="t('programs.history.logCaption')"
+          :columns="entryColumns"
           :rows="entryRows"
           row-key="id"
           :page-size="10"
@@ -163,11 +171,11 @@ const filtered = computed(() => Object.values(filters).some(Boolean));
         >
           <template #cell-saved="{ row }">
             <span class="saved-data">{{ row.saved }}</span>
-            <StatusBadge v-if="row.onHold" tone="warning" label="Recorded while On Hold" />
+            <StatusBadge v-if="row.onHold" tone="warning" :label="t('programs.history.onHold')" />
           </template>
         </AppTable>
         <p v-if="history.total > history.entries.length" class="history-note">
-          Showing the latest {{ history.entries.length }} of {{ history.total }} records. Narrow the filters to see older ones.
+          {{ t('programs.history.latest', { shown: history.entries.length, total: history.total }) }}
         </p>
       </section>
     </div>
@@ -176,7 +184,8 @@ const filtered = computed(() => Object.values(filters).some(Boolean));
 
 <style scoped>
 .history-intro {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-muted);
 }
 
 .history-filters {

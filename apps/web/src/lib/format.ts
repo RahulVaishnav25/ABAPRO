@@ -98,3 +98,19 @@ export function careStatusTone(status: string): BadgeTone {
   if (status === 'mastered') return 'mastered';
   return 'neutral';
 }
+
+/** Badge tone for a task phase. */
+export function phaseTone(phase: string): BadgeTone {
+  switch ((phase || '').toLowerCase()) {
+    case 'treatment':
+    case 'intervention':
+      return 'warning';
+    case 'mastered':
+      return 'success';
+    case 'maintenance':
+    case 'generalization':
+      return 'info';
+    default:
+      return 'neutral';
+  }
+}

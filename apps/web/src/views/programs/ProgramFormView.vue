@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import {
   ASSESSMENT_TYPE_GROUPS,
-  CARE_STATUS_OPTIONS,
+  CARE_STATUSES,
   type AssessmentSummary,
   type CareStatus,
   type ClientDirectoryItem,
@@ -16,7 +17,7 @@ import {
   programRequest,
   saveProgramRequest,
 } from '@/api/programs';
-import { ApiError } from '@/api/client';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppCombobox from '@/components/ui/AppCombobox.vue';
 import AppInput from '@/components/ui/AppInput.vue';
@@ -27,12 +28,8 @@ import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useToastStore } from '@/stores/toast';
-import { useLoader } from '@/lib/loader';
+import { errorMessage, useLoader } from '@/lib/loader';
 
-const MEASUREMENT_PROCEDURES = [
-  { value: 'Probe', label: 'Probe' },
-  { value: 'Step by Step', label: 'Step by Step' },
-];
 
 const assessmentTypeGroups = ASSESSMENT_TYPE_GROUPS.map((g) => ({
   group: g.group,
@@ -42,6 +39,11 @@ const assessmentTypeGroups = ASSESSMENT_TYPE_GROUPS.map((g) => ({
 const toast = useToastStore();
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
+// The combobox stores what is typed, so the standard procedures keep their saved English values.
+const measurementProcedures = computed(() => ['Probe', 'Step by Step'].map((value) => ({ value, label: value })));
+const statusOptions = computed(() => CARE_STATUSES.map((value) => ({ value, label: t(`status.${value}`) })));
+const clientOptions = computed(() => clients.value.map((client) => ({ value: client.id, label: client.displayName })));
 const programId = computed(() => (typeof route.params.programId === 'string' ? route.params.programId : ''));
 const saving = ref(false);
 const formError = ref('');
@@ -102,7 +104,7 @@ const { loading, error, load } = useLoader(async () => {
     goalStatement.value = program.goals[0]?.statement ?? '';
   }
   if (clientId.value) assessments.value = await assessmentsRequest(clientId.value);
-}, 'The program form could not be loaded.', Boolean(programId.value));
+}, t('programs.form.error'), Boolean(programId.value));
 
 async function onClient(): Promise<void> {
   assessments.value = clientId.value ? await assessmentsRequest(clientId.value) : [];
@@ -139,10 +141,10 @@ async function save(): Promise<void> {
       changeReason: changeReason.value || undefined,
     };
     const saved = await saveProgramRequest(body, programId.value || undefined);
-    toast.push({ tone: 'success', title: 'Program saved', message: saved.title });
+    toast.push({ tone: 'success', title: t('programs.form.saved'), message: saved.title });
     await router.push(`/programs/${saved.id}`);
   } catch (saveError) {
-    formError.value = saveError instanceof ApiError ? saveError.message : 'The program could not be saved.';
+    formError.value = errorMessage(saveError, t('programs.form.saveError'));
   } finally {
     saving.value = false;
   }
@@ -154,57 +156,62 @@ onMounted(() => void load());
 <template>
   <PageContainer>
     <PageHeader
-      :title="programId ? 'Edit program' : 'New program'"
-      description="Measurement and mastery settings are stored with this record. The application does not decide mastery for you."
+      :title="programId ? t('programs.form.editTitle') : t('programs.form.newTitle')"
+      :description="t('programs.form.description')"
+      :back-to="programId ? `/programs/${programId}` : '/programs'"
     />
     <SkeletonBlock v-if="loading" height="240px" />
-    <ErrorState v-else-if="error" title="Program form unavailable" :description="error" @retry="load" />
+    <ErrorState v-else-if="error" :title="t('programs.form.unavailable')" :description="error" @retry="load" />
     <form v-else class="program-form" @submit.prevent="save">
-      <div v-if="formError" class="alert alert-danger" role="alert">
-        <p class="form-error">{{ formError }}</p>
-      </div>
-      <div v-if="programId && originalMeasurement" class="alert alert-info">
-        <p class="note">Changing measurement procedure, mastery criteria, or teaching steps requires a reason. Earlier observations keep the configuration they were recorded with.</p>
-      </div>
+      <p v-if="formError" class="form-alert" role="alert"><AppIcon name="alert" :size="16" />{{ formError }}</p>
+      <p v-if="programId && originalMeasurement" class="form-note"><AppIcon name="info" :size="16" />{{ t('programs.form.changeNote') }}</p>
 
-      <section class="form-section">
-        <div class="section-header">
-          <h2 class="section-title">Program Overview</h2>
-          <p class="section-desc">General details, domain, implementation timeline, and assessment grouping</p>
+      <section class="settings-card">
+        <div class="section-heading">
+          <h2>{{ t('programs.form.overview') }}</h2>
+          <p class="section-desc">{{ t('programs.form.overviewHint') }}</p>
         </div>
-        <div class="fields-grid">
-          <AppSelect v-model="clientId" label="Client" :disabled="Boolean(programId)" :options="clients.map((client) => ({ value: client.id, label: client.displayName }))" required @update:model-value="onClient" />
-          <AppInput v-model="title" label="Program Name" required />
-          <AppInput v-model="domain" label="Program Domain" required />
-          <AppInput v-model="dateImplemented" label="Date Implemented" type="date" />
-          <AppInput v-model="dateMastered" label="Date Mastered" type="date" />
-          <AppSelect v-model="assessmentType" label="Assessment Type" :groups="assessmentTypeGroups" placeholder="None" />
-          <AppSelect v-if="programId" v-model="status" label="Status" :options="[...CARE_STATUS_OPTIONS]" />
-          <AppInput v-model="reviewOn" label="Review date" type="date" />
+        <div class="form-grid">
+          <AppSelect v-model="clientId" :label="t('programs.form.client')" :disabled="Boolean(programId)" :options="clientOptions" required @update:model-value="onClient" />
+          <AppInput v-model="title" :label="t('programs.form.title')" required />
+          <AppInput v-model="domain" :label="t('programs.form.domain')" required />
+          <AppSelect v-model="assessmentType" :label="t('programs.form.assessmentType')" :groups="assessmentTypeGroups" :placeholder="t('programs.form.none')" />
+        </div>
+        <div class="form-grid">
+          <AppInput v-model="dateImplemented" :label="t('programs.form.implemented')" type="date" />
+          <AppInput v-model="dateMastered" :label="t('programs.form.mastered')" type="date" />
+          <AppInput v-model="reviewOn" :label="t('programs.form.reviewDate')" type="date" />
+          <AppSelect v-if="programId" v-model="status" :label="t('programs.form.status')" :options="statusOptions" />
         </div>
       </section>
 
-      <section class="form-section">
-        <div class="section-header">
-          <h2 class="section-title">Clinical Protocol & Instructions</h2>
-          <p class="section-desc">SD, teaching method, procedures, steps, and measurement protocol</p>
+      <section class="settings-card">
+        <div class="section-heading">
+          <h2>{{ t('programs.form.protocol') }}</h2>
+          <p class="section-desc">{{ t('programs.form.protocolHint') }}</p>
         </div>
-        <div class="fields-stack">
-          <AppTextarea v-model="sd" label="SD" :rows="2" />
-          <AppTextarea v-model="masterySteps" label="Mastery Steps" :rows="2" />
-          <AppTextarea v-model="teachingProcedure" label="Teaching Steps" :rows="2" />
-          <AppTextarea v-model="errorCorrectionProcedure" label="Error Correction Procedure" :rows="2" />
-          <AppTextarea v-model="teachingMethod" label="Teaching Method" :rows="2" />
-          <AppTextarea v-model="netTeachingIdea" label="Net Teaching Idea" :rows="2" />
-          <AppCombobox v-model="measurementProcedure" label="Measurement Procedure" :options="MEASUREMENT_PROCEDURES" multiline :rows="2" />
-          <AppTextarea v-model="masteryCriteria" label="Mastery Criteria" :rows="2" hint="Record the criterion. It is not applied automatically." />
-          <AppInput v-if="programId" v-model="changeReason" label="Reason for a clinical change" />
+        <div class="form-stack">
+          <AppTextarea v-model="sd" :label="t('programs.form.sd')" :rows="2" />
+          <div class="form-grid">
+            <AppTextarea v-model="teachingProcedure" :label="t('programs.form.teachingSteps')" :rows="3" />
+            <AppTextarea v-model="masterySteps" :label="t('programs.form.masterySteps')" :rows="3" />
+          </div>
+          <div class="form-grid">
+            <AppTextarea v-model="teachingMethod" :label="t('programs.form.teachingMethod')" :rows="2" />
+            <AppTextarea v-model="errorCorrectionProcedure" :label="t('programs.form.errorCorrection')" :rows="2" />
+          </div>
+          <AppTextarea v-model="netTeachingIdea" :label="t('programs.form.netIdea')" :rows="2" />
+          <div class="form-grid">
+            <AppCombobox v-model="measurementProcedure" :label="t('programs.form.procedure')" :options="measurementProcedures" multiline :rows="2" />
+            <AppTextarea v-model="masteryCriteria" :label="t('programs.form.masteryCriteria')" :rows="2" :hint="t('programs.form.masteryCriteriaHint')" />
+          </div>
+          <AppInput v-if="programId" v-model="changeReason" :label="t('programs.form.changeReason')" />
         </div>
       </section>
 
       <div class="form-actions">
-        <AppButton type="button" variant="secondary" @click="router.push(programId ? `/programs/${programId}` : '/programs')">Cancel</AppButton>
-        <AppButton type="submit" :loading="saving">Save</AppButton>
+        <AppButton type="button" variant="secondary" @click="router.push(programId ? `/programs/${programId}` : '/programs')">{{ t('common.cancel') }}</AppButton>
+        <AppButton type="submit" :loading="saving">{{ t('programs.form.save') }}</AppButton>
       </div>
     </form>
   </PageContainer>
@@ -212,110 +219,19 @@ onMounted(() => void load());
 
 <style scoped>
 .program-form {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.alert {
-  padding: 14px 18px;
-  border-radius: var(--radius-md);
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-
-.alert-danger {
-  background: var(--color-danger-soft);
-  border: 1px solid var(--color-danger);
-  color: var(--color-danger);
-}
-
-.alert-info {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-inline-start: 4px solid var(--color-primary);
-  color: var(--color-ink);
-}
-
-.form-error {
-  margin: 0;
-  color: var(--color-danger);
-  font-weight: 600;
-}
-
-.note {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
-.form-section {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
-  box-shadow: var(--shadow-sm);
-  padding: 24px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-header {
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 14px;
-}
-
-.section-title {
-  margin: 0;
-  font-size: 1.12rem;
-  font-weight: 700;
-  color: var(--color-ink);
-  letter-spacing: -0.01em;
-}
-
-.section-desc {
-  margin: 4px 0 0;
-  font-size: 0.88rem;
-  color: var(--color-text-muted);
-}
-
-.fields-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
-  align-items: start;
+  gap: var(--space-5);
+  max-width: 1040px;
 }
 
-.fields-stack {
+.form-note {
   display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0 16px;
-}
-
-@media (max-width: 640px) {
-  .form-section {
-    padding: 16px;
-    gap: 16px;
-  }
-
-  .fields-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .form-actions {
-    flex-direction: column-reverse;
-  }
-
-  .form-actions > * {
-    width: 100%;
-  }
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-info-soft);
+  color: var(--color-info);
+  font-size: var(--text-sm);
 }
 </style>

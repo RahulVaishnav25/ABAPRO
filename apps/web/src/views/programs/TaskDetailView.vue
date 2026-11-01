@@ -1,25 +1,32 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { getTaskRequest, type TaskItem } from '@/api/tasks';
 import CreateTaskModal from '@/components/programs/CreateTaskModal.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useLoader } from '@/lib/loader';
+import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
+const { t } = useI18n();
 
 const taskId = computed(() => String(route.params.taskId ?? ''));
 const task = ref<TaskItem | null>(null);
 
 const { loading, error, load } = useLoader(async () => {
   task.value = await getTaskRequest(taskId.value);
-}, 'The task could not be loaded.');
+}, t('tasks.pageError'));
 
 function handleClose(): void {
-  if (task.value?.programId) {
+  // Return to the page that opened the task, such as the Therapy Workspace.
+  if (window.history.state?.back) {
+    router.back();
+  } else if (task.value?.programId) {
     void router.push(`/programs/${task.value.programId}`);
   } else {
     void router.push('/programs/tasks');
@@ -38,8 +45,8 @@ onMounted(() => void load());
     <SkeletonBlock v-if="loading" height="260px" />
     <ErrorState
       v-else-if="error || !task"
-      title="Task preview unavailable"
-      :description="error || 'Task not found.'"
+      :title="t('tasks.pageUnavailable')"
+      :description="error || t('tasks.notFound')"
       @retry="load"
     />
     <CreateTaskModal
@@ -47,6 +54,7 @@ onMounted(() => void load());
       :open="true"
       mode="preview"
       :task="task"
+      :can-edit="auth.can('programs.edit')"
       @close="handleClose"
       @edit="handleEdit"
     />

@@ -1,48 +1,31 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { careStatusLabel, type MeasurementMethod, type ProgramDetail } from '@abapro/shared';
-import type { BadgeTone } from '@/components/ui/types';
+import { useI18n } from 'vue-i18n';
+import type { ProgramDetail } from '@abapro/shared';
 import { programRequest } from '@/api/programs';
 import { createTaskRequest, programTasks, updateTaskRequest, type CreateTaskInput, type TaskItem } from '@/api/tasks';
 import CreateTaskModal from '@/components/programs/CreateTaskModal.vue';
+import ActionMenu from '@/components/ui/ActionMenu.vue';
 import AppButton from '@/components/ui/AppButton.vue';
+import AppTable from '@/components/ui/AppTable.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import ProgramCommunicationSection from '@/components/programs/communication/ProgramCommunicationSection.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatusBadge from '@/components/ui/StatusBadge.vue';
-import { careStatusTone } from '@/lib/format';
+import { careStatusTone, formatDate, phaseTone } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import { errorMessage, useLoader } from '@/lib/loader';
-
-function measurementLabel(method: MeasurementMethod): string {
-  return { trial: 'Trial by trial', probe: 'Probe', frequency: 'Frequency', duration: 'Duration', abc: 'ABC' }[method];
-}
-
-function phaseTone(phase: string): BadgeTone {
-  const p = (phase || '').toLowerCase();
-  switch (p) {
-    case 'treatment':
-    case 'intervention':
-      return 'warning';
-    case 'mastered':
-      return 'success';
-    case 'maintenance':
-    case 'generalization':
-      return 'info';
-    case 'baseline':
-    default:
-      return 'neutral';
-  }
-}
 
 const auth = useAuthStore();
 const toast = useToastStore();
 const route = useRoute();
 const router = useRouter();
+const { t, te } = useI18n();
 const programId = computed(() => String(route.params.programId ?? ''));
 const program = ref<ProgramDetail | null>(null);
 const tasks = computed(() => (program.value ? programTasks(program.value) : []));
@@ -72,7 +55,7 @@ function openPreviewTaskModal(t: TaskItem): void {
 
 const { loading, error, load } = useLoader(async () => {
   program.value = await programRequest(programId.value);
-}, 'The program could not be loaded.');
+}, t('programs.detail.error'));
 
 async function handleTaskSubmit(input: CreateTaskInput): Promise<void> {
   if (!program.value) return;
@@ -82,15 +65,15 @@ async function handleTaskSubmit(input: CreateTaskInput): Promise<void> {
       const updated = await updateTaskRequest(selectedTask.value.id, input);
       toast.push({
         tone: 'success',
-        title: 'Task updated',
-        message: `Task "${updated.name}" has been updated successfully.`,
+        title: t('tasks.updated'),
+        message: t('tasks.updatedMessage', { name: updated.name }),
       });
     } else {
       const created = await createTaskRequest(program.value, input);
       toast.push({
         tone: 'success',
-        title: 'Task created',
-        message: `Task "${created.name}" has been created for this program.`,
+        title: t('tasks.created'),
+        message: t('tasks.createdMessage', { name: created.name }),
       });
     }
     isCreateTaskOpen.value = false;
@@ -98,13 +81,55 @@ async function handleTaskSubmit(input: CreateTaskInput): Promise<void> {
   } catch (err) {
     toast.push({
       tone: 'danger',
-      title: taskModalMode.value === 'edit' ? 'Failed to update task' : 'Failed to create task',
-      message: errorMessage(err, 'Please check your inputs and try again.'),
+      title: taskModalMode.value === 'edit' ? t('tasks.updateFailed') : t('tasks.createFailed'),
+      message: errorMessage(err, t('tasks.checkInputs')),
     });
   } finally {
     submittingTask.value = false;
   }
 }
+
+/** The saved procedure, translated when it is one of the standard ones. */
+const procedureName = computed(() => {
+  const value = program.value?.measurementProcedure;
+  if (value) return te(`programs.form.procedures.${value}`) ? t(`programs.form.procedures.${value}`) : value;
+  return program.value ? t(`programs.measurement.${program.value.measurementType}`) : '';
+});
+
+const taskColumns = computed(() => [
+  { key: 'name', label: t('tasks.columns.name'), sortable: true },
+  { key: 'phase', label: t('tasks.columns.phase'), sortable: true },
+  { key: 'trials', label: t('tasks.columns.trials'), sortable: true, align: 'end' as const },
+  { key: 'criteria', label: t('tasks.columns.criteria') },
+  { key: 'sd', label: t('tasks.columns.sd') },
+  { key: 'status', label: t('tasks.columns.status'), sortable: true },
+  { key: 'actions', label: t('tasks.columns.actions') },
+]);
+const taskRows = computed(() =>
+  tasks.value.map((task) => ({
+    id: task.id,
+    name: task.name,
+    phase: t(`phases.${task.phase}`),
+    trials: task.desiredTrials,
+    criteria: t('tasks.criteria', { sessions: task.masterySessions, probe: task.masteryProbe }),
+    sd: task.sd || '',
+    status: t(`status.${task.status}`),
+    task,
+  })),
+);
+const taskOf = (row: Record<string, unknown>) => row.task as TaskItem;
+
+/** The protocol texts that have content, in reading order. */
+const protocolBlocks = computed(() => {
+  const value = program.value;
+  if (!value) return [];
+  return [
+    { key: 'teachingSteps', text: value.teachingProcedure },
+    { key: 'masterySteps', text: value.masterySteps },
+    { key: 'errorCorrection', text: value.errorCorrectionProcedure },
+    { key: 'netIdea', text: value.netTeachingIdea },
+  ].filter((block) => block.text);
+});
 
 onMounted(() => void load());
 </script>
@@ -112,243 +137,196 @@ onMounted(() => void load());
 <template>
   <PageContainer>
     <SkeletonBlock v-if="loading" height="260px" />
-    <ErrorState v-else-if="error || !program" title="Program unavailable" :description="error" @retry="load" />
-    <div v-else class="program-detail-view">
-      <!-- Page Header -->
-      <PageHeader :title="program.title" :description="program.clientName">
+    <ErrorState v-else-if="error || !program" :title="t('programs.detail.unavailable')" :description="error" @retry="load" />
+    <div v-else class="program-detail">
+      <PageHeader :title="program.title" back-to="/programs" :back-label="t('programs.title')">
+        <template #meta>
+          <RouterLink class="client-link" :to="`/clients/${program.clientId}`">{{ program.clientName }}</RouterLink>
+        </template>
         <template #actions>
-          <AppButton variant="secondary" @click="router.push(`/clients/${program.clientId}`)">Client profile</AppButton>
-          <AppButton v-if="auth.can('programs.edit')" @click="router.push(`/programs/${program.id}/edit`)">Edit program</AppButton>
+          <AppButton variant="secondary" @click="router.push(`/clients/${program.clientId}`)">{{ t('programs.detail.clientProfile') }}</AppButton>
+          <AppButton v-if="auth.can('programs.edit')" icon="edit" @click="router.push(`/programs/${program.id}/edit`)">{{ t('programs.detail.editProgram') }}</AppButton>
         </template>
       </PageHeader>
 
-      <!-- Key Highlights Banner Card -->
-      <section class="overview-banner">
-        <div class="banner-badge-group">
-          <StatusBadge :tone="careStatusTone(program.status)" :label="careStatusLabel(program.status)" />
-          <span class="version-tag">Version {{ program.configurationVersion }}</span>
+      <!-- Summary -->
+      <section class="summary" :aria-label="t('programs.detail.overview')">
+        <div class="summary-badges">
+          <StatusBadge :tone="careStatusTone(program.status)" :label="t(`status.${program.status}`)" />
+          <span class="version-tag">{{ t('programs.detail.version', { n: program.configurationVersion }) }}</span>
         </div>
-        <div class="banner-metrics">
-          <div class="metric-item">
-            <span class="metric-label">Domain</span>
-            <span class="metric-value">{{ program.domain || 'General' }}</span>
-          </div>
-          <div class="metric-divider" aria-hidden="true"></div>
-          <div class="metric-item">
-            <span class="metric-label">Measurement Procedure</span>
-            <span class="metric-value">{{ program.measurementProcedure || measurementLabel(program.measurementType) }}</span>
-          </div>
-          <div class="metric-divider" aria-hidden="true"></div>
-          <div class="metric-item">
-            <span class="metric-label">Tasks</span>
-            <span class="metric-value">{{ program.targets.length }} task{{ program.targets.length === 1 ? '' : 's' }}</span>
-          </div>
-          <div class="metric-divider" aria-hidden="true"></div>
-          <div class="metric-item">
-            <span class="metric-label">Date Implemented</span>
-            <span class="metric-value">{{ program.dateImplemented || 'Not set' }}</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Section: Program Overview -->
-      <section class="detail-section">
-        <div class="section-header">
+        <dl class="summary-metrics">
           <div>
-            <h2 class="section-title">Program Overview</h2>
-            <p class="section-desc">Timeline, assessment alignment, and client objectives</p>
-          </div>
-        </div>
-        <dl class="details-grid">
-          <div>
-            <dt>Client</dt>
-            <dd>
-              <RouterLink :to="`/clients/${program.clientId}`">{{ program.clientName }}</RouterLink>
-            </dd>
+            <dt>{{ t('programs.detail.domain') }}</dt>
+            <dd>{{ program.domain || t('programs.general') }}</dd>
           </div>
           <div>
-            <dt>Domain</dt>
-            <dd>{{ program.domain || 'Not specified' }}</dd>
+            <dt>{{ t('programs.detail.procedure') }}</dt>
+            <dd>{{ procedureName }}</dd>
           </div>
           <div>
-            <dt>Date Implemented</dt>
-            <dd>{{ program.dateImplemented || 'Not set' }}</dd>
+            <dt>{{ t('programs.detail.tasks') }}</dt>
+            <dd>{{ t('card.tasks', program.targets.length) }}</dd>
           </div>
           <div>
-            <dt>Date Mastered</dt>
-            <dd>{{ program.dateMastered || 'Not set' }}</dd>
-          </div>
-          <div>
-            <dt>Assessment Type</dt>
-            <dd>{{ program.assessmentType || 'None' }}</dd>
-          </div>
-          <div>
-            <dt>Review Date</dt>
-            <dd>{{ program.reviewOn || 'Not scheduled' }}</dd>
-          </div>
-          <div v-if="program.assessmentId">
-            <dt>Linked Assessment</dt>
-            <dd>
-              <RouterLink :to="`/assessments/${program.assessmentId}`">{{ program.assessmentName || 'View Assessment' }}</RouterLink>
-            </dd>
+            <dt>{{ t('programs.detail.implemented') }}</dt>
+            <dd>{{ formatDate(program.dateImplemented, t('programs.notSet')) }}</dd>
           </div>
         </dl>
-
-        <div v-if="program.description || program.objective || program.goals.length" class="text-callouts">
-          <div v-if="program.description" class="callout-block">
-            <span class="callout-label">Description</span>
-            <p class="callout-body">{{ program.description }}</p>
-          </div>
-          <div v-if="program.objective" class="callout-block">
-            <span class="callout-label">Clinical Objective</span>
-            <p class="callout-body">{{ program.objective }}</p>
-          </div>
-          <div v-if="program.goals.length" class="callout-block">
-            <span class="callout-label">Goals</span>
-            <ul class="goals-list">
-              <li v-for="goal in program.goals" :key="goal.id">
-                <span class="goal-statement">{{ goal.statement }}</span>
-                <span v-if="goal.reviewOn" class="goal-meta">Review: {{ goal.reviewOn }}</span>
-              </li>
-            </ul>
-          </div>
-        </div>
       </section>
 
-      <!-- Section: Clinical & Teaching Protocol -->
-      <section class="detail-section">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">Clinical & Teaching Protocol</h2>
-            <p class="section-desc">Stimulus instructions, instructional steps, measurement method, and criteria</p>
+      <div class="detail-columns">
+        <section class="settings-card">
+          <div class="section-heading">
+            <h2>{{ t('programs.detail.overview') }}</h2>
+            <p class="section-desc">{{ t('programs.detail.overviewHint') }}</p>
           </div>
-        </div>
-        <dl class="details-grid">
-          <div>
-            <dt>SD (Discriminative Stimulus)</dt>
-            <dd class="sd-value">{{ program.sd || 'Not specified' }}</dd>
+          <dl class="detail-list">
+            <div>
+              <dt>{{ t('programs.detail.client') }}</dt>
+              <dd><RouterLink :to="`/clients/${program.clientId}`">{{ program.clientName }}</RouterLink></dd>
+            </div>
+            <div>
+              <dt>{{ t('programs.detail.domain') }}</dt>
+              <dd>{{ program.domain || t('programs.notSpecified') }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('programs.detail.implemented') }}</dt>
+              <dd>{{ formatDate(program.dateImplemented, t('programs.notSet')) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('programs.detail.mastered') }}</dt>
+              <dd>{{ formatDate(program.dateMastered, t('programs.notSet')) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('programs.detail.assessmentType') }}</dt>
+              <dd>{{ program.assessmentType || t('programs.none') }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('programs.detail.reviewDate') }}</dt>
+              <dd>{{ formatDate(program.reviewOn, t('programs.notScheduled')) }}</dd>
+            </div>
+            <div v-if="program.assessmentId">
+              <dt>{{ t('programs.detail.linkedAssessment') }}</dt>
+              <dd>
+                <RouterLink :to="`/assessments/${program.assessmentId}`">{{ program.assessmentName || t('programs.detail.viewAssessment') }}</RouterLink>
+              </dd>
+            </div>
+          </dl>
+          <div v-if="program.description || program.objective || program.goals.length" class="text-blocks">
+            <div v-if="program.description" class="text-block">
+              <h3>{{ t('programs.detail.descriptionLabel') }}</h3>
+              <p>{{ program.description }}</p>
+            </div>
+            <div v-if="program.objective" class="text-block">
+              <h3>{{ t('programs.detail.objective') }}</h3>
+              <p>{{ program.objective }}</p>
+            </div>
+            <div v-if="program.goals.length" class="text-block">
+              <h3>{{ t('programs.detail.goals') }}</h3>
+              <ul class="goal-list">
+                <li v-for="goal in program.goals" :key="goal.id">
+                  <span>{{ goal.statement }}</span>
+                  <span v-if="goal.reviewOn" class="goal-meta">{{ t('programs.detail.goalReview', { date: formatDate(goal.reviewOn) }) }}</span>
+                </li>
+              </ul>
+            </div>
           </div>
-          <div>
-            <dt>Teaching Method</dt>
-            <dd>{{ program.teachingMethod || 'Not specified' }}</dd>
-          </div>
-          <div>
-            <dt>Measurement Procedure</dt>
-            <dd>{{ program.measurementProcedure || measurementLabel(program.measurementType) }}</dd>
-          </div>
-        </dl>
+        </section>
 
-        <div class="protocol-blocks">
-          <div v-if="program.teachingProcedure" class="protocol-card">
-            <span class="protocol-tag">Teaching Steps</span>
-            <p class="protocol-text">{{ program.teachingProcedure }}</p>
+        <section class="settings-card">
+          <div class="section-heading">
+            <h2>{{ t('programs.detail.protocol') }}</h2>
+            <p class="section-desc">{{ t('programs.detail.protocolHint') }}</p>
           </div>
-          <div v-if="program.masterySteps" class="protocol-card">
-            <span class="protocol-tag">Mastery Steps</span>
-            <p class="protocol-text">{{ program.masterySteps }}</p>
+          <dl class="detail-list">
+            <div class="is-wide">
+              <dt>{{ t('programs.detail.sd') }}</dt>
+              <dd class="pre">{{ program.sd || t('programs.notSpecified') }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('programs.detail.teachingMethod') }}</dt>
+              <dd>{{ program.teachingMethod || t('programs.notSpecified') }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('programs.detail.procedure') }}</dt>
+              <dd>{{ procedureName }}</dd>
+            </div>
+          </dl>
+          <div class="text-blocks">
+            <div v-for="block in protocolBlocks" :key="block.key" class="text-block">
+              <h3>{{ t(`programs.detail.${block.key}`) }}</h3>
+              <p class="pre">{{ block.text }}</p>
+            </div>
+            <div class="text-block is-criteria">
+              <h3>{{ t('programs.detail.masteryCriteria') }}</h3>
+              <p class="pre">{{ program.masteryCriteria || t('programs.notRecorded') }}</p>
+              <p class="criteria-hint">{{ t('programs.detail.criteriaHint') }}</p>
+            </div>
           </div>
-          <div v-if="program.errorCorrectionProcedure" class="protocol-card">
-            <span class="protocol-tag">Error Correction Procedure</span>
-            <p class="protocol-text">{{ program.errorCorrectionProcedure }}</p>
+        </section>
+      </div>
+
+      <section class="settings-card">
+        <header class="card-header">
+          <div class="section-heading">
+            <h2>{{ t('programs.detail.tasks') }} <span class="count">{{ tasks.length }}</span></h2>
+            <p class="section-desc">{{ t('programs.detail.tasksHint') }}</p>
           </div>
-          <div v-if="program.netTeachingIdea" class="protocol-card">
-            <span class="protocol-tag">NET Teaching Idea</span>
-            <p class="protocol-text">{{ program.netTeachingIdea }}</p>
-          </div>
-          <div class="protocol-card criteria-card">
-            <span class="protocol-tag">Mastery Criteria</span>
-            <p class="protocol-text">{{ program.masteryCriteria || 'Not recorded.' }}</p>
-            <span class="criteria-hint">Recorded for clinical reference. The clinician decides task mastery and phase transitions.</span>
-          </div>
-        </div>
+          <AppButton type="button" icon="plus" @click="openCreateTaskModal">{{ t('programs.detail.addTask') }}</AppButton>
+        </header>
+        <EmptyState v-if="tasks.length === 0" icon="tasks" :title="t('programs.detail.noTasks')" :description="t('programs.detail.noTasksHint')">
+          <template #actions>
+            <AppButton type="button" variant="secondary" icon="plus" @click="openCreateTaskModal">{{ t('programs.detail.addFirstTask') }}</AppButton>
+          </template>
+        </EmptyState>
+        <AppTable
+          v-else
+          class="task-table"
+          :caption="t('programs.detail.tasks')"
+          :columns="taskColumns"
+          :rows="taskRows"
+          row-key="id"
+          :page-size="10"
+          :searchable="false"
+          density="compact"
+        >
+          <template #cell-name="{ row }">
+            <button type="button" class="row-link" @click="openPreviewTaskModal(taskOf(row))">{{ row.name }}</button>
+          </template>
+          <template #cell-phase="{ row }">
+            <StatusBadge :tone="phaseTone(taskOf(row).phase)" :label="String(row.phase)" />
+          </template>
+          <template #cell-criteria="{ row }">
+            <span>{{ row.criteria }}</span>
+            <small v-if="taskOf(row).phase === 'Baseline' && taskOf(row).baselineSessions" class="criteria-sub">
+              {{ t('tasks.baselineCriteria', { sessions: taskOf(row).baselineSessions, probe: taskOf(row).baselineProbe ?? 100 }) }}
+            </small>
+          </template>
+          <template #cell-sd="{ row }">
+            <span class="sd-text" :title="String(row.sd)">{{ row.sd || '—' }}</span>
+          </template>
+          <template #cell-status="{ row }">
+            <StatusBadge :tone="careStatusTone(taskOf(row).status)" :label="String(row.status)" />
+          </template>
+          <template #cell-actions="{ row }">
+            <ActionMenu
+              :label="t('tasks.actionsFor', { name: row.name })"
+              :items="[{ key: 'preview', label: t('tasks.preview') }, { key: 'edit', label: t('tasks.edit') }]"
+              @select="$event === 'preview' ? openPreviewTaskModal(taskOf(row)) : openEditTaskModal(taskOf(row))"
+            />
+          </template>
+        </AppTable>
       </section>
 
-      <!-- Section: Tasks -->
-      <section class="detail-section">
-        <div class="section-header tasks-header">
-          <div>
-            <h2 class="section-title">
-              Tasks
-              <span class="count-badge">{{ tasks.length }}</span>
-            </h2>
-            <p class="section-desc">Clinical tasks and their criteria configured for this program</p>
-          </div>
-          <AppButton type="button" @click="openCreateTaskModal">Add Task</AppButton>
-        </div>
-
-        <div v-if="tasks.length === 0" class="empty-tasks">
-          <p>No tasks created for this program yet.</p>
-          <AppButton type="button" variant="secondary" @click="openCreateTaskModal">Add first task</AppButton>
-        </div>
-
-        <div v-else class="tasks-table-wrap">
-          <table class="tasks-table">
-            <thead>
-              <tr>
-                <th>Task Name</th>
-                <th>Phase</th>
-                <th>Desired Trials</th>
-                <th>Mastery Criteria</th>
-                <th>SD</th>
-                <th>Status</th>
-                <th class="actions-col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="task in tasks" :key="task.id">
-                <td>
-                  <button
-                    type="button"
-                    class="task-title-link"
-                    @click="openPreviewTaskModal(task)"
-                  >
-                    <strong class="task-title">{{ task.name }}</strong>
-                  </button>
-                </td>
-                <td>
-                  <StatusBadge :tone="phaseTone(task.phase)" :label="task.phase" />
-                </td>
-                <td>
-                  <span class="trials-badge">{{ task.desiredTrials }}</span>
-                </td>
-                <td>
-                  <span class="criteria-label">
-                    {{ task.masterySessions }} ses · {{ task.masteryProbe }}%
-                  </span>
-                  <span v-if="task.phase === 'Baseline' && task.baselineSessions" class="criteria-sub">
-                    (Base: {{ task.baselineSessions }} ses · {{ task.baselineProbe ?? 100 }}%)
-                  </span>
-                </td>
-                <td class="sd-cell">
-                  <span v-if="task.sd" class="sd-text" :title="task.sd">{{ task.sd }}</span>
-                  <span v-else class="text-muted">—</span>
-                </td>
-                <td>
-                  <StatusBadge :tone="careStatusTone(task.status)" :label="careStatusLabel(task.status)" />
-                </td>
-                <td>
-                  <div class="row-actions">
-                    <AppButton size="sm" variant="secondary" @click="openPreviewTaskModal(task)">Preview</AppButton>
-                    <AppButton size="sm" variant="secondary" @click="openEditTaskModal(task)">Edit</AppButton>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Section: Notes, attachments and home activities -->
-      <section class="detail-section">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">Notes & Attachments</h2>
-            <p class="section-desc">Session notes, files, audio and home activities, shared with the child’s parents</p>
-          </div>
+      <section class="settings-card">
+        <div class="section-heading">
+          <h2>{{ t('programs.detail.comms') }}</h2>
+          <p class="section-desc">{{ t('programs.detail.commsHint') }}</p>
         </div>
         <ProgramCommunicationSection :program-id="program.id" :legacy-notes="program.notes" />
       </section>
-      <!-- Create / Edit / Preview Task Modal -->
+
       <CreateTaskModal
         :open="isCreateTaskOpen"
         :mode="taskModalMode"
@@ -364,401 +342,179 @@ onMounted(() => void load());
 </template>
 
 <style scoped>
-.program-detail-view {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.overview-banner {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
-  padding: 20px 24px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.banner-badge-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.version-tag {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  background: var(--color-surface-muted, #f7f9fa);
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-}
-
-.banner-metrics {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px 24px;
-}
-
-.metric-item {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.metric-label {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-
-.metric-value {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.metric-divider {
-  width: 1px;
-  height: 28px;
-  background: var(--color-border);
-}
-
-.detail-section {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
-  padding: 24px 28px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 14px;
-}
-
-.section-title {
-  margin: 0;
-  font-size: 1.12rem;
-  font-weight: 700;
-  color: var(--color-ink);
-  letter-spacing: -0.01em;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.section-desc {
-  margin: 4px 0 0;
-  font-size: 0.88rem;
-  color: var(--color-text-muted);
-}
-
-.count-badge {
-  font-size: 0.8rem;
-  font-weight: 600;
-  background: var(--color-primary-soft, #e7f4f2);
-  color: var(--color-primary-ink, #084840);
-  padding: 2px 8px;
-  border-radius: 9999px;
-}
-
-.details-grid {
+.program-detail {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 18px 24px;
-  margin: 0;
+  gap: var(--space-5);
 }
 
-dt {
-  margin: 0;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 700;
+.client-link {
   color: var(--color-text-muted);
-}
-
-dd {
-  margin: 4px 0 0;
-  font-size: 0.95rem;
   font-weight: 500;
-  color: var(--color-ink);
-}
-
-.sd-value {
-  font-family: inherit;
-  font-weight: 600;
-  color: var(--color-primary-ink, #084840);
-}
-
-.text-callouts {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 4px;
-}
-
-.callout-block {
-  background: var(--color-surface-muted, #f7f9fa);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 14px 18px;
-}
-
-.callout-label {
-  display: block;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  margin-bottom: 6px;
-}
-
-.callout-body {
-  margin: 0;
-  font-size: 0.94rem;
-  line-height: 1.5;
-  color: var(--color-ink);
-}
-
-.goals-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.goals-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.goal-statement {
-  font-weight: 500;
-  color: var(--color-ink);
-}
-
-.goal-meta {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-}
-
-.protocol-blocks {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.protocol-card {
-  background: var(--color-surface-muted, #f7f9fa);
-  border: 1px solid var(--color-border);
-  border-inline-start: 3px solid var(--color-primary);
-  border-radius: var(--radius-sm);
-  padding: 14px 18px;
-}
-
-.protocol-tag {
-  display: block;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 700;
-  color: var(--color-primary-ink, #084840);
-  margin-bottom: 6px;
-}
-
-.protocol-text {
-  margin: 0;
-  font-size: 0.94rem;
-  line-height: 1.5;
-  color: var(--color-ink);
-}
-
-.criteria-card {
-  border-inline-start-color: var(--color-border-strong);
-}
-
-.criteria-hint {
-  display: block;
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  margin-top: 6px;
-}
-
-.tasks-header {
-  align-items: center;
-}
-
-.empty-tasks {
-  text-align: center;
-  padding: 32px 16px;
-  background: var(--color-surface-muted, #f7f9fa);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md, 8px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.empty-tasks p {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.95rem;
-}
-
-.tasks-table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 8px);
-  background: var(--color-surface);
-}
-
-.tasks-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92rem;
-  text-align: start;
-}
-
-.tasks-table th,
-.tasks-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
-}
-
-.tasks-table th {
-  background: var(--color-surface-muted, #f8fafc);
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-}
-
-.tasks-table tr:last-child td {
-  border-bottom: none;
-}
-
-.tasks-table tr:hover td {
-  background: var(--color-surface-muted, #fbfcfd);
-}
-
-.task-title {
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.task-title-link {
   text-decoration: none;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-  text-align: start;
 }
 
-.task-title-link:hover .task-title {
-  color: var(--color-primary);
+.client-link:hover,
+.client-link:focus-visible {
+  color: var(--color-primary-ink);
   text-decoration: underline;
 }
 
-.actions-col {
-  width: 160px;
-}
-
-.row-actions {
+.summary {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
   align-items: center;
+  gap: var(--space-4) var(--space-8);
+  padding: var(--space-5) var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
 }
 
-.trials-badge {
-  display: inline-flex;
+.summary-badges {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  min-width: 28px;
+  gap: var(--space-2);
+}
+
+.version-tag {
   padding: 2px 8px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  border-radius: 9999px;
-  background: var(--color-surface-muted, #eef2f6);
-  color: var(--color-text);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 
-.criteria-label {
+.summary-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-8);
+}
+
+.summary-metrics dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
   font-weight: 500;
+}
+
+.summary-metrics dd {
+  margin: 2px 0 0;
   color: var(--color-ink);
+  font-weight: 600;
+}
+
+.detail-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.detail-list .is-wide {
+  grid-column: 1 / -1;
+}
+
+.pre {
+  white-space: pre-wrap;
+}
+
+.text-blocks {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.text-block {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.text-block h3 {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.text-block.is-criteria {
+  border-inline-start: 3px solid var(--color-primary);
+}
+
+.criteria-hint,
+.goal-meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.goal-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
+
+.goal-list li {
+  display: grid;
+}
+
+.count {
+  margin-inline-start: 6px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.task-table :deep(.table-card) {
+  box-shadow: none;
+}
+
+.row-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+
+.row-link:hover,
+.row-link:focus-visible {
+  color: var(--color-primary-ink);
+  text-decoration: underline;
 }
 
 .criteria-sub {
   display: block;
-  font-size: 0.78rem;
   color: var(--color-text-muted);
-  margin-top: 2px;
-}
-
-.sd-cell {
-  max-width: 240px;
+  font-size: var(--text-xs);
 }
 
 .sd-text {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  max-width: 240px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.35;
-  color: var(--color-text);
-}
-
-.text-muted {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
-@media (max-width: 640px) {
-  .detail-section,
-  .overview-banner {
-    padding: 16px;
-    gap: 16px;
+@media (max-width: 520px) {
+  .detail-columns {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .banner-metrics {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .metric-divider {
-    display: none;
-  }
-
-  .details-grid {
-    grid-template-columns: 1fr;
-    gap: 14px;
+  .summary {
+    padding: var(--space-4);
   }
 }
 </style>
