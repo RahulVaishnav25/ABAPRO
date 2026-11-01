@@ -38,7 +38,9 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
         <div class="program-heading">
           <span class="status-icon" :title="careStatusLabel(program.status)"><AppIcon :name="`status-${program.status}`" /></span>
           <div>
-            <h3 class="program-title">{{ program.title }}</h3>
+            <h3 class="program-title">
+              <RouterLink class="card-link" :to="`/programs/${program.id}`">{{ program.title }}</RouterLink>
+            </h3>
             <p class="program-meta">{{ program.domain || 'General' }} · {{ program.measurementProcedure || 'Probe' }}</p>
           </div>
         </div>
@@ -62,7 +64,9 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
         <li v-for="task in shown" :key="task.id" class="task-card" :class="`care-tone-${task.status}`">
           <span class="status-icon task-icon" :title="careStatusLabel(task.status)"><AppIcon :name="`status-${task.status}`" /></span>
           <div class="task-body">
-            <strong class="task-name">{{ task.name }}</strong>
+            <strong class="task-name">
+              <RouterLink class="card-link" :to="`/programs/tasks/${task.id}`">{{ task.name }}</RouterLink>
+            </strong>
             <span class="task-meta">{{ task.phase }} · {{ task.desiredTrials }} trials</span>
             <StatusBadge :tone="careStatusTone(task.status)" :label="careStatusLabel(task.status)" />
             <div v-if="recording(task)" class="task-record">
@@ -150,6 +154,18 @@ const shown = computed(() => (props.expanded ? props.tasks : props.tasks.slice(0
 .task-icon {
   width: 26px;
   height: 26px;
+}
+
+/* Program and task names open their pages. */
+.card-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.card-link:hover,
+.card-link:focus-visible {
+  color: var(--color-primary);
+  text-decoration: underline;
 }
 
 .program-title {
