@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import {
-  careStatusLabel,
   CARE_STATUSES,
   type CareStatus,
   type ClientDirectoryItem,
-  promptLevelLabel,
   type ProgramSummary,
   type PromptLevel,
   type RecordResponse,
@@ -40,18 +39,18 @@ type ViewMode = 'horizontal' | 'vertical';
 
 const MASTERED_STATUS: CareStatus = 'mastered';
 const COLUMN_ORDER: CareStatus[] = ['in_treatment', 'maintenance', 'on_hold', 'mastered'];
-const FILTER_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
-  { value: 'all', label: 'All' },
-  ...COLUMN_ORDER.map((status) => ({ value: status, label: careStatusLabel(status) })),
-];
-const VIEW_OPTIONS: Array<{ value: ViewMode; label: string; icon: string }> = [
-  { value: 'horizontal', label: 'Horizontal View', icon: 'layout-horizontal' },
-  { value: 'vertical', label: 'Vertical View', icon: 'layout-vertical' },
+const FILTER_OPTIONS: StatusFilter[] = ['all', ...COLUMN_ORDER];
+const VIEW_OPTIONS: Array<{ value: ViewMode; icon: string }> = [
+  { value: 'horizontal', icon: 'layout-horizontal' },
+  { value: 'vertical', icon: 'layout-vertical' },
 ];
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToastStore();
+const { t } = useI18n();
+const statusName = (status: CareStatus) => t(`status.${status}`);
+const filterLabel = (filter: StatusFilter) => (filter === 'all' ? t('workspace.all') : statusName(filter));
 
 const clients = ref<ClientDirectoryItem[]>([]);
 const clientSearch = ref('');
@@ -116,7 +115,7 @@ const clientLoader = useLoader(async () => {
   if (!selectedId.value && clients.value[0]) {
     await router.replace({ query: { ...route.query, client: clients.value[0].id } });
   }
-}, 'Your clients could not be loaded.');
+}, t('workspace.clientsError'));
 
 // After the first load, switching clients keeps the current content in place until the next client loads.
 const workspaceLoaded = ref(false);
@@ -137,7 +136,7 @@ const workspaceLoader = useLoader(async () => {
   tasks.value = allTasks.filter((task) => task.clientId === selectedId.value).map(toTask);
   recording.value = statusMap(statuses);
   workspaceLoaded.value = true;
-}, 'This client’s programs could not be loaded.', false);
+}, t('workspace.programsError'), false);
 
 function selectClient(id: string): void {
   expanded.value = new Set();
@@ -160,17 +159,17 @@ const saving = ref(false);
 
 function programActions(program: ProgramSummary): ActionMenuItem[] {
   const items: ActionMenuItem[] = [];
-  if (program.status !== 'on_hold') items.push({ key: 'hold', label: 'Move to On Hold' });
-  if (program.status !== MASTERED_STATUS) items.push({ key: 'mastered', label: 'Mark as Mastered' });
-  items.push({ key: 'tasks', label: 'View associated tasks' }, { key: 'add-task', label: 'Add Task' });
+  items.push({ key: 'add-task', label: t('workspace.actions.addTask') }, { key: 'tasks', label: t('workspace.actions.viewTasks') });
+  if (program.status !== 'on_hold') items.push({ key: 'hold', label: t('workspace.actions.moveOnHold') });
+  if (program.status !== MASTERED_STATUS) items.push({ key: 'mastered', label: t('workspace.actions.markMastered') });
   return items;
 }
 
 function taskActions(task: TaskItem): ActionMenuItem[] {
   const items: ActionMenuItem[] = [];
-  if (task.status !== 'on_hold') items.push({ key: 'hold', label: 'Move to On Hold' });
-  if (task.status !== MASTERED_STATUS) items.push({ key: 'mastered', label: 'Mark as Mastered' });
-  items.push({ key: 'graph', label: 'View Graph' });
+  items.push({ key: 'graph', label: t('workspace.actions.viewGraph') });
+  if (task.status !== 'on_hold') items.push({ key: 'hold', label: t('workspace.actions.moveOnHold') });
+  if (task.status !== MASTERED_STATUS) items.push({ key: 'mastered', label: t('workspace.actions.markMastered') });
   return items;
 }
 
@@ -181,7 +180,7 @@ function onProgramAction(program: ProgramSummary, key: string): void {
       programId: program.id,
       name: program.title,
       status: key === 'hold' ? 'on_hold' : MASTERED_STATUS,
-      title: key === 'hold' ? 'Move program to On Hold' : 'Mark program as mastered',
+      title: key === 'hold' ? t('workspace.statusDialog.programOnHold') : t('workspace.statusDialog.programMastered'),
     };
   } else if (key === 'tasks') {
     expand(program.id);
@@ -199,7 +198,7 @@ function onTaskAction(task: TaskItem, key: string): void {
       taskId: task.id,
       name: task.name,
       status: key === 'hold' ? 'on_hold' : MASTERED_STATUS,
-      title: key === 'hold' ? 'Move task to On Hold' : 'Mark task as mastered',
+      title: key === 'hold' ? t('workspace.statusDialog.taskOnHold') : t('workspace.statusDialog.taskMastered'),
     };
   } else if (key === 'graph') {
     graphTask.value = task;
@@ -207,7 +206,7 @@ function onTaskAction(task: TaskItem, key: string): void {
 }
 
 const pendingDescription = computed(() =>
-  pending.value ? `“${pending.value.name}” moves to ${careStatusLabel(pending.value.status)}. The reason is saved with its history.` : '',
+  pending.value ? t('workspace.statusDialog.description', { name: pending.value.name, status: statusName(pending.value.status) }) : '',
 );
 
 async function confirmChange(reason: string): Promise<void> {
@@ -218,11 +217,11 @@ async function confirmChange(reason: string): Promise<void> {
     const body = { status: change.status, changeReason: reason };
     if (change.kind === 'program') await setProgramStatusRequest(change.programId, body);
     else await setTaskStatusRequest(change.programId, change.taskId ?? '', body);
-    toast.push({ tone: 'success', title: 'Status updated', message: `${change.name} is now ${careStatusLabel(change.status)}.` });
+    toast.push({ tone: 'success', title: t('workspace.statusUpdated'), message: t('workspace.statusUpdatedMessage', { name: change.name, status: statusName(change.status) }) });
     pending.value = null;
     await workspaceLoader.load();
   } catch (changeError) {
-    toast.push({ tone: 'danger', title: 'Status was not changed', message: errorMessage(changeError, 'Try again.') });
+    toast.push({ tone: 'danger', title: t('workspace.statusNotChanged'), message: errorMessage(changeError, t('errors.generic')) });
   } finally {
     saving.value = false;
   }
@@ -238,12 +237,12 @@ async function addTask(input: CreateTaskInput): Promise<void> {
   addingTask.value = true;
   try {
     const created = await createTaskRequest(program, input);
-    toast.push({ tone: 'success', title: 'Task added', message: `${created.name} was added to ${program.title}.` });
+    toast.push({ tone: 'success', title: t('workspace.taskAdded'), message: t('workspace.taskAddedMessage', { task: created.name, program: program.title }) });
     taskProgram.value = null;
     expand(program.id);
     await workspaceLoader.load();
   } catch (addError) {
-    toast.push({ tone: 'danger', title: 'Task was not added', message: errorMessage(addError, 'Try again.') });
+    toast.push({ tone: 'danger', title: t('workspace.taskNotAdded'), message: errorMessage(addError, t('errors.generic')) });
   } finally {
     addingTask.value = false;
   }
@@ -272,28 +271,46 @@ function openRecord(task: TaskItem): void {
   void refreshRecording().catch(() => undefined);
 }
 
-async function saveRecord(value: { response: RecordResponse } | { promptLevels: PromptLevel[] }): Promise<void> {
+type RecordedValue = { response: RecordResponse } | { promptLevels: PromptLevel[] };
+
+/** Saves one record and reports it; returns whether it was saved. */
+async function submitRecord(task: TaskItem, value: RecordedValue, requestId: string): Promise<boolean> {
+  try {
+    const status = await recordTaskRequest(task.id, { requestId, ...value });
+    recording.value = new Map(recording.value).set(task.id, status);
+    const recorded = 'promptLevels' in value
+      ? value.promptLevels.map((level) => t(`promptLevels.${level}`)).join(', ')
+      : value.response === 'yes' ? t('workspace.yes') : t('workspace.no');
+    toast.push({
+      tone: 'success',
+      title: t('workspace.recorded'),
+      message: t('workspace.recordedMessage', { value: recorded, task: task.name, left: status.remainingToday }),
+    });
+    return true;
+  } catch (recordError) {
+    toast.push({ tone: 'danger', title: t('workspace.notRecorded'), message: errorMessage(recordError, t('errors.generic')) });
+    await refreshRecording().catch(() => undefined);
+    return false;
+  }
+}
+
+async function saveRecord(value: RecordedValue): Promise<void> {
   const task = recordTask.value;
   if (!task) return;
   recordingSaving.value = true;
-  try {
-    const status = await recordTaskRequest(task.id, { requestId: recordRequestId, ...value });
-    recording.value = new Map(recording.value).set(task.id, status);
-    const recorded = 'promptLevels' in value
-      ? value.promptLevels.map(promptLevelLabel).join(', ')
-      : value.response === 'yes' ? '+ (Yes)' : '− (No)';
-    toast.push({
-      tone: 'success',
-      title: 'Recorded',
-      message: `${recorded} for ${task.name}. ${status.remainingToday} left today.`,
-    });
-    recordTask.value = null;
-  } catch (recordError) {
-    toast.push({ tone: 'danger', title: 'Not recorded', message: errorMessage(recordError, 'Try again.') });
-    await refreshRecording().catch(() => undefined);
-  } finally {
-    recordingSaving.value = false;
-  }
+  if (await submitRecord(task, value, recordRequestId)) recordTask.value = null;
+  recordingSaving.value = false;
+}
+
+/** One tap on a task card saves a Yes or a No; each tap is its own record. */
+const quickSaving = ref(new Set<string>());
+async function quickRecord(task: TaskItem, response: RecordResponse): Promise<void> {
+  if (quickSaving.value.has(task.id)) return;
+  quickSaving.value = new Set(quickSaving.value).add(task.id);
+  await submitRecord(task, { response }, crypto.randomUUID());
+  const next = new Set(quickSaving.value);
+  next.delete(task.id);
+  quickSaving.value = next;
 }
 
 const graphTask = ref<TaskItem | null>(null);
@@ -306,22 +323,28 @@ onMounted(async () => {
 
 <template>
   <div class="therapy">
-    <aside class="clients" aria-label="Your clients">
-      <h2 class="clients-title">My clients</h2>
+    <aside class="clients" :aria-label="t('workspace.myClients')">
+      <div class="clients-head">
+        <h2 class="clients-title">{{ t('workspace.myClients') }}</h2>
+        <span v-if="clients.length" class="clients-count">{{ clients.length }}</span>
+      </div>
       <SkeletonBlock v-if="clientLoader.loading.value" height="240px" />
-      <ErrorState v-else-if="clientLoader.error.value" title="Clients unavailable" :description="clientLoader.error.value" @retry="clientLoader.load" />
-      <p v-else-if="clients.length === 0" class="clients-empty">No clients are assigned to you yet.</p>
+      <ErrorState v-else-if="clientLoader.error.value" :title="t('workspace.clientsUnavailable')" :description="clientLoader.error.value" @retry="clientLoader.load" />
+      <p v-else-if="clients.length === 0" class="clients-empty">{{ t('workspace.noClients') }}</p>
       <template v-else>
-        <label class="visually-hidden" for="client-search">Search clients by name or code</label>
-        <input
-          id="client-search"
-          v-model="clientSearch"
-          type="search"
-          class="client-search"
-          placeholder="Name or code"
-          autocomplete="off"
-        />
-        <p v-if="filteredClients.length === 0" class="clients-empty">No matching clients.</p>
+        <div class="client-search-wrap">
+          <AppIcon name="search" :size="16" class="client-search-icon" />
+          <label class="visually-hidden" for="client-search">{{ t('workspace.searchLabel') }}</label>
+          <input
+            id="client-search"
+            v-model="clientSearch"
+            type="search"
+            class="control client-search"
+            :placeholder="t('workspace.searchPlaceholder')"
+            autocomplete="off"
+          />
+        </div>
+        <p v-if="filteredClients.length === 0" class="clients-empty">{{ t('workspace.noMatches') }}</p>
       </template>
       <ul v-if="filteredClients.length" class="client-list">
         <li v-for="client in filteredClients" :key="client.id">
@@ -330,7 +353,7 @@ onMounted(async () => {
             class="client-tile"
             :class="{ 'is-selected': client.id === selectedId }"
             :aria-pressed="client.id === selectedId"
-            :aria-label="`Client ${client.initials}, ${client.clientCode}`"
+            :aria-label="`${client.initials}, ${client.clientCode}`"
             @click="selectClient(client.id)"
           >
             <span class="client-initials" aria-hidden="true">{{ client.initials }}</span>
@@ -340,23 +363,23 @@ onMounted(async () => {
       </ul>
     </aside>
 
-    <section class="workspace" aria-label="Therapy workspace">
+    <section class="workspace" :aria-label="t('workspace.title')">
       <header class="workspace-header">
         <div class="workspace-top">
           <div class="workspace-heading">
             <span v-if="selected" class="workspace-initials" aria-hidden="true">{{ selected.initials }}</span>
             <div>
-              <h1 class="workspace-title">Therapy Workspace</h1>
+              <h1 class="workspace-title">{{ t('workspace.title') }}</h1>
               <p v-if="selected" class="workspace-client">
-                <RouterLink class="workspace-client-name" :to="`/clients/${selected.id}`" title="Open client details">
+                <RouterLink class="workspace-client-name" :to="`/clients/${selected.id}`" :title="t('workspace.openClient')">
                   {{ selected.displayName }}
                 </RouterLink>
                 <span class="workspace-client-code">{{ selected.clientCode }}</span>
               </p>
-              <p v-else class="workspace-subtitle">Choose a client to see their programs.</p>
+              <p v-else class="workspace-subtitle">{{ t('workspace.chooseClient') }}</p>
             </div>
           </div>
-          <div class="views" role="group" aria-label="View">
+          <div class="views" role="group" :aria-label="t('workspace.view')">
             <button
               v-for="option in VIEW_OPTIONS"
               :key="option.value"
@@ -364,39 +387,40 @@ onMounted(async () => {
               class="view-button"
               :class="{ 'is-active': viewMode === option.value }"
               :aria-pressed="viewMode === option.value"
-              :title="option.label"
+              :title="t(`workspace.views.${option.value}`)"
               @click="setQuery({ view: option.value })"
             >
-              <AppIcon :name="option.icon" />
-              <span>{{ option.label }}</span>
+              <AppIcon :name="option.icon" :size="16" />
+              <span>{{ t(`workspace.views.${option.value}`) }}</span>
             </button>
           </div>
         </div>
-        <div class="filters" role="group" aria-label="Filter by status">
+        <div class="filters" role="group" :aria-label="t('workspace.filterByStatus')">
           <button
             v-for="option in FILTER_OPTIONS"
-            :key="option.value"
+            :key="option"
             type="button"
             class="filter-chip"
-            :class="[option.value === 'all' ? 'tone-all' : `care-tone-${option.value}`, { 'is-active': statusFilter === option.value }]"
-            :aria-pressed="statusFilter === option.value"
-            @click="setQuery({ status: option.value === 'all' ? undefined : option.value })"
+            :class="[option === 'all' ? 'tone-all' : `care-tone-${option}`, { 'is-active': statusFilter === option }]"
+            :aria-pressed="statusFilter === option"
+            @click="setQuery({ status: option === 'all' ? undefined : option })"
           >
-            <AppIcon :name="`status-${option.value}`" />
-            {{ option.label }}
-            <span class="filter-count">{{ filterCount(option.value) }}</span>
+            <AppIcon :name="`status-${option}`" :size="16" />
+            {{ filterLabel(option) }}
+            <span class="filter-count">{{ filterCount(option) }}</span>
           </button>
         </div>
       </header>
 
       <SkeletonBlock v-if="workspaceLoader.loading.value && !workspaceLoaded" height="320px" />
-      <ErrorState v-else-if="workspaceLoader.error.value" title="Workspace unavailable" :description="workspaceLoader.error.value" @retry="workspaceLoader.load" />
-      <EmptyState v-else-if="!selected" title="No client selected" description="Choose a client on the left to open their therapy workspace." />
-      <EmptyState v-else-if="programs.length === 0" title="No programs yet" description="Programs created for this client appear here." />
+      <ErrorState v-else-if="workspaceLoader.error.value" :title="t('workspace.unavailable')" :description="workspaceLoader.error.value" @retry="workspaceLoader.load" />
+      <EmptyState v-else-if="!selected" icon="workspace" :title="t('workspace.noClientSelected')" :description="t('workspace.noClientSelectedHint')" />
+      <EmptyState v-else-if="programs.length === 0" icon="programs" :title="t('workspace.noPrograms')" :description="t('workspace.noProgramsHint')" />
       <EmptyState
         v-else-if="visiblePrograms.length === 0"
-        :title="`Nothing ${careStatusLabel(statusFilter)}`"
-        description="No programs or tasks for this client have that status."
+        :icon="`status-${statusFilter}`"
+        :title="t('workspace.nothingWithStatus', { status: filterLabel(statusFilter) })"
+        :description="t('workspace.nothingWithStatusHint')"
       />
 
       <div
@@ -415,9 +439,11 @@ onMounted(async () => {
           :program-actions="programActions(program)"
           :task-actions="taskActions"
           :recording="(task) => recording.get(task.id)"
+          :saving="quickSaving"
           @program-action="onProgramAction(program, $event)"
           @task-action="onTaskAction"
           @record="openRecord"
+          @quick-record="quickRecord"
           @expand="expand(program.id)"
         />
       </div>
@@ -427,7 +453,7 @@ onMounted(async () => {
       :open="pending !== null"
       :title="pending?.title ?? ''"
       :description="pendingDescription"
-      :confirm-label="pending?.status === MASTERED_STATUS ? 'Mark as mastered' : 'Move to On Hold'"
+      :confirm-label="pending?.status === MASTERED_STATUS ? t('workspace.actions.markMastered') : t('workspace.actions.moveOnHold')"
       :saving="saving"
       @confirm="confirmChange"
       @close="pending = null"
@@ -457,72 +483,87 @@ onMounted(async () => {
 <style scoped>
 .therapy {
   /* Height of the client panel: the viewport below the top bar, breadcrumbs and page padding. */
-  --panel-height: max(360px, calc(100dvh - var(--topbar-height, 64px) - 96px));
+  --panel-height: max(360px, calc(100dvh - var(--topbar-height) - 110px));
   display: grid;
-  grid-template-columns: 136px minmax(0, 1fr);
+  grid-template-columns: 188px minmax(0, 1fr);
   align-items: start;
-  gap: 20px;
+  gap: var(--space-5);
+  width: min(1440px, 100%);
+  margin: 0 auto;
 }
 
-/* Client selector */
+/* Client rail: a calm list; only the list scrolls, so the panel keeps its size however many clients there are. */
 .clients {
   position: sticky;
-  top: calc(var(--topbar-height, 64px) + 16px + env(safe-area-inset-top, 0px));
+  top: calc(var(--topbar-height) + var(--space-4) + env(safe-area-inset-top, 0px));
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
   height: var(--panel-height);
-  padding: 16px 12px;
-  background: linear-gradient(180deg, #0e6b62 0%, #0a4f49 100%);
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  color: #ffffff;
+  box-shadow: var(--shadow-xs);
+}
+
+.clients-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-1);
 }
 
 .clients-title {
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.85;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.clients-count {
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
 }
 
 .clients-empty {
-  font-size: 0.85rem;
-  opacity: 0.85;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.client-search-wrap {
+  position: relative;
+}
+
+.client-search-icon {
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 10px;
+  translate: 0 -50%;
+  color: var(--color-text-subtle);
+  pointer-events: none;
 }
 
 .client-search {
-  width: 100%;
   min-height: 36px;
-  padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  font: inherit;
-  font-size: 0.85rem;
+  padding-inline-start: 32px;
+  font-size: var(--text-sm);
 }
 
-.client-search::placeholder {
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.client-search:focus {
-  outline: 3px solid #ffd479;
-  outline-offset: 1px;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* Only the list scrolls; the panel keeps its size however many clients there are. */
 .client-list {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   min-height: 0;
   margin: 0;
-  padding: 2px 2px 4px;
+  padding: 0;
   list-style: none;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -532,63 +573,65 @@ onMounted(async () => {
 
 .client-tile {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   width: 100%;
-  padding: 12px 6px;
-  border: 2px solid transparent;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.1);
-  color: inherit;
+  min-height: 44px;
+  padding: 6px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  text-align: start;
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s;
+  transition: background-color var(--transition), color var(--transition);
 }
 
 .client-tile:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--color-surface-sunken);
 }
 
 .client-tile.is-selected {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: #0a4f49;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
 }
 
 .client-tile:focus-visible {
-  outline: 3px solid #ffd479;
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus);
 }
 
 .client-initials {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  flex: none;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
 }
 
 .client-tile.is-selected .client-initials {
-  background: #0e6b62;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
 .client-code {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  word-break: break-all;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Workspace */
 .workspace {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
   min-width: 0;
   /* Never shorter than the client panel, so the page keeps its height while clients change. */
   min-height: var(--panel-height);
@@ -602,78 +645,16 @@ onMounted(async () => {
 
 .workspace-header {
   position: sticky;
-  top: calc(var(--topbar-height, 64px) + env(safe-area-inset-top, 0px));
+  top: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
   z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 20px;
-  padding: 14px 16px;
-  background: var(--color-surface);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
-
-.workspace-heading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.workspace-initials {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--color-primary);
-  color: #ffffff;
-  font-weight: 800;
-}
-
-.workspace-title {
-  margin: 0;
-  font-size: 1.15rem;
-  color: var(--color-ink);
-}
-
-.workspace-subtitle {
-  margin: 2px 0 0;
-  color: var(--color-text-muted);
-  font-size: 0.88rem;
-}
-
-.workspace-client {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  margin: 2px 0 0;
-}
-
-.workspace-client-name {
-  color: var(--color-ink);
-  font-size: 1.05rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.workspace-client-name:hover,
-.workspace-client-name:focus-visible {
-  color: var(--color-primary);
-  text-decoration: underline;
-}
-
-.workspace-client-code {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--color-surface-muted);
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  box-shadow: var(--shadow-xs);
 }
 
 .workspace-top {
@@ -681,59 +662,124 @@ onMounted(async () => {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px 20px;
-  width: 100%;
+  gap: var(--space-3) var(--space-5);
+}
+
+.workspace-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.workspace-initials {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.workspace-title {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.workspace-subtitle {
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.workspace-client {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.workspace-client-name {
+  color: var(--color-ink);
+  font-size: var(--text-lg);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.workspace-client-name:hover,
+.workspace-client-name:focus-visible {
+  color: var(--color-primary-ink);
+  text-decoration: underline;
+}
+
+.workspace-client-code {
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .views {
   display: inline-flex;
   padding: 3px;
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
 }
 
 .view-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 6px 12px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-muted);
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 500;
   cursor: pointer;
 }
 
 .view-button.is-active {
   background: var(--color-surface);
   color: var(--color-ink);
-  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
 }
 
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  width: 100%;
+  gap: var(--space-2);
 }
 
 .filter-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
   background: var(--color-surface);
   color: var(--color-text-muted);
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.filter-chip:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-ink);
 }
 
 .filter-chip :deep(.icon) {
@@ -742,6 +788,7 @@ onMounted(async () => {
 
 .filter-chip.is-active {
   color: var(--color-ink);
+  font-weight: 600;
   border-color: var(--status-accent);
   background: var(--status-soft);
 }
@@ -752,11 +799,13 @@ onMounted(async () => {
 }
 
 .filter-count {
-  min-width: 22px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--color-surface-muted);
-  font-size: 0.78rem;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 18px;
   text-align: center;
 }
 
@@ -764,7 +813,7 @@ onMounted(async () => {
 .groups {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 @media (max-width: 720px) {
@@ -781,14 +830,23 @@ onMounted(async () => {
     min-height: 0;
   }
 
+  .workspace-header {
+    position: static;
+    padding: var(--space-4);
+  }
+
   .client-list {
     flex-direction: row;
     overflow-x: auto;
   }
 
   .client-tile {
-    width: 96px;
     flex: none;
+    width: auto;
+  }
+
+  .client-code {
+    white-space: nowrap;
   }
 
   .view-button span {

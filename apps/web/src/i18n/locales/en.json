@@ -186,5 +186,143 @@
   "errors": {
     "generic": "Something went wrong. Try again.",
     "unreachable": "The server could not be reached. Start the API and try again."
+  },
+  "status": {
+    "in_treatment": "In Treatment",
+    "maintenance": "Maintenance",
+    "on_hold": "On Hold",
+    "mastered": "Mastered"
+  },
+  "phases": {
+    "Baseline": "Baseline",
+    "Treatment": "Treatment",
+    "Maintenance": "Maintenance",
+    "Mastered": "Mastered"
+  },
+  "promptLevels": {
+    "independent": "Independent",
+    "full_prompt": "Full Prompt",
+    "partial_prompt": "Partial Prompt",
+    "gesture_prompt": "Gesture Prompt",
+    "model_prompt": "Model Prompt",
+    "positional": "Positional"
+  },
+  "workspace": {
+    "myClients": "My clients",
+    "clientCount": "No clients | 1 client | {n} clients",
+    "searchLabel": "Search clients by name or code",
+    "searchPlaceholder": "Name or code",
+    "noClients": "No clients are assigned to you yet.",
+    "noMatches": "No matching clients.",
+    "clientsUnavailable": "Clients unavailable",
+    "clientsError": "Your clients could not be loaded.",
+    "programsError": "This client’s programs could not be loaded.",
+    "title": "Therapy Workspace",
+    "openClient": "Open client details",
+    "chooseClient": "Choose a client to see their programs.",
+    "view": "View",
+    "views": {
+      "horizontal": "Side by side",
+      "vertical": "Stacked"
+    },
+    "filterByStatus": "Filter by status",
+    "all": "All",
+    "unavailable": "Workspace unavailable",
+    "noClientSelected": "No client selected",
+    "noClientSelectedHint": "Choose a client to open their programs and tasks.",
+    "noPrograms": "No programs yet",
+    "noProgramsHint": "Programs created for this client appear here.",
+    "nothingWithStatus": "Nothing {status}",
+    "nothingWithStatusHint": "No programs or tasks for this client have that status.",
+    "actions": {
+      "moveOnHold": "Move to On Hold",
+      "markMastered": "Mark as mastered",
+      "viewTasks": "Show all tasks",
+      "addTask": "Add task",
+      "viewGraph": "View graph"
+    },
+    "programActions": "Actions for program {name}",
+    "taskActions": "Actions for task {name}",
+    "statusDialog": {
+      "programOnHold": "Move program to On Hold",
+      "programMastered": "Mark program as mastered",
+      "taskOnHold": "Move task to On Hold",
+      "taskMastered": "Mark task as mastered",
+      "description": "“{name}” moves to {status}. The reason is saved with its history.",
+      "reason": "Reason for the change",
+      "reasonTooShort": "Explain the change in at least 12 characters."
+    },
+    "statusUpdated": "Status updated",
+    "statusUpdatedMessage": "{name} is now {status}.",
+    "statusNotChanged": "Status was not changed",
+    "taskAdded": "Task added",
+    "taskAddedMessage": "{task} was added to {program}.",
+    "taskNotAdded": "Task was not added",
+    "recorded": "Recorded",
+    "recordedMessage": "{value} for {task}. {left} left today.",
+    "notRecorded": "Not recorded",
+    "yes": "+ (Yes)",
+    "no": "− (No)"
+  },
+  "card": {
+    "tasks": "No tasks | 1 task | {n} tasks",
+    "noTasks": "No tasks yet",
+    "showAll": "Show all {n} tasks",
+    "trials": "{n} trial | {n} trials",
+    "leftToday": "{left} of {total} left today",
+    "doneToday": "Done for today",
+    "record": "Record",
+    "recordTask": "Record {name}",
+    "recordYes": "Record yes for {name}",
+    "recordNo": "Record no for {name}",
+    "progress": "Recorded today",
+    "general": "General"
+  },
+  "recordDialog": {
+    "title": "Record",
+    "program": "Program",
+    "task": "Task",
+    "response": "Response",
+    "promptLevels": "Prompt levels",
+    "checking": "Checking today’s records…",
+    "complete": "Today is complete: {total} of {total} trials recorded.",
+    "trialOf": "Trial {n} of {total} today",
+    "remaining": "{left} of {total} records left today, shared by everyone on this client’s care team.",
+    "chooseResponse": "Choose + (Yes) or − (No).",
+    "chooseLevels": "Choose one or more prompt levels.",
+    "submit": "Save record"
+  },
+  "graph": {
+    "title": "Graph · {task}",
+    "range": "Range",
+    "ranges": {
+      "7": "Last 7 days",
+      "30": "Last 30 days",
+      "90": "Last 90 days",
+      "all": "All history"
+    },
+    "today": "Today ({date}): {recorded} recorded, {left} of {total} left.",
+    "yesNoTitle": "Yes and No by day",
+    "yesNoDescription": "Records saved by every therapist on this client’s care team.",
+    "promptTitle": "Prompt levels by day",
+    "promptDescription": "How many records selected each level. One record can select several.",
+    "noGraph": "No records yet",
+    "noGraphHint": "The graph appears after the first record is saved.",
+    "unavailable": "Records unavailable",
+    "error": "This task’s records could not be loaded.",
+    "caption": "Recorded responses, newest first",
+    "latest": "Showing the latest 200 records in this range.",
+    "columns": {
+      "date": "Date",
+      "time": "Time",
+      "session": "Session",
+      "trial": "Trial",
+      "response": "Response",
+      "therapist": "Therapist"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "plusYes": "+ Yes",
+    "minusNo": "− No"
   }
 }

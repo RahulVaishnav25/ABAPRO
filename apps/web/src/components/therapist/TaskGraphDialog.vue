@@ -1,34 +1,33 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { promptLevelLabel, type TaskRecordHistory } from '@abapro/shared';
+import { useI18n } from 'vue-i18n';
+import type { TaskRecordHistory } from '@abapro/shared';
 import { taskRecordsRequest } from '@/api/programs';
 import type { TaskItem } from '@/api/tasks';
 import { hasPrompts, hasYesNo, promptLevelsOption, promptLevelsSummary, taskRecordsOption, taskRecordsSummary } from '@/charts/task-records';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import AppTable from '@/components/ui/AppTable.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import GraphContainer from '@/components/ui/GraphContainer.vue';
-import { formatShortDate, formatTime } from '@/lib/format';
+import { formatDate, formatShortDate, formatTime } from '@/lib/format';
 import { useLoader } from '@/lib/loader';
 
-const RANGE_OPTIONS = [
-  { value: '7', label: 'Last 7 days' },
-  { value: '30', label: 'Last 30 days' },
-  { value: '90', label: 'Last 90 days' },
-  { value: 'all', label: 'All history' },
-];
-const RECORD_COLUMNS = [
-  { key: 'date', label: 'Date', sortable: true },
-  { key: 'time', label: 'Time' },
-  { key: 'session', label: 'Session', sortable: true, align: 'end' as const },
-  { key: 'trial', label: 'Trial', sortable: true, align: 'end' as const },
-  { key: 'response', label: 'Response', sortable: true },
-  { key: 'therapist', label: 'Therapist', sortable: true },
-];
 
 const props = defineProps<{ open: boolean; task: TaskItem | null }>();
 const emit = defineEmits<{ close: [] }>();
+
+const { t } = useI18n();
+const rangeOptions = computed(() => ['7', '30', '90', 'all'].map((value) => ({ value, label: t(`graph.ranges.${value}`) })));
+const recordColumns = computed(() => [
+  { key: 'date', label: t('graph.columns.date'), sortable: true },
+  { key: 'time', label: t('graph.columns.time') },
+  { key: 'session', label: t('graph.columns.session'), sortable: true, align: 'end' as const },
+  { key: 'trial', label: t('graph.columns.trial'), sortable: true, align: 'end' as const },
+  { key: 'response', label: t('graph.columns.response'), sortable: true },
+  { key: 'therapist', label: t('graph.columns.therapist'), sortable: true },
+]);
 
 const range = ref('30');
 const history = ref<TaskRecordHistory | null>(null);
@@ -43,7 +42,7 @@ function rangeStart(): string | undefined {
 const loader = useLoader(async () => {
   if (!props.task) return;
   history.value = await taskRecordsRequest(props.task.id, rangeStart());
-}, 'This task’s records could not be loaded.', false);
+}, t('graph.error'), false);
 
 watch(
   () => props.open,
@@ -70,30 +69,31 @@ const rows = computed(() =>
     session: record.sessionNumber,
     trial: record.trialNumber,
     response: record.promptLevels.length
-      ? record.promptLevels.map(promptLevelLabel).join(', ')
-      : record.response === 'yes' ? '+ Yes' : '− No',
+      ? record.promptLevels.map((level) => t(`promptLevels.${level}`)).join(', ')
+      : record.response === 'yes' ? t('graph.plusYes') : t('graph.minusNo'),
     therapist: record.therapistName,
   })),
 );
 const today = computed(() => {
   const status = history.value?.status;
   if (!status) return '';
-  return `Today (${formatShortDate(status.date)}): ${status.recordedToday} recorded, ${status.remainingToday} of ${status.dailyLimit} left.`;
+  return t('graph.today', { date: formatShortDate(status.date), recorded: status.recordedToday, left: status.remainingToday, total: status.dailyLimit });
 });
 </script>
 
 <template>
-  <AppDialog :open="open" :title="`Graph · ${task?.name ?? ''}`" size="lg" @close="emit('close')">
+  <AppDialog :open="open" :title="t('graph.title', { task: task?.name ?? '' })" size="lg" @close="emit('close')">
     <div class="graph-toolbar">
       <p class="graph-context">{{ task?.programTitle }}<template v-if="today"> · {{ today }}</template></p>
-      <AppSelect v-model="range" class="graph-range" label="Range" :options="RANGE_OPTIONS" hide-label />
+      <AppSelect v-model="range" class="graph-range" :label="t('graph.range')" :options="rangeOptions" hide-label />
     </div>
-    <ErrorState v-if="loader.error.value" title="Records unavailable" :description="loader.error.value" @retry="loader.load" />
+    <ErrorState v-if="loader.error.value" :title="t('graph.unavailable')" :description="loader.error.value" @retry="loader.load" />
+    <EmptyState v-else-if="history && history.records.length === 0" icon="status-all" :title="t('graph.noGraph')" :description="t('graph.noGraphHint')" />
     <template v-else>
       <GraphContainer
         v-if="showYesNo"
-        title="Yes and No by day"
-        description="Records saved by every therapist on this client’s care team."
+        :title="t('graph.yesNoTitle')"
+        :description="t('graph.yesNoDescription')"
         :option="option"
         :summary="summary"
         :loading="loader.loading.value && !history"
@@ -101,23 +101,25 @@ const today = computed(() => {
       <GraphContainer
         v-if="promptOption"
         class="prompt-graph"
-        title="Prompt levels by day"
-        description="How many records selected each level. One record can select several."
+        :title="t('graph.promptTitle')"
+        :description="t('graph.promptDescription')"
         :option="promptOption"
         :summary="promptSummary"
       />
       <AppTable
         v-if="history && rows.length"
         class="record-table"
-        caption="Recorded responses, newest first"
-        :columns="RECORD_COLUMNS"
+        :caption="t('graph.caption')"
+        :columns="recordColumns"
         :rows="rows"
         row-key="id"
         :page-size="10"
         density="compact"
         :searchable="false"
-      />
-      <p v-if="history && history.records.length >= 200" class="record-note">Showing the latest 200 records in this range.</p>
+      >
+        <template #cell-date="{ value }">{{ formatDate(String(value)) }}</template>
+      </AppTable>
+      <p v-if="history && history.records.length >= 200" class="record-note">{{ t('graph.latest') }}</p>
     </template>
   </AppDialog>
 </template>

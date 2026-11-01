@@ -186,5 +186,143 @@
   "errors": {
     "generic": "Une erreur s'est produite. Réessayez.",
     "unreachable": "Impossible de joindre le serveur. Démarrez l'API et réessayez."
+  },
+  "status": {
+    "in_treatment": "En traitement",
+    "maintenance": "Maintien",
+    "on_hold": "En pause",
+    "mastered": "Acquis"
+  },
+  "phases": {
+    "Baseline": "Ligne de base",
+    "Treatment": "Traitement",
+    "Maintenance": "Maintien",
+    "Mastered": "Acquis"
+  },
+  "promptLevels": {
+    "independent": "Autonome",
+    "full_prompt": "Guidance totale",
+    "partial_prompt": "Guidance partielle",
+    "gesture_prompt": "Guidance gestuelle",
+    "model_prompt": "Modelage",
+    "positional": "Positionnelle"
+  },
+  "workspace": {
+    "myClients": "Mes clients",
+    "clientCount": "Aucun client | 1 client | {n} clients",
+    "searchLabel": "Rechercher des clients par nom ou code",
+    "searchPlaceholder": "Nom ou code",
+    "noClients": "Aucun client ne vous est encore attribué.",
+    "noMatches": "Aucun client correspondant.",
+    "clientsUnavailable": "Clients indisponibles",
+    "clientsError": "Impossible de charger vos clients.",
+    "programsError": "Impossible de charger les programmes de ce client.",
+    "title": "Espace de thérapie",
+    "openClient": "Ouvrir la fiche du client",
+    "chooseClient": "Choisissez un client pour voir ses programmes.",
+    "view": "Affichage",
+    "views": {
+      "horizontal": "Côte à côte",
+      "vertical": "Empilé"
+    },
+    "filterByStatus": "Filtrer par statut",
+    "all": "Tous",
+    "unavailable": "Espace de travail indisponible",
+    "noClientSelected": "Aucun client sélectionné",
+    "noClientSelectedHint": "Choisissez un client pour ouvrir ses programmes et tâches.",
+    "noPrograms": "Pas encore de programmes",
+    "noProgramsHint": "Les programmes créés pour ce client apparaîtront ici.",
+    "nothingWithStatus": "Rien en {status}",
+    "nothingWithStatusHint": "Aucun programme ni aucune tâche de ce client n’a ce statut.",
+    "actions": {
+      "moveOnHold": "Mettre en pause",
+      "markMastered": "Marquer comme acquis",
+      "viewTasks": "Afficher toutes les tâches",
+      "addTask": "Ajouter une tâche",
+      "viewGraph": "Voir le graphique"
+    },
+    "programActions": "Actions du programme {name}",
+    "taskActions": "Actions de la tâche {name}",
+    "statusDialog": {
+      "programOnHold": "Mettre le programme en pause",
+      "programMastered": "Marquer le programme comme acquis",
+      "taskOnHold": "Mettre la tâche en pause",
+      "taskMastered": "Marquer la tâche comme acquise",
+      "description": "« {name} » passe à {status}. Le motif est enregistré dans son historique.",
+      "reason": "Motif du changement",
+      "reasonTooShort": "Expliquez le changement en au moins 12 caractères."
+    },
+    "statusUpdated": "Statut mis à jour",
+    "statusUpdatedMessage": "{name} est maintenant {status}.",
+    "statusNotChanged": "Le statut n’a pas été modifié",
+    "taskAdded": "Tâche ajoutée",
+    "taskAddedMessage": "{task} a été ajoutée à {program}.",
+    "taskNotAdded": "La tâche n’a pas été ajoutée",
+    "recorded": "Enregistré",
+    "recordedMessage": "{value} pour {task}. Il en reste {left} aujourd’hui.",
+    "notRecorded": "Non enregistré",
+    "yes": "+ (Oui)",
+    "no": "− (Non)"
+  },
+  "card": {
+    "tasks": "Aucune tâche | 1 tâche | {n} tâches",
+    "noTasks": "Pas encore de tâches",
+    "showAll": "Afficher les {n} tâches",
+    "trials": "{n} essai | {n} essais",
+    "leftToday": "{left} sur {total} restants aujourd’hui",
+    "doneToday": "Terminé pour aujourd’hui",
+    "record": "Enregistrer",
+    "recordTask": "Enregistrer {name}",
+    "recordYes": "Enregistrer oui pour {name}",
+    "recordNo": "Enregistrer non pour {name}",
+    "progress": "Enregistré aujourd’hui",
+    "general": "Général"
+  },
+  "recordDialog": {
+    "title": "Enregistrer",
+    "program": "Programme",
+    "task": "Tâche",
+    "response": "Réponse",
+    "promptLevels": "Niveaux de guidance",
+    "checking": "Vérification des enregistrements du jour…",
+    "complete": "La journée est complète : {total} essais sur {total} enregistrés.",
+    "trialOf": "Essai {n} sur {total} aujourd’hui",
+    "remaining": "Il reste {left} enregistrements sur {total} aujourd’hui, partagés par toute l’équipe de ce client.",
+    "chooseResponse": "Choisissez + (Oui) ou − (Non).",
+    "chooseLevels": "Choisissez un ou plusieurs niveaux de guidance.",
+    "submit": "Enregistrer"
+  },
+  "graph": {
+    "title": "Graphique · {task}",
+    "range": "Période",
+    "ranges": {
+      "7": "7 derniers jours",
+      "30": "30 derniers jours",
+      "90": "90 derniers jours",
+      "all": "Tout l’historique"
+    },
+    "today": "Aujourd’hui ({date}) : {recorded} enregistrés, {left} sur {total} restants.",
+    "yesNoTitle": "Oui et Non par jour",
+    "yesNoDescription": "Enregistrements de toute l’équipe thérapeutique de ce client.",
+    "promptTitle": "Niveaux de guidance par jour",
+    "promptDescription": "Nombre d’enregistrements ayant choisi chaque niveau. Un enregistrement peut en choisir plusieurs.",
+    "noGraph": "Pas encore d’enregistrements",
+    "noGraphHint": "Le graphique apparaît après le premier enregistrement.",
+    "unavailable": "Enregistrements indisponibles",
+    "error": "Impossible de charger les enregistrements de cette tâche.",
+    "caption": "Réponses enregistrées, des plus récentes aux plus anciennes",
+    "latest": "Les 200 derniers enregistrements de cette période sont affichés.",
+    "columns": {
+      "date": "Date",
+      "time": "Heure",
+      "session": "Séance",
+      "trial": "Essai",
+      "response": "Réponse",
+      "therapist": "Thérapeute"
+    },
+    "yes": "Oui",
+    "no": "Non",
+    "plusYes": "+ Oui",
+    "minusNo": "− Non"
   }
 }

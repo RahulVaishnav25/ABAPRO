@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { PROMPT_LEVEL_OPTIONS, type PromptLevel, type RecordResponse, type TaskRecordingStatus } from '@abapro/shared';
 import type { TaskItem } from '@/api/tasks';
 import AppButton from '@/components/ui/AppButton.vue';
@@ -8,10 +9,6 @@ import AppDialog from '@/components/ui/AppDialog.vue';
 import AppRadioGroup from '@/components/ui/AppRadioGroup.vue';
 import FieldError from '@/components/ui/FieldError.vue';
 
-const RESPONSE_OPTIONS = [
-  { value: 'yes', label: '+ (Yes)' },
-  { value: 'no', label: '− (No)' },
-];
 
 const props = defineProps<{
   open: boolean;
@@ -22,6 +19,12 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ submit: [value: { response: RecordResponse } | { promptLevels: PromptLevel[] }]; close: [] }>();
 
+const { t } = useI18n();
+const responseOptions = computed(() => [
+  { value: 'yes', label: t('workspace.yes') },
+  { value: 'no', label: t('workspace.no') },
+]);
+const levelOptions = computed(() => PROMPT_LEVEL_OPTIONS.map((option) => ({ value: option.value, label: t(`promptLevels.${option.value}`) })));
 const response = ref('');
 const promptLevels = ref<PromptLevel[]>([]);
 const error = ref('');
@@ -48,17 +51,17 @@ watch(
 const full = computed(() => props.status?.remainingToday === 0);
 const position = computed(() => {
   const status = props.status;
-  if (!status) return 'Checking today’s records…';
+  if (!status) return t('recordDialog.checking');
   if (status.nextTrial === null) {
-    return `Today is complete: ${status.dailyLimit} of ${status.dailyLimit} trials recorded.`;
+    return t('recordDialog.complete', { total: status.dailyLimit });
   }
-  return `Trial ${status.nextTrial} of ${status.dailyLimit} today`;
+  return t('recordDialog.trialOf', { n: status.nextTrial, total: status.dailyLimit });
 });
 
 function submit(): void {
   if (promptUsed.value) {
     if (promptLevels.value.length === 0) {
-      error.value = 'Choose one or more prompt levels.';
+      error.value = t('recordDialog.chooseLevels');
       return;
     }
     // Sent in the listed order, whatever order they were ticked in.
@@ -66,7 +69,7 @@ function submit(): void {
     return;
   }
   if (response.value !== 'yes' && response.value !== 'no') {
-    error.value = 'Choose + (Yes) or − (No).';
+    error.value = t('recordDialog.chooseResponse');
     return;
   }
   emit('submit', { response: response.value });
@@ -74,25 +77,25 @@ function submit(): void {
 </script>
 
 <template>
-  <AppDialog :open="open" title="Record" @close="emit('close')">
+  <AppDialog :open="open" :title="t('recordDialog.title')" size="sm" @close="emit('close')">
     <dl class="record-task">
       <div>
-        <dt>Program</dt>
+        <dt>{{ t('recordDialog.program') }}</dt>
         <dd>{{ task?.programTitle }}</dd>
       </div>
       <div>
-        <dt>Task</dt>
+        <dt>{{ t('recordDialog.task') }}</dt>
         <dd>{{ task?.name }}</dd>
       </div>
     </dl>
     <p class="record-position">{{ position }}</p>
     <p v-if="status" class="record-remaining">
-      {{ status.remainingToday }} of {{ status.dailyLimit }} records left today, shared by everyone on this client’s care team.
+      {{ t('recordDialog.remaining', { left: status.remainingToday, total: status.dailyLimit }) }}
     </p>
     <fieldset v-if="!full && promptUsed" class="choice-group record-options" aria-describedby="record-levels-error">
-      <legend>Prompt levels</legend>
+      <legend>{{ t('recordDialog.promptLevels') }}</legend>
       <AppCheckbox
-        v-for="option in PROMPT_LEVEL_OPTIONS"
+        v-for="option in levelOptions"
         :key="option.value"
         :model-value="promptLevels.includes(option.value)"
         :label="option.label"
@@ -104,14 +107,14 @@ function submit(): void {
       v-else-if="!full"
       v-model="response"
       class="record-options"
-      label="Response"
+      :label="t('recordDialog.response')"
       name="record-response"
-      :options="RESPONSE_OPTIONS"
+      :options="responseOptions"
       :error="error"
     />
     <template #footer>
-      <AppButton type="button" variant="secondary" @click="emit('close')">Cancel</AppButton>
-      <AppButton type="button" :loading="saving" :disabled="full || !status" @click="submit">Submit</AppButton>
+      <AppButton type="button" variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</AppButton>
+      <AppButton type="button" :loading="saving" :disabled="full || !status" @click="submit">{{ t('recordDialog.submit') }}</AppButton>
     </template>
   </AppDialog>
 </template>
@@ -129,10 +132,8 @@ function submit(): void {
 }
 
 .record-task dt {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--color-text-muted);
 }
 
@@ -150,7 +151,8 @@ function submit(): void {
 
 .record-remaining {
   margin: 2px 0 14px;
-  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
 .record-options {

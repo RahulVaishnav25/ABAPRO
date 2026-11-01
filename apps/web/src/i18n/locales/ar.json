@@ -186,5 +186,143 @@
   "errors": {
     "generic": "حدث خطأ ما. حاول مرة أخرى.",
     "unreachable": "تعذر الوصول إلى الخادم. شغّل واجهة البرمجة وحاول مرة أخرى."
+  },
+  "status": {
+    "in_treatment": "قيد العلاج",
+    "maintenance": "المتابعة",
+    "on_hold": "متوقف مؤقتًا",
+    "mastered": "متقَن"
+  },
+  "phases": {
+    "Baseline": "خط الأساس",
+    "Treatment": "العلاج",
+    "Maintenance": "المتابعة",
+    "Mastered": "متقَن"
+  },
+  "promptLevels": {
+    "independent": "مستقل",
+    "full_prompt": "مساعدة كاملة",
+    "partial_prompt": "مساعدة جزئية",
+    "gesture_prompt": "مساعدة بالإشارة",
+    "model_prompt": "مساعدة بالنمذجة",
+    "positional": "مساعدة موضعية"
+  },
+  "workspace": {
+    "myClients": "عملائي",
+    "clientCount": "لا يوجد عملاء | عميل واحد | {n} عملاء",
+    "searchLabel": "البحث عن العملاء بالاسم أو الرمز",
+    "searchPlaceholder": "الاسم أو الرمز",
+    "noClients": "لم يُعيَّن لك أي عميل بعد.",
+    "noMatches": "لا يوجد عملاء مطابقون.",
+    "clientsUnavailable": "العملاء غير متاحين",
+    "clientsError": "تعذر تحميل عملائك.",
+    "programsError": "تعذر تحميل برامج هذا العميل.",
+    "title": "مساحة العلاج",
+    "openClient": "فتح بيانات العميل",
+    "chooseClient": "اختر عميلًا لعرض برامجه.",
+    "view": "طريقة العرض",
+    "views": {
+      "horizontal": "جنبًا إلى جنب",
+      "vertical": "متراصّ"
+    },
+    "filterByStatus": "التصفية حسب الحالة",
+    "all": "الكل",
+    "unavailable": "مساحة العمل غير متاحة",
+    "noClientSelected": "لم يتم اختيار عميل",
+    "noClientSelectedHint": "اختر عميلًا لفتح برامجه ومهامه.",
+    "noPrograms": "لا توجد برامج بعد",
+    "noProgramsHint": "ستظهر هنا البرامج التي تُنشأ لهذا العميل.",
+    "nothingWithStatus": "لا شيء بحالة {status}",
+    "nothingWithStatusHint": "لا توجد برامج أو مهام لهذا العميل بهذه الحالة.",
+    "actions": {
+      "moveOnHold": "إيقاف مؤقت",
+      "markMastered": "تحديد كمتقَن",
+      "viewTasks": "عرض كل المهام",
+      "addTask": "إضافة مهمة",
+      "viewGraph": "عرض الرسم البياني"
+    },
+    "programActions": "إجراءات البرنامج {name}",
+    "taskActions": "إجراءات المهمة {name}",
+    "statusDialog": {
+      "programOnHold": "إيقاف البرنامج مؤقتًا",
+      "programMastered": "تحديد البرنامج كمتقَن",
+      "taskOnHold": "إيقاف المهمة مؤقتًا",
+      "taskMastered": "تحديد المهمة كمتقَنة",
+      "description": "ستنتقل «{name}» إلى {status}. يُحفظ السبب في سجلها.",
+      "reason": "سبب التغيير",
+      "reasonTooShort": "اشرح التغيير في 12 حرفًا على الأقل."
+    },
+    "statusUpdated": "تم تحديث الحالة",
+    "statusUpdatedMessage": "أصبحت حالة {name} الآن {status}.",
+    "statusNotChanged": "لم يتم تغيير الحالة",
+    "taskAdded": "تمت إضافة المهمة",
+    "taskAddedMessage": "تمت إضافة {task} إلى {program}.",
+    "taskNotAdded": "لم تتم إضافة المهمة",
+    "recorded": "تم التسجيل",
+    "recordedMessage": "{value} لـ {task}. المتبقي اليوم: {left}.",
+    "notRecorded": "لم يتم التسجيل",
+    "yes": "+ (نعم)",
+    "no": "− (لا)"
+  },
+  "card": {
+    "tasks": "لا توجد مهام | مهمة واحدة | {n} مهام",
+    "noTasks": "لا توجد مهام بعد",
+    "showAll": "عرض المهام كلها ({n})",
+    "trials": "{n} محاولة | {n} محاولات",
+    "leftToday": "المتبقي اليوم {left} من {total}",
+    "doneToday": "اكتمل لهذا اليوم",
+    "record": "تسجيل",
+    "recordTask": "تسجيل {name}",
+    "recordYes": "تسجيل نعم لـ {name}",
+    "recordNo": "تسجيل لا لـ {name}",
+    "progress": "المسجَّل اليوم",
+    "general": "عام"
+  },
+  "recordDialog": {
+    "title": "تسجيل",
+    "program": "البرنامج",
+    "task": "المهمة",
+    "response": "الاستجابة",
+    "promptLevels": "مستويات المساعدة",
+    "checking": "جارٍ التحقق من تسجيلات اليوم…",
+    "complete": "اكتمل اليوم: تم تسجيل {total} من {total} محاولات.",
+    "trialOf": "المحاولة {n} من {total} اليوم",
+    "remaining": "المتبقي اليوم {left} من {total} تسجيلات، يتشاركها جميع أعضاء فريق رعاية هذا العميل.",
+    "chooseResponse": "اختر + (نعم) أو − (لا).",
+    "chooseLevels": "اختر مستوى مساعدة واحدًا أو أكثر.",
+    "submit": "حفظ التسجيل"
+  },
+  "graph": {
+    "title": "الرسم البياني · {task}",
+    "range": "الفترة",
+    "ranges": {
+      "7": "آخر 7 أيام",
+      "30": "آخر 30 يومًا",
+      "90": "آخر 90 يومًا",
+      "all": "كل السجل"
+    },
+    "today": "اليوم ({date}): تم تسجيل {recorded}، والمتبقي {left} من {total}.",
+    "yesNoTitle": "نعم ولا حسب اليوم",
+    "yesNoDescription": "التسجيلات التي حفظها جميع معالجي هذا العميل.",
+    "promptTitle": "مستويات المساعدة حسب اليوم",
+    "promptDescription": "عدد التسجيلات التي اختارت كل مستوى. يمكن للتسجيل الواحد اختيار عدة مستويات.",
+    "noGraph": "لا توجد تسجيلات بعد",
+    "noGraphHint": "يظهر الرسم البياني بعد حفظ أول تسجيل.",
+    "unavailable": "التسجيلات غير متاحة",
+    "error": "تعذر تحميل تسجيلات هذه المهمة.",
+    "caption": "الاستجابات المسجلة، من الأحدث إلى الأقدم",
+    "latest": "يُعرض آخر 200 تسجيل في هذه الفترة.",
+    "columns": {
+      "date": "التاريخ",
+      "time": "الوقت",
+      "session": "الجلسة",
+      "trial": "المحاولة",
+      "response": "الاستجابة",
+      "therapist": "المعالج"
+    },
+    "yes": "نعم",
+    "no": "لا",
+    "plusYes": "+ نعم",
+    "minusNo": "− لا"
   }
 }

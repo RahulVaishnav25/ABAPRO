@@ -186,5 +186,143 @@
   "errors": {
     "generic": "משהו השתבש. כדאי לנסות שוב.",
     "unreachable": "לא ניתן להתחבר לשרת. יש להפעיל את ה-API ולנסות שוב."
+  },
+  "status": {
+    "in_treatment": "בטיפול",
+    "maintenance": "שימור",
+    "on_hold": "בהשהיה",
+    "mastered": "נרכש"
+  },
+  "phases": {
+    "Baseline": "קו בסיס",
+    "Treatment": "טיפול",
+    "Maintenance": "שימור",
+    "Mastered": "נרכש"
+  },
+  "promptLevels": {
+    "independent": "עצמאי",
+    "full_prompt": "הנחיה מלאה",
+    "partial_prompt": "הנחיה חלקית",
+    "gesture_prompt": "הנחיה בתנועה",
+    "model_prompt": "הדגמה",
+    "positional": "הנחיה מיקומית"
+  },
+  "workspace": {
+    "myClients": "המטופלים שלי",
+    "clientCount": "אין מטופלים | מטופל אחד | {n} מטופלים",
+    "searchLabel": "חיפוש מטופלים לפי שם או קוד",
+    "searchPlaceholder": "שם או קוד",
+    "noClients": "עדיין לא שויכו אליך מטופלים.",
+    "noMatches": "אין מטופלים תואמים.",
+    "clientsUnavailable": "המטופלים לא זמינים",
+    "clientsError": "לא ניתן לטעון את המטופלים שלך.",
+    "programsError": "לא ניתן לטעון את התוכניות של מטופל זה.",
+    "title": "סביבת הטיפול",
+    "openClient": "פתיחת פרטי המטופל",
+    "chooseClient": "יש לבחור מטופל כדי לראות את התוכניות שלו.",
+    "view": "תצוגה",
+    "views": {
+      "horizontal": "זה לצד זה",
+      "vertical": "בערימה"
+    },
+    "filterByStatus": "סינון לפי סטטוס",
+    "all": "הכול",
+    "unavailable": "סביבת העבודה לא זמינה",
+    "noClientSelected": "לא נבחר מטופל",
+    "noClientSelectedHint": "יש לבחור מטופל כדי לפתוח את התוכניות והמשימות שלו.",
+    "noPrograms": "עדיין אין תוכניות",
+    "noProgramsHint": "תוכניות שייווצרו למטופל זה יופיעו כאן.",
+    "nothingWithStatus": "אין פריטים בסטטוס {status}",
+    "nothingWithStatusHint": "אין למטופל זה תוכניות או משימות בסטטוס הזה.",
+    "actions": {
+      "moveOnHold": "השהיה",
+      "markMastered": "סימון כנרכש",
+      "viewTasks": "הצגת כל המשימות",
+      "addTask": "הוספת משימה",
+      "viewGraph": "הצגת גרף"
+    },
+    "programActions": "פעולות לתוכנית {name}",
+    "taskActions": "פעולות למשימה {name}",
+    "statusDialog": {
+      "programOnHold": "השהיית התוכנית",
+      "programMastered": "סימון התוכנית כנרכשת",
+      "taskOnHold": "השהיית המשימה",
+      "taskMastered": "סימון המשימה כנרכשת",
+      "description": "„{name}” תעבור לסטטוס {status}. הסיבה תישמר בהיסטוריה.",
+      "reason": "סיבת השינוי",
+      "reasonTooShort": "יש להסביר את השינוי ב-12 תווים לפחות."
+    },
+    "statusUpdated": "הסטטוס עודכן",
+    "statusUpdatedMessage": "{name} עכשיו בסטטוס {status}.",
+    "statusNotChanged": "הסטטוס לא שונה",
+    "taskAdded": "המשימה נוספה",
+    "taskAddedMessage": "{task} נוספה ל{program}.",
+    "taskNotAdded": "המשימה לא נוספה",
+    "recorded": "נרשם",
+    "recordedMessage": "{value} עבור {task}. נותרו היום {left}.",
+    "notRecorded": "לא נרשם",
+    "yes": "+ (כן)",
+    "no": "− (לא)"
+  },
+  "card": {
+    "tasks": "אין משימות | משימה אחת | {n} משימות",
+    "noTasks": "עדיין אין משימות",
+    "showAll": "הצגת כל {n} המשימות",
+    "trials": "ניסיון {n} | {n} ניסיונות",
+    "leftToday": "נותרו היום {left} מתוך {total}",
+    "doneToday": "הושלם להיום",
+    "record": "רישום",
+    "recordTask": "רישום {name}",
+    "recordYes": "רישום כן עבור {name}",
+    "recordNo": "רישום לא עבור {name}",
+    "progress": "נרשם היום",
+    "general": "כללי"
+  },
+  "recordDialog": {
+    "title": "רישום",
+    "program": "תוכנית",
+    "task": "משימה",
+    "response": "תגובה",
+    "promptLevels": "רמות הנחיה",
+    "checking": "בודקים את הרישומים של היום…",
+    "complete": "היום הושלם: נרשמו {total} מתוך {total} ניסיונות.",
+    "trialOf": "ניסיון {n} מתוך {total} היום",
+    "remaining": "נותרו היום {left} מתוך {total} רישומים, משותפים לכל צוות הטיפול של מטופל זה.",
+    "chooseResponse": "יש לבחור + (כן) או − (לא).",
+    "chooseLevels": "יש לבחור רמת הנחיה אחת או יותר.",
+    "submit": "שמירת הרישום"
+  },
+  "graph": {
+    "title": "גרף · {task}",
+    "range": "טווח",
+    "ranges": {
+      "7": "7 הימים האחרונים",
+      "30": "30 הימים האחרונים",
+      "90": "90 הימים האחרונים",
+      "all": "כל ההיסטוריה"
+    },
+    "today": "היום ({date}): נרשמו {recorded}, נותרו {left} מתוך {total}.",
+    "yesNoTitle": "כן ולא לפי יום",
+    "yesNoDescription": "רישומים שנשמרו על ידי כל המטפלים של מטופל זה.",
+    "promptTitle": "רמות הנחיה לפי יום",
+    "promptDescription": "כמה רישומים בחרו בכל רמה. רישום אחד יכול לבחור כמה רמות.",
+    "noGraph": "עדיין אין רישומים",
+    "noGraphHint": "הגרף יופיע אחרי שמירת הרישום הראשון.",
+    "unavailable": "הרישומים לא זמינים",
+    "error": "לא ניתן לטעון את הרישומים של משימה זו.",
+    "caption": "תגובות שנרשמו, מהחדשה לישנה",
+    "latest": "מוצגים 200 הרישומים האחרונים בטווח זה.",
+    "columns": {
+      "date": "תאריך",
+      "time": "שעה",
+      "session": "מפגש",
+      "trial": "ניסיון",
+      "response": "תגובה",
+      "therapist": "מטפל/ת"
+    },
+    "yes": "כן",
+    "no": "לא",
+    "plusYes": "+ כן",
+    "minusNo": "− לא"
   }
 }

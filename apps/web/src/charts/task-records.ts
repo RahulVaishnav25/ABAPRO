@@ -1,6 +1,11 @@
 import { PROMPT_LEVEL_OPTIONS, type TaskRecordDay } from '@abapro/shared';
 import type { EChartsCoreOption } from 'echarts/core';
+import { i18n } from '@/i18n';
 import { formatShortDate } from '@/lib/format';
+
+const t = (key: string) => i18n.global.t(key);
+/** Legends start on the reading side. */
+const legendSide = () => (document.documentElement.dir === 'rtl' ? { right: 0 } : { left: 0 });
 
 const axis = { color: '#556575' };
 const line = { color: '#d5dde3' };
@@ -16,7 +21,7 @@ export function taskRecordsOption(days: TaskRecordDay[]): EChartsCoreOption | nu
   return {
     color: [YES_COLOR, NO_COLOR],
     tooltip: { trigger: 'axis', axisPointer: { type: 'line' } },
-    legend: { top: 0, left: 0, icon: 'roundRect', itemWidth: 14, itemHeight: 4, textStyle: { color: '#25313b' } },
+    legend: { top: 0, ...legendSide(), icon: 'roundRect', itemWidth: 14, itemHeight: 4, textStyle: { color: '#25313b' } },
     grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true },
     xAxis: {
       type: 'category',
@@ -33,7 +38,7 @@ export function taskRecordsOption(days: TaskRecordDay[]): EChartsCoreOption | nu
     },
     series: [
       {
-        name: 'Yes',
+        name: t('graph.yes'),
         type: 'line',
         // Drawn above No, inside No's hollow marker when the counts match.
         z: 3,
@@ -45,7 +50,7 @@ export function taskRecordsOption(days: TaskRecordDay[]): EChartsCoreOption | nu
         lineStyle: { width: 2 },
       },
       {
-        name: 'No',
+        name: t('graph.no'),
         type: 'line',
         z: 2,
         data: days.map((day) => day.no),
@@ -60,7 +65,7 @@ export function taskRecordsOption(days: TaskRecordDay[]): EChartsCoreOption | nu
 }
 
 export function taskRecordsSummary(days: TaskRecordDay[]): string {
-  return days.map((day) => `${day.date}: ${day.yes} yes, ${day.no} no`).join('. ');
+  return days.map((day) => `${day.date}: ${day.yes} ${t('graph.yes')}, ${day.no} ${t('graph.no')}`).join('. ');
 }
 
 // Six categorical slots, checked for colour-blind separation. Three sit below 3:1 on white, so every level
@@ -82,7 +87,7 @@ export function promptLevelsOption(days: TaskRecordDay[]): EChartsCoreOption | n
   return {
     color: PROMPT_COLORS,
     tooltip: { trigger: 'axis', axisPointer: { type: 'line' } },
-    legend: { top: 0, left: 0, itemWidth: 12, itemHeight: 8, textStyle: { color: '#25313b' } },
+    legend: { top: 0, ...legendSide(), itemWidth: 12, itemHeight: 8, textStyle: { color: '#25313b' } },
     grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true },
     xAxis: {
       type: 'category',
@@ -98,7 +103,7 @@ export function promptLevelsOption(days: TaskRecordDay[]): EChartsCoreOption | n
       axisLabel: axis,
     },
     series: PROMPT_LEVEL_OPTIONS.map((option, index) => ({
-      name: option.label,
+      name: t(`promptLevels.${option.value}`),
       type: 'line',
       data: days.map((day) => day.prompts[option.value]),
       symbol: PROMPT_SYMBOLS[index],
@@ -111,6 +116,6 @@ export function promptLevelsOption(days: TaskRecordDay[]): EChartsCoreOption | n
 
 export function promptLevelsSummary(days: TaskRecordDay[]): string {
   return days
-    .map((day) => `${day.date}: ${PROMPT_LEVEL_OPTIONS.map((option) => `${day.prompts[option.value]} ${option.label}`).join(', ')}`)
+    .map((day) => `${day.date}: ${PROMPT_LEVEL_OPTIONS.map((option) => `${day.prompts[option.value]} ${t(`promptLevels.${option.value}`)}`).join(', ')}`)
     .join('. ');
 }

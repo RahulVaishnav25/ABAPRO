@@ -186,5 +186,143 @@
   "errors": {
     "generic": "Algo salió mal. Inténtelo de nuevo.",
     "unreachable": "No se pudo conectar con el servidor. Inicie la API e inténtelo de nuevo."
+  },
+  "status": {
+    "in_treatment": "En tratamiento",
+    "maintenance": "Mantenimiento",
+    "on_hold": "En pausa",
+    "mastered": "Dominado"
+  },
+  "phases": {
+    "Baseline": "Línea base",
+    "Treatment": "Tratamiento",
+    "Maintenance": "Mantenimiento",
+    "Mastered": "Dominado"
+  },
+  "promptLevels": {
+    "independent": "Independiente",
+    "full_prompt": "Ayuda total",
+    "partial_prompt": "Ayuda parcial",
+    "gesture_prompt": "Ayuda gestual",
+    "model_prompt": "Modelado",
+    "positional": "Posicional"
+  },
+  "workspace": {
+    "myClients": "Mis clientes",
+    "clientCount": "Ningún cliente | 1 cliente | {n} clientes",
+    "searchLabel": "Buscar clientes por nombre o código",
+    "searchPlaceholder": "Nombre o código",
+    "noClients": "Todavía no tiene clientes asignados.",
+    "noMatches": "No hay clientes que coincidan.",
+    "clientsUnavailable": "Clientes no disponibles",
+    "clientsError": "No se pudieron cargar sus clientes.",
+    "programsError": "No se pudieron cargar los programas de este cliente.",
+    "title": "Espacio de terapia",
+    "openClient": "Abrir los datos del cliente",
+    "chooseClient": "Elija un cliente para ver sus programas.",
+    "view": "Vista",
+    "views": {
+      "horizontal": "En paralelo",
+      "vertical": "Apilada"
+    },
+    "filterByStatus": "Filtrar por estado",
+    "all": "Todos",
+    "unavailable": "Espacio de trabajo no disponible",
+    "noClientSelected": "Ningún cliente seleccionado",
+    "noClientSelectedHint": "Elija un cliente para abrir sus programas y tareas.",
+    "noPrograms": "Todavía no hay programas",
+    "noProgramsHint": "Aquí aparecerán los programas creados para este cliente.",
+    "nothingWithStatus": "Nada en {status}",
+    "nothingWithStatusHint": "Ningún programa ni tarea de este cliente tiene ese estado.",
+    "actions": {
+      "moveOnHold": "Poner en pausa",
+      "markMastered": "Marcar como dominado",
+      "viewTasks": "Mostrar todas las tareas",
+      "addTask": "Añadir tarea",
+      "viewGraph": "Ver gráfico"
+    },
+    "programActions": "Acciones del programa {name}",
+    "taskActions": "Acciones de la tarea {name}",
+    "statusDialog": {
+      "programOnHold": "Poner el programa en pausa",
+      "programMastered": "Marcar el programa como dominado",
+      "taskOnHold": "Poner la tarea en pausa",
+      "taskMastered": "Marcar la tarea como dominada",
+      "description": "«{name}» pasa a {status}. El motivo se guarda en su historial.",
+      "reason": "Motivo del cambio",
+      "reasonTooShort": "Explique el cambio con al menos 12 caracteres."
+    },
+    "statusUpdated": "Estado actualizado",
+    "statusUpdatedMessage": "{name} ahora está en {status}.",
+    "statusNotChanged": "No se cambió el estado",
+    "taskAdded": "Tarea añadida",
+    "taskAddedMessage": "Se añadió {task} a {program}.",
+    "taskNotAdded": "No se añadió la tarea",
+    "recorded": "Registrado",
+    "recordedMessage": "{value} en {task}. Quedan {left} hoy.",
+    "notRecorded": "No registrado",
+    "yes": "+ (Sí)",
+    "no": "− (No)"
+  },
+  "card": {
+    "tasks": "Sin tareas | 1 tarea | {n} tareas",
+    "noTasks": "Todavía no hay tareas",
+    "showAll": "Mostrar las {n} tareas",
+    "trials": "{n} ensayo | {n} ensayos",
+    "leftToday": "Quedan {left} de {total} hoy",
+    "doneToday": "Completado por hoy",
+    "record": "Registrar",
+    "recordTask": "Registrar {name}",
+    "recordYes": "Registrar sí en {name}",
+    "recordNo": "Registrar no en {name}",
+    "progress": "Registrado hoy",
+    "general": "General"
+  },
+  "recordDialog": {
+    "title": "Registrar",
+    "program": "Programa",
+    "task": "Tarea",
+    "response": "Respuesta",
+    "promptLevels": "Niveles de ayuda",
+    "checking": "Comprobando los registros de hoy…",
+    "complete": "Hoy está completo: {total} de {total} ensayos registrados.",
+    "trialOf": "Ensayo {n} de {total} hoy",
+    "remaining": "Quedan {left} de {total} registros hoy, compartidos por todo el equipo de este cliente.",
+    "chooseResponse": "Elija + (Sí) o − (No).",
+    "chooseLevels": "Elija uno o más niveles de ayuda.",
+    "submit": "Guardar registro"
+  },
+  "graph": {
+    "title": "Gráfico · {task}",
+    "range": "Periodo",
+    "ranges": {
+      "7": "Últimos 7 días",
+      "30": "Últimos 30 días",
+      "90": "Últimos 90 días",
+      "all": "Todo el historial"
+    },
+    "today": "Hoy ({date}): {recorded} registrados, quedan {left} de {total}.",
+    "yesNoTitle": "Sí y No por día",
+    "yesNoDescription": "Registros guardados por todo el equipo terapéutico de este cliente.",
+    "promptTitle": "Niveles de ayuda por día",
+    "promptDescription": "Cuántos registros eligieron cada nivel. Un registro puede elegir varios.",
+    "noGraph": "Todavía no hay registros",
+    "noGraphHint": "El gráfico aparece cuando se guarda el primer registro.",
+    "unavailable": "Registros no disponibles",
+    "error": "No se pudieron cargar los registros de esta tarea.",
+    "caption": "Respuestas registradas, de la más reciente a la más antigua",
+    "latest": "Se muestran los últimos 200 registros de este periodo.",
+    "columns": {
+      "date": "Fecha",
+      "time": "Hora",
+      "session": "Sesión",
+      "trial": "Ensayo",
+      "response": "Respuesta",
+      "therapist": "Terapeuta"
+    },
+    "yes": "Sí",
+    "no": "No",
+    "plusYes": "+ Sí",
+    "minusNo": "− No"
   }
 }

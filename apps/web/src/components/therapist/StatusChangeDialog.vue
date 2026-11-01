@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import AppTextarea from '@/components/ui/AppTextarea.vue';
@@ -13,6 +14,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ confirm: [reason: string]; close: [] }>();
 
+const { t } = useI18n();
 const reason = ref('');
 const error = ref('');
 
@@ -29,7 +31,7 @@ watch(
 function confirm(): void {
   // The API records a reason with every status change.
   if (reason.value.trim().length < 12) {
-    error.value = 'Explain the change in at least 12 characters.';
+    error.value = t('workspace.statusDialog.reasonTooShort');
     return;
   }
   emit('confirm', reason.value.trim());
@@ -37,10 +39,10 @@ function confirm(): void {
 </script>
 
 <template>
-  <AppDialog :open="open" :title="title" :description="description" @close="emit('close')">
-    <AppTextarea v-model="reason" label="Reason for the change" :rows="3" :error="error" required />
+  <AppDialog :open="open" :title="title" :description="description" size="sm" @close="emit('close')">
+    <AppTextarea v-model="reason" :label="t('workspace.statusDialog.reason')" :rows="3" :error="error" required />
     <template #footer>
-      <AppButton type="button" variant="secondary" @click="emit('close')">Cancel</AppButton>
+      <AppButton type="button" variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</AppButton>
       <AppButton type="button" :loading="saving" @click="confirm">{{ confirmLabel }}</AppButton>
     </template>
   </AppDialog>
