@@ -26,13 +26,15 @@ const notificationsRef = ref<HTMLElement | null>(null);
 const userRef = ref<HTMLElement | null>(null);
 
 const isPlatformAdmin = computed(() => auth.user?.platformAdmin === true);
-const initials = computed(() =>
-  (auth.user?.name || auth.user?.email || 'A')
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join(''),
-);
+/** Up to two letters: the first and last words of the name, or the start of the email when there is no name. */
+const initials = computed(() => {
+  const name = auth.user?.name?.trim() ?? '';
+  const words = name.split(/\s+/).filter((word) => /\p{L}|\p{N}/u.test(word));
+  // Array.from keeps letters outside the basic plane whole.
+  const first = (word: string | undefined) => Array.from(word?.replace(/^[^\p{L}\p{N}]+/u, '') ?? '')[0] ?? '';
+  const letters = words.length > 1 ? first(words[0]) + first(words[words.length - 1]) : first(words[0]);
+  return (letters || first(auth.user?.email) || '?').toLocaleUpperCase();
+});
 const clinicOptions = computed(() => auth.user?.clinics ?? []);
 
 async function chooseClinic(event: Event): Promise<void> {
@@ -161,10 +163,10 @@ async function signOut(): Promise<void> {
         <div v-if="userOpen" class="dropdown user-dropdown" role="menu" :aria-label="auth.user?.name ?? t('shell.account')">
           <div class="user-card">
             <span class="avatar avatar-lg" aria-hidden="true">{{ initials }}</span>
-            <div>
-              <strong>{{ auth.user?.name }}</strong>
-              <span>{{ auth.user?.email }}</span>
-              <span>{{ auth.user?.roleLabel }}</span>
+            <div class="user-card-text">
+              <strong class="user-card-name">{{ auth.user?.name }}</strong>
+              <span v-if="auth.user?.email" class="user-card-detail" :title="auth.user.email">{{ auth.user.email }}</span>
+              <span v-if="auth.user?.roleLabel" class="user-card-role">{{ auth.user.roleLabel }}</span>
             </div>
           </div>
           <div class="menu-items">
@@ -332,29 +334,46 @@ async function signOut(): Promise<void> {
   background: var(--color-surface-sunken);
 }
 
+/* Initials centred in a fixed circle; line-height 1 keeps the text box from pushing the letters off centre. */
 .avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  display: grid;
-  place-items: center;
-  flex: none;
+  overflow: hidden;
   background: var(--color-primary);
-  color: #fff;
-  font-size: var(--text-xs);
+  color: #ffffff;
+  font-size: 0.75rem;
   font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  user-select: none;
 }
 
 .avatar-lg {
-  width: 40px;
-  height: 40px;
-  font-size: var(--text-sm);
+  width: 44px;
+  height: 44px;
+  font-size: 0.9375rem;
 }
 
 .user-copy {
   flex-direction: column;
   align-items: flex-start;
+  min-width: 0;
+  max-width: 200px;
   line-height: 1.25;
+}
+
+.user-name,
+.user-role {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-name {
@@ -376,7 +395,7 @@ async function signOut(): Promise<void> {
   position: absolute;
   inset-inline-end: 0;
   top: calc(100% + 8px);
-  width: min(300px, 86vw);
+  width: min(300px, calc(100vw - 2 * var(--space-4)));
   padding: var(--space-4);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -402,27 +421,48 @@ async function signOut(): Promise<void> {
 
 .user-card {
   display: flex;
-  gap: var(--space-3);
   align-items: center;
-  padding: var(--space-3) var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
   margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.user-card strong,
-.user-card span {
-  display: block;
+/* Only the text block's own lines are styled here, so the avatar keeps its centring. */
+.user-card-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.user-card-name {
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-.user-card strong {
-  color: var(--color-ink);
-  font-size: var(--text-base);
-}
-
-.user-card span {
+.user-card-detail {
+  overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-card-role {
+  justify-self: start;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .menu-items {
