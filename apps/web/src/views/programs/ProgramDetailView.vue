@@ -347,6 +347,12 @@ onMounted(() => void load());
   gap: var(--space-5);
 }
 
+/* Grid children may shrink below their content, so wide tables scroll inside their card. */
+.program-detail > *,
+.detail-columns > * {
+  min-width: 0;
+}
+
 .client-link {
   color: var(--color-text-muted);
   font-weight: 500;

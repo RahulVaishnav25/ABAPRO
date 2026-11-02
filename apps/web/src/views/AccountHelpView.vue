@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import AuthSplit from '@/components/auth/AuthSplit.vue';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 
 const route = useRoute();
+const { t } = useI18n();
 const kind = computed(() => {
   if (route.name === 'forgot-password') return 'password';
   if (route.name === 'contact') return 'contact';
@@ -14,25 +17,13 @@ const kind = computed(() => {
 <template>
   <AuthSplit>
     <article class="help-card">
-      <template v-if="kind === 'password'">
-        <h2>Forgot password</h2>
-        <p>
-          Your organisation administrator sets a new password for you. ABAPro does not email a reset link. Ask them to update your sign-in, then come back and sign in with the new password.
-        </p>
-      </template>
-      <template v-else-if="kind === 'contact'">
-        <h2>Contact us</h2>
-        <p>
-          For a new account or a new password, contact your organisation administrator. For questions about ABAPro, contact Techieora Private Limited.
-        </p>
-      </template>
-      <template v-else>
-        <h2>Need an account?</h2>
-        <p>
-          There is no public registration. Your organisation administrator, or the platform administrator, creates the email and password you use to sign in.
-        </p>
-      </template>
-      <RouterLink class="back" :to="{ name: 'login' }">Back to sign in</RouterLink>
+      <span class="help-icon" aria-hidden="true"><AppIcon :name="kind === 'password' ? 'info' : kind === 'contact' ? 'notification' : 'user'" :size="20" /></span>
+      <h2>{{ t(`pages.help.${kind}Title`) }}</h2>
+      <p>{{ t(`pages.help.${kind}`) }}</p>
+      <RouterLink class="back" :to="{ name: 'login' }">
+        <AppIcon name="arrow-left" :size="16" class="flip-rtl" />
+        {{ t('pages.help.back') }}
+      </RouterLink>
     </article>
   </AuthSplit>
 </template>
@@ -54,8 +45,27 @@ const kind = computed(() => {
   color: var(--color-text-muted);
 }
 
+.help-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
+}
+
 .back {
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary-ink);
+  font-weight: 600;
   text-decoration: none;
+}
+
+.back:hover,
+.back:focus-visible {
+  text-decoration: underline;
 }
 </style>

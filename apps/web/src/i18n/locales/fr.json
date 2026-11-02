@@ -1522,5 +1522,223 @@
       "signIn": "Se connecter",
       "myOrganisation": "Mon organisation"
     }
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "descriptionPlatform": "Les totaux de chaque organisation, clinique et client du portail.",
+    "description": "Une vue d’ensemble de votre travail. Les chiffres sont des exemples tant que les requêtes cliniques ne sont pas connectées.",
+    "refresh": "Actualiser",
+    "openTasks": "Ouvrir les tâches",
+    "unavailable": "Tableau de bord indisponible",
+    "error": "Impossible de charger le tableau de bord.",
+    "portalCounts": "Totaux du portail",
+    "summaryCounts": "Totaux",
+    "platform": {
+      "organisations": "Organisations",
+      "organisationsDetail": "Sur ce portail",
+      "clinics": "Cliniques",
+      "clinicsDetail": "Dans toutes les organisations",
+      "clients": "Clients",
+      "clientsDetail": "{n} actifs",
+      "view": "Tout voir"
+    },
+    "byCountry": "Cliniques par pays",
+    "byCountryHint": "Chaque clinique est comptée dans le pays de son organisation.",
+    "sample": "Données d’exemple",
+    "generated": "Généré le {date} pour {organisation}.",
+    "disclaimer": "Ces chiffres sont des exemples de démonstration, pas des dossiers cliniques.",
+    "scopes": {
+      "organization": "Totaux de l’organisation",
+      "caseload": "Vos suivis",
+      "family": "Votre enfant"
+    },
+    "metrics": {
+      "organization": {
+        "activeClients": {
+          "label": "Clients actifs",
+          "detail": "Statut : actif"
+        },
+        "activeTherapists": {
+          "label": "Thérapeutes actifs",
+          "detail": "Personnel accrédité"
+        },
+        "programsInProgress": {
+          "label": "Programmes en cours",
+          "detail": "Pour les clients actifs"
+        }
+      },
+      "caseload": {
+        "activeClients": {
+          "label": "Clients actifs",
+          "detail": "Qui vous sont affectés"
+        },
+        "activeTherapists": {
+          "label": "Thérapeutes actifs",
+          "detail": "Vous"
+        },
+        "programsInProgress": {
+          "label": "Programmes en cours",
+          "detail": "Dans vos suivis"
+        }
+      },
+      "family": {
+        "activeClients": {
+          "label": "Clients actifs",
+          "detail": "Liés à votre compte"
+        },
+        "activeTherapists": {
+          "label": "Thérapeutes actifs",
+          "detail": "Qui suivent votre enfant"
+        },
+        "programsInProgress": {
+          "label": "Programmes en cours",
+          "detail": "Pour votre enfant"
+        }
+      }
+    },
+    "activity": "Activité récente",
+    "noActivity": "Aucune activité récente."
+  },
+  "assessments": {
+    "title": "Évaluations",
+    "description": "Les évaluations des clients et les modèles rédigés par votre clinique. N’y saisissez pas de questions de tests protégés.",
+    "new": "Nouvelle évaluation",
+    "unavailable": "Évaluations indisponibles",
+    "error": "Impossible de charger les évaluations.",
+    "empty": "Aucune évaluation",
+    "emptyHint": "Créez une évaluation pour un client, ou partez d’un modèle que vous rédigez.",
+    "caption": "Évaluations",
+    "columns": {
+      "name": "Évaluation",
+      "client": "Client",
+      "type": "Type",
+      "dates": "Évaluation et révision",
+      "clinician": "Clinicien",
+      "status": "Statut"
+    },
+    "noDate": "Sans date",
+    "reviewOn": "Révision le {date}",
+    "reviewNotSet": "Révision non fixée",
+    "noClinician": "Aucun clinicien",
+    "programs": "Aucun programme | 1 programme | {n} programmes",
+    "statuses": {
+      "draft": "Brouillon",
+      "in_progress": "En cours",
+      "completed": "Terminée",
+      "reviewed": "Révisée"
+    },
+    "templates": {
+      "title": "Modèles d’évaluation",
+      "description": "Les modèles sont des listes appartenant à votre organisation. Copier un modèle dans une évaluation ne garde pas de lien, et modifier le modèle ensuite ne change pas les évaluations terminées.",
+      "none": "Pas encore de modèles.",
+      "items": "Aucun item | 1 item | {n} items",
+      "name": "Nom du modèle",
+      "type": "Type d’évaluation",
+      "typeHint": "Par exemple : liste de compétences",
+      "firstItem": "Premier item",
+      "firstItemHint": "Rédigez votre propre item. Ne collez pas un test publié.",
+      "save": "Enregistrer le modèle",
+      "saved": "Modèle enregistré",
+      "savedMessage": "Les évaluations existantes gardent leurs propres items copiés.",
+      "notSaved": "Le modèle n’a pas été enregistré",
+      "description_text": "Items rédigés par le clinicien. Ce modèle n’inclut pas de test publié."
+    },
+    "form": {
+      "newTitle": "Nouvelle évaluation",
+      "editTitle": "Modifier l’évaluation",
+      "readTitle": "Évaluation",
+      "description": "Le résumé du clinicien et les items de cette évaluation.",
+      "edit": "Modifier",
+      "unavailable": "Évaluation indisponible",
+      "error": "Impossible de charger l’évaluation.",
+      "details": "Informations",
+      "client": "Client",
+      "template": "Modèle",
+      "noTemplate": "Aucun modèle",
+      "name": "Nom de l’évaluation",
+      "type": "Type",
+      "typeHint": "Utilisez votre propre nom de type.",
+      "assessedOn": "Date de l’évaluation",
+      "reviewOn": "Date de révision",
+      "status": "Statut",
+      "clinician": "Clinicien affecté",
+      "unassigned": "Non affecté",
+      "items": "Items",
+      "itemsHint": "Ces items sont rédigés par la clinique. Le formulaire ne fournit pas d’instrument sous licence.",
+      "item": "Item",
+      "response": "Réponse",
+      "result": "Résultat",
+      "addItem": "Ajouter un item",
+      "removeItem": "Retirer l’item",
+      "noItems": "Pas encore d’items.",
+      "kinds": {
+        "text": "Texte",
+        "yes_no": "Oui / non",
+        "rating": "Note",
+        "count": "Nombre"
+      },
+      "results": "Résumé et résultats",
+      "summary": "Résumé du clinicien",
+      "resultsNote": "Résultats",
+      "changeReason": "Motif de clôture ou de révision",
+      "changeReasonHint": "Requis quand le statut devient Terminée ou Révisée.",
+      "documents": "Documents d’appui",
+      "noDocuments": "Pas encore de documents.",
+      "document": "Document",
+      "saveDocument": "Enregistrer le document",
+      "notScanned": "Non analysé",
+      "rejected": "Refusé",
+      "documentSaved": "Document enregistré",
+      "documentSavedMessage": "L’analyse n’est pas branchée : le fichier est marqué non analysé.",
+      "documentNotSaved": "Le document n’a pas été enregistré",
+      "linkedPrograms": "Programmes liés",
+      "noPrograms": "Aucun programme n’est lié à cette évaluation.",
+      "save": "Enregistrer l’évaluation",
+      "saved": "Évaluation enregistrée",
+      "saveError": "Impossible d’enregistrer l’évaluation."
+    }
+  },
+  "pages": {
+    "forbidden": {
+      "title": "Accès refusé",
+      "description": "Votre rôle ne permet pas d’ouvrir cette page.",
+      "back": "Retour au tableau de bord"
+    },
+    "notFound": {
+      "title": "Page introuvable",
+      "description": "Cette adresse ne fait pas partie de l’application.",
+      "dashboard": "Aller au tableau de bord",
+      "signIn": "Aller à la connexion"
+    },
+    "placeholder": {
+      "unavailable": "Cette section est indisponible",
+      "error": "Impossible de charger cette page.",
+      "notReady": "Pas encore disponible",
+      "logo": "Logo de l’organisation",
+      "logoHint": "Le stockage privé des fichiers n’est pas branché. Ce champ reste désactivé jusqu’à la mise en place des paramètres de l’organisation.",
+      "message": "Message",
+      "messageHint": "Les messages ne sont pas encore disponibles. Ce champ n’envoie rien.",
+      "messagePlaceholder": "Rédigez un message"
+    },
+    "help": {
+      "passwordTitle": "Mot de passe oublié",
+      "password": "L’administrateur de votre organisation vous attribue un nouveau mot de passe. ABAPro n’envoie pas de lien de réinitialisation. Demandez-lui de mettre à jour votre accès, puis reconnectez-vous avec le nouveau mot de passe.",
+      "contactTitle": "Nous contacter",
+      "contact": "Pour un nouveau compte ou un nouveau mot de passe, contactez l’administrateur de votre organisation. Pour toute question sur ABAPro, contactez Techieora Private Limited.",
+      "accountTitle": "Besoin d’un compte ?",
+      "account": "Il n’y a pas d’inscription publique. L’administrateur de votre organisation, ou de la plateforme, crée l’e-mail et le mot de passe de connexion.",
+      "back": "Retour à la connexion"
+    },
+    "invite": {
+      "eyebrow": "Invitation",
+      "title": "Rejoindre une organisation",
+      "invalid": "Cette invitation n’est plus valide.",
+      "signInFirst": "Connectez-vous avec l’adresse e-mail qui a reçu cette invitation, puis acceptez-la.",
+      "signIn": "Se connecter pour accepter",
+      "signedInAs": "Connecté en tant que {email}. Accepter ajoute cette organisation à votre compte.",
+      "accept": "Accepter l’invitation",
+      "accepted": "Invitation acceptée",
+      "error": "Impossible d’accepter cette invitation."
+    }
   }
 }

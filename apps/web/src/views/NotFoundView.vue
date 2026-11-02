@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import CopyrightFooter from '@/components/CopyrightFooter.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
 const auth = useAuthStore();
+const { t } = useI18n();
 
 function goHome(): void {
   void router.push(auth.isAuthenticated ? { name: auth.user?.platformAdmin ? 'platform-dashboard' : 'dashboard' } : { name: 'login' });
@@ -15,10 +17,10 @@ function goHome(): void {
 <template>
   <div class="missing-shell">
     <main class="missing">
-      <p class="eyebrow">ABAPro</p>
-      <h1>Page not found</h1>
-      <p>That address is not part of the application.</p>
-      <AppButton @click="goHome">{{ auth.isAuthenticated ? 'Go to dashboard' : 'Go to sign in' }}</AppButton>
+      <p class="code" aria-hidden="true">404</p>
+      <h1>{{ t('pages.notFound.title') }}</h1>
+      <p class="missing-text">{{ t('pages.notFound.description') }}</p>
+      <AppButton icon="arrow-left" @click="goHome">{{ auth.isAuthenticated ? t('pages.notFound.dashboard') : t('pages.notFound.signIn') }}</AppButton>
     </main>
     <CopyrightFooter />
   </div>
@@ -26,28 +28,37 @@ function goHome(): void {
 
 <style scoped>
 .missing-shell {
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
+  background: var(--color-bg);
 }
 
 .missing {
+  display: grid;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-  padding: 32px;
-  max-width: 560px;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
 }
 
-.eyebrow {
-  font-weight: 700;
+.code {
   color: var(--color-primary);
+  font-size: 3.5rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
 }
 
-p:last-of-type {
+h1 {
+  font-size: var(--text-2xl);
+}
+
+.missing-text {
+  max-width: 44ch;
+  margin-bottom: var(--space-2);
   color: var(--color-text-muted);
-  margin-bottom: 8px;
 }
 </style>

@@ -1522,5 +1522,223 @@
       "signIn": "Sign in",
       "myOrganisation": "My organisation"
     }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "descriptionPlatform": "Counts for every organisation, clinic and client on this portal.",
+    "description": "An overview of your work. The figures here are sample data until clinical queries are connected.",
+    "refresh": "Refresh",
+    "openTasks": "Open tasks",
+    "unavailable": "Dashboard unavailable",
+    "error": "The dashboard could not be loaded.",
+    "portalCounts": "Portal counts",
+    "summaryCounts": "Summary counts",
+    "platform": {
+      "organisations": "Organisations",
+      "organisationsDetail": "On this portal",
+      "clinics": "Clinics",
+      "clinicsDetail": "Across every organisation",
+      "clients": "Clients",
+      "clientsDetail": "{n} active",
+      "view": "View all"
+    },
+    "byCountry": "Clinics by country",
+    "byCountryHint": "Each clinic is counted in its organisation’s country.",
+    "sample": "Sample data",
+    "generated": "Generated {date} for {organisation}.",
+    "disclaimer": "These figures are sample values for demonstration, not clinical records.",
+    "scopes": {
+      "organization": "Organisation totals",
+      "caseload": "Your caseload",
+      "family": "Your child"
+    },
+    "metrics": {
+      "organization": {
+        "activeClients": {
+          "label": "Active clients",
+          "detail": "Status: active"
+        },
+        "activeTherapists": {
+          "label": "Active therapists",
+          "detail": "Credentialed staff"
+        },
+        "programsInProgress": {
+          "label": "Programs in progress",
+          "detail": "Across active clients"
+        }
+      },
+      "caseload": {
+        "activeClients": {
+          "label": "Active clients",
+          "detail": "Assigned to you"
+        },
+        "activeTherapists": {
+          "label": "Active therapists",
+          "detail": "You"
+        },
+        "programsInProgress": {
+          "label": "Programs in progress",
+          "detail": "On your caseload"
+        }
+      },
+      "family": {
+        "activeClients": {
+          "label": "Active clients",
+          "detail": "Linked to your account"
+        },
+        "activeTherapists": {
+          "label": "Active therapists",
+          "detail": "Working with your child"
+        },
+        "programsInProgress": {
+          "label": "Programs in progress",
+          "detail": "For your child"
+        }
+      }
+    },
+    "activity": "Recent activity",
+    "noActivity": "No recent activity."
+  },
+  "assessments": {
+    "title": "Assessments",
+    "description": "Client assessments and templates written by your clinic. Do not enter copyrighted test questions.",
+    "new": "New assessment",
+    "unavailable": "Assessments unavailable",
+    "error": "Assessments could not be loaded.",
+    "empty": "No assessments",
+    "emptyHint": "Create an assessment for a client, or start from a template you write yourself.",
+    "caption": "Assessments",
+    "columns": {
+      "name": "Assessment",
+      "client": "Client",
+      "type": "Type",
+      "dates": "Assessed and review",
+      "clinician": "Clinician",
+      "status": "Status"
+    },
+    "noDate": "No date",
+    "reviewOn": "Review {date}",
+    "reviewNotSet": "Review not set",
+    "noClinician": "No clinician",
+    "programs": "No programs | 1 program | {n} programs",
+    "statuses": {
+      "draft": "Draft",
+      "in_progress": "In progress",
+      "completed": "Completed",
+      "reviewed": "Reviewed"
+    },
+    "templates": {
+      "title": "Assessment templates",
+      "description": "Templates are checklists owned by your organisation. Copying one into a client assessment does not keep a live link, and editing the template later does not change completed assessments.",
+      "none": "No templates yet.",
+      "items": "No items | 1 item | {n} items",
+      "name": "Template name",
+      "type": "Assessment type",
+      "typeHint": "For example: skill checklist",
+      "firstItem": "First item",
+      "firstItemHint": "Write your own item. Do not paste a published test.",
+      "save": "Save template",
+      "saved": "Template saved",
+      "savedMessage": "Existing assessments keep their own copied items.",
+      "notSaved": "Template was not saved",
+      "description_text": "Clinician-written items. This template does not include a published test."
+    },
+    "form": {
+      "newTitle": "New assessment",
+      "editTitle": "Edit assessment",
+      "readTitle": "Assessment",
+      "description": "The clinician’s summary and the items set for this assessment.",
+      "edit": "Edit",
+      "unavailable": "Assessment unavailable",
+      "error": "The assessment could not be loaded.",
+      "details": "Details",
+      "client": "Client",
+      "template": "Template",
+      "noTemplate": "No template",
+      "name": "Assessment name",
+      "type": "Type",
+      "typeHint": "Use your own type name.",
+      "assessedOn": "Assessment date",
+      "reviewOn": "Review date",
+      "status": "Status",
+      "clinician": "Assigned clinician",
+      "unassigned": "Unassigned",
+      "items": "Items",
+      "itemsHint": "These items are written by the clinic. The form does not supply a licensed instrument.",
+      "item": "Item",
+      "response": "Response",
+      "result": "Result",
+      "addItem": "Add item",
+      "removeItem": "Remove item",
+      "noItems": "No items yet.",
+      "kinds": {
+        "text": "Text",
+        "yes_no": "Yes / no",
+        "rating": "Rating",
+        "count": "Count"
+      },
+      "results": "Summary and results",
+      "summary": "Clinician summary",
+      "resultsNote": "Results",
+      "changeReason": "Reason for completing or reviewing",
+      "changeReasonHint": "Needed when the status becomes Completed or Reviewed.",
+      "documents": "Supporting documents",
+      "noDocuments": "No documents yet.",
+      "document": "Document",
+      "saveDocument": "Save document",
+      "notScanned": "Not scanned",
+      "rejected": "Rejected",
+      "documentSaved": "Document saved",
+      "documentSavedMessage": "Scanning is not connected, so the file is marked not scanned.",
+      "documentNotSaved": "Document was not saved",
+      "linkedPrograms": "Linked programs",
+      "noPrograms": "No programs are linked to this assessment.",
+      "save": "Save assessment",
+      "saved": "Assessment saved",
+      "saveError": "The assessment could not be saved."
+    }
+  },
+  "pages": {
+    "forbidden": {
+      "title": "Access denied",
+      "description": "Your role does not include permission to open this page.",
+      "back": "Back to the dashboard"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "That address is not part of the application.",
+      "dashboard": "Go to the dashboard",
+      "signIn": "Go to sign in"
+    },
+    "placeholder": {
+      "unavailable": "This section is unavailable",
+      "error": "This page could not be loaded.",
+      "notReady": "Not available yet",
+      "logo": "Organisation logo",
+      "logoHint": "Private file storage is not connected. This stays disabled until organisation settings are available.",
+      "message": "Message",
+      "messageHint": "Messages are not available yet. This field does not send anything.",
+      "messagePlaceholder": "Write a message"
+    },
+    "help": {
+      "passwordTitle": "Forgot password",
+      "password": "Your organisation administrator sets a new password for you. ABAPro does not email a reset link. Ask them to update your sign-in, then come back and sign in with the new password.",
+      "contactTitle": "Contact us",
+      "contact": "For a new account or a new password, contact your organisation administrator. For questions about ABAPro, contact Techieora Private Limited.",
+      "accountTitle": "Need an account?",
+      "account": "There is no public registration. Your organisation administrator, or the platform administrator, creates the email and password you use to sign in.",
+      "back": "Back to sign in"
+    },
+    "invite": {
+      "eyebrow": "Invitation",
+      "title": "Join an organisation",
+      "invalid": "This invitation is no longer valid.",
+      "signInFirst": "Sign in with the email address that received this invitation, then accept it.",
+      "signIn": "Sign in to accept",
+      "signedInAs": "Signed in as {email}. Accepting adds this organisation to your account.",
+      "accept": "Accept invitation",
+      "accepted": "Invitation accepted",
+      "error": "This invitation could not be accepted."
+    }
   }
 }

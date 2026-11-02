@@ -1522,5 +1522,223 @@
       "signIn": "Iniciar sesión",
       "myOrganisation": "Mi organización"
     }
+  },
+  "dashboard": {
+    "title": "Panel",
+    "descriptionPlatform": "Totales de todas las organizaciones, clínicas y clientes del portal.",
+    "description": "Un resumen de su trabajo. Las cifras son datos de ejemplo hasta que se conecten las consultas clínicas.",
+    "refresh": "Actualizar",
+    "openTasks": "Abrir tareas",
+    "unavailable": "Panel no disponible",
+    "error": "No se pudo cargar el panel.",
+    "portalCounts": "Totales del portal",
+    "summaryCounts": "Totales",
+    "platform": {
+      "organisations": "Organizaciones",
+      "organisationsDetail": "En este portal",
+      "clinics": "Clínicas",
+      "clinicsDetail": "En todas las organizaciones",
+      "clients": "Clientes",
+      "clientsDetail": "{n} activos",
+      "view": "Ver todo"
+    },
+    "byCountry": "Clínicas por país",
+    "byCountryHint": "Cada clínica se cuenta en el país de su organización.",
+    "sample": "Datos de ejemplo",
+    "generated": "Generado el {date} para {organisation}.",
+    "disclaimer": "Estas cifras son valores de ejemplo para demostración, no registros clínicos.",
+    "scopes": {
+      "organization": "Totales de la organización",
+      "caseload": "Sus casos",
+      "family": "Su hijo o hija"
+    },
+    "metrics": {
+      "organization": {
+        "activeClients": {
+          "label": "Clientes activos",
+          "detail": "Estado: activo"
+        },
+        "activeTherapists": {
+          "label": "Terapeutas activos",
+          "detail": "Personal acreditado"
+        },
+        "programsInProgress": {
+          "label": "Programas en curso",
+          "detail": "En los clientes activos"
+        }
+      },
+      "caseload": {
+        "activeClients": {
+          "label": "Clientes activos",
+          "detail": "Asignados a usted"
+        },
+        "activeTherapists": {
+          "label": "Terapeutas activos",
+          "detail": "Usted"
+        },
+        "programsInProgress": {
+          "label": "Programas en curso",
+          "detail": "En sus casos"
+        }
+      },
+      "family": {
+        "activeClients": {
+          "label": "Clientes activos",
+          "detail": "Vinculados a su cuenta"
+        },
+        "activeTherapists": {
+          "label": "Terapeutas activos",
+          "detail": "Trabajan con su hijo o hija"
+        },
+        "programsInProgress": {
+          "label": "Programas en curso",
+          "detail": "Para su hijo o hija"
+        }
+      }
+    },
+    "activity": "Actividad reciente",
+    "noActivity": "No hay actividad reciente."
+  },
+  "assessments": {
+    "title": "Evaluaciones",
+    "description": "Evaluaciones de clientes y plantillas escritas por su clínica. No introduzca preguntas de pruebas con derechos de autor.",
+    "new": "Nueva evaluación",
+    "unavailable": "Evaluaciones no disponibles",
+    "error": "No se pudieron cargar las evaluaciones.",
+    "empty": "No hay evaluaciones",
+    "emptyHint": "Cree una evaluación para un cliente o parta de una plantilla propia.",
+    "caption": "Evaluaciones",
+    "columns": {
+      "name": "Evaluación",
+      "client": "Cliente",
+      "type": "Tipo",
+      "dates": "Evaluación y revisión",
+      "clinician": "Clínico",
+      "status": "Estado"
+    },
+    "noDate": "Sin fecha",
+    "reviewOn": "Revisión {date}",
+    "reviewNotSet": "Sin revisión",
+    "noClinician": "Sin clínico",
+    "programs": "Sin programas | 1 programa | {n} programas",
+    "statuses": {
+      "draft": "Borrador",
+      "in_progress": "En curso",
+      "completed": "Completada",
+      "reviewed": "Revisada"
+    },
+    "templates": {
+      "title": "Plantillas de evaluación",
+      "description": "Las plantillas son listas de comprobación de su organización. Copiar una en una evaluación no mantiene un vínculo, y editar la plantilla después no cambia las evaluaciones completadas.",
+      "none": "Todavía no hay plantillas.",
+      "items": "Sin ítems | 1 ítem | {n} ítems",
+      "name": "Nombre de la plantilla",
+      "type": "Tipo de evaluación",
+      "typeHint": "Por ejemplo: lista de habilidades",
+      "firstItem": "Primer ítem",
+      "firstItemHint": "Escriba su propio ítem. No pegue una prueba publicada.",
+      "save": "Guardar plantilla",
+      "saved": "Plantilla guardada",
+      "savedMessage": "Las evaluaciones existentes conservan sus propios ítems copiados.",
+      "notSaved": "No se guardó la plantilla",
+      "description_text": "Ítems escritos por el clínico. Esta plantilla no incluye una prueba publicada."
+    },
+    "form": {
+      "newTitle": "Nueva evaluación",
+      "editTitle": "Editar evaluación",
+      "readTitle": "Evaluación",
+      "description": "El resumen del clínico y los ítems de esta evaluación.",
+      "edit": "Editar",
+      "unavailable": "Evaluación no disponible",
+      "error": "No se pudo cargar la evaluación.",
+      "details": "Datos",
+      "client": "Cliente",
+      "template": "Plantilla",
+      "noTemplate": "Sin plantilla",
+      "name": "Nombre de la evaluación",
+      "type": "Tipo",
+      "typeHint": "Use su propio nombre de tipo.",
+      "assessedOn": "Fecha de evaluación",
+      "reviewOn": "Fecha de revisión",
+      "status": "Estado",
+      "clinician": "Clínico asignado",
+      "unassigned": "Sin asignar",
+      "items": "Ítems",
+      "itemsHint": "Los ítems los escribe la clínica. El formulario no proporciona un instrumento con licencia.",
+      "item": "Ítem",
+      "response": "Respuesta",
+      "result": "Resultado",
+      "addItem": "Añadir ítem",
+      "removeItem": "Quitar ítem",
+      "noItems": "Todavía no hay ítems.",
+      "kinds": {
+        "text": "Texto",
+        "yes_no": "Sí / no",
+        "rating": "Valoración",
+        "count": "Recuento"
+      },
+      "results": "Resumen y resultados",
+      "summary": "Resumen del clínico",
+      "resultsNote": "Resultados",
+      "changeReason": "Motivo para completar o revisar",
+      "changeReasonHint": "Necesario cuando el estado pasa a Completada o Revisada.",
+      "documents": "Documentos de apoyo",
+      "noDocuments": "Todavía no hay documentos.",
+      "document": "Documento",
+      "saveDocument": "Guardar documento",
+      "notScanned": "No analizado",
+      "rejected": "Rechazado",
+      "documentSaved": "Documento guardado",
+      "documentSavedMessage": "El análisis no está conectado, así que el archivo se marca como no analizado.",
+      "documentNotSaved": "No se guardó el documento",
+      "linkedPrograms": "Programas vinculados",
+      "noPrograms": "No hay programas vinculados a esta evaluación.",
+      "save": "Guardar evaluación",
+      "saved": "Evaluación guardada",
+      "saveError": "No se pudo guardar la evaluación."
+    }
+  },
+  "pages": {
+    "forbidden": {
+      "title": "Acceso denegado",
+      "description": "Su rol no tiene permiso para abrir esta página.",
+      "back": "Volver al panel"
+    },
+    "notFound": {
+      "title": "Página no encontrada",
+      "description": "Esa dirección no forma parte de la aplicación.",
+      "dashboard": "Ir al panel",
+      "signIn": "Ir a iniciar sesión"
+    },
+    "placeholder": {
+      "unavailable": "Esta sección no está disponible",
+      "error": "No se pudo cargar esta página.",
+      "notReady": "Todavía no disponible",
+      "logo": "Logotipo de la organización",
+      "logoHint": "El almacenamiento privado de archivos no está conectado. Esto permanece desactivado hasta que la configuración de la organización esté disponible.",
+      "message": "Mensaje",
+      "messageHint": "Los mensajes todavía no están disponibles. Este campo no envía nada.",
+      "messagePlaceholder": "Escriba un mensaje"
+    },
+    "help": {
+      "passwordTitle": "He olvidado mi contraseña",
+      "password": "El administrador de su organización le asigna una contraseña nueva. ABAPro no envía enlaces de restablecimiento. Pídale que actualice su acceso y vuelva a iniciar sesión con la nueva contraseña.",
+      "contactTitle": "Contacto",
+      "contact": "Para una cuenta o contraseña nueva, contacte con el administrador de su organización. Para preguntas sobre ABAPro, contacte con Techieora Private Limited.",
+      "accountTitle": "¿Necesita una cuenta?",
+      "account": "No hay registro público. El administrador de su organización, o de la plataforma, crea el correo y la contraseña con los que inicia sesión.",
+      "back": "Volver a iniciar sesión"
+    },
+    "invite": {
+      "eyebrow": "Invitación",
+      "title": "Unirse a una organización",
+      "invalid": "Esta invitación ya no es válida.",
+      "signInFirst": "Inicie sesión con el correo que recibió esta invitación y después acéptela.",
+      "signIn": "Iniciar sesión para aceptar",
+      "signedInAs": "Ha iniciado sesión como {email}. Al aceptar, esta organización se añade a su cuenta.",
+      "accept": "Aceptar invitación",
+      "accepted": "Invitación aceptada",
+      "error": "No se pudo aceptar esta invitación."
+    }
   }
 }

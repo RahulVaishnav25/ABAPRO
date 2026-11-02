@@ -5,7 +5,7 @@ const axis = { color: '#556575' };
 const line = { color: '#d5dde3' };
 const split = { color: '#e7edf1' };
 
-export function clinicsByCountryOption(points: PlatformClinicCountry[], countryName: (code: string) => string): EChartsCoreOption | null {
+export function clinicsByCountryOption(points: PlatformClinicCountry[], countryName: (code: string) => string, seriesName = 'Clinics'): EChartsCoreOption | null {
   if (points.length === 0) return null;
   return {
     color: ['#0e6b62'],
@@ -26,7 +26,7 @@ export function clinicsByCountryOption(points: PlatformClinicCountry[], countryN
     },
     series: [
       {
-        name: 'Clinics',
+        name: seriesName,
         type: 'bar',
         data: points.map((point) => point.clinics),
         barMaxWidth: 28,

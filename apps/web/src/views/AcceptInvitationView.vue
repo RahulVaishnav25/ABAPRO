@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { acceptInvitationRequest } from '@/api/resources';
 import AppButton from '@/components/ui/AppButton.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -11,6 +12,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToastStore();
+const { t } = useI18n();
 const error = ref('');
 const saving = ref(false);
 
@@ -20,16 +22,16 @@ const signInHref = computed(() => `/api/v1/auth/login?returnTo=${encodeURICompon
 async function accept(): Promise<void> {
   error.value = '';
   if (!token.value) {
-    error.value = 'This invitation is no longer valid.';
+    error.value = t('pages.invite.invalid');
     return;
   }
   saving.value = true;
   try {
     auth.user = await acceptInvitationRequest(token.value);
-    toast.push({ tone: 'success', title: 'Invitation accepted', message: auth.user.organization?.name });
+    toast.push({ tone: 'success', title: t('pages.invite.accepted'), message: auth.user.organization?.name });
     await router.push('/');
   } catch (acceptError) {
-    error.value = errorMessage(acceptError, 'This invitation could not be accepted.');
+    error.value = errorMessage(acceptError, t('pages.invite.error'));
   } finally {
     saving.value = false;
   }
@@ -39,17 +41,17 @@ async function accept(): Promise<void> {
 <template>
   <div class="accept">
     <section>
-      <p class="eyebrow">Invitation</p>
-      <h1>Join an organization</h1>
-      <p v-if="!token" class="form-error" role="alert">This invitation is no longer valid.</p>
+      <p class="eyebrow">{{ t('pages.invite.eyebrow') }}</p>
+      <h1>{{ t('pages.invite.title') }}</h1>
+      <p v-if="!token" class="form-error" role="alert">{{ t('pages.invite.invalid') }}</p>
       <template v-else-if="!auth.isAuthenticated">
-        <p>Sign in with the email address that received this invitation, then accept it.</p>
-        <a class="action" :href="signInHref">Sign in to accept</a>
+        <p>{{ t('pages.invite.signInFirst') }}</p>
+        <a class="action" :href="signInHref">{{ t('pages.invite.signIn') }}</a>
       </template>
       <template v-else>
-        <p>Signed in as {{ auth.user?.email }}. Accepting adds this organization to your account.</p>
+        <p>{{ t('pages.invite.signedInAs', { email: auth.user?.email ?? '' }) }}</p>
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-        <AppButton :loading="saving" @click="accept">Accept invitation</AppButton>
+        <AppButton :loading="saving" @click="accept">{{ t('pages.invite.accept') }}</AppButton>
       </template>
     </section>
   </div>

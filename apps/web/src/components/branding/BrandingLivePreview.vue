@@ -451,7 +451,7 @@ const previewStyles = computed(() => {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: #5b6675;
   margin-bottom: 6px;
   letter-spacing: 0.04em;
 }

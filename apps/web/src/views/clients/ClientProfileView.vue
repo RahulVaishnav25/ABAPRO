@@ -594,7 +594,7 @@ onMounted(async () => {
 
       <AppTabs v-model="tab" :tabs="tabs" :label="t('clients.profile.tabsLabel')" />
 
-      <div class="tab-panels">
+      <div :id="`panel-${tab}`" class="tab-panels" role="tabpanel" :aria-labelledby="`tab-${tab}`">
         <template v-if="tab === 'overview'">
           <section class="settings-card">
             <header class="card-header">
