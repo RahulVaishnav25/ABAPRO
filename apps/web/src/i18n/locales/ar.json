@@ -107,7 +107,6 @@
     "clinics": "العيادات",
     "clinic-detail": "العيادة",
     "settings": "الإعدادات",
-    "team": "الفريق",
     "preferences": "التفضيلات",
     "reports": "التقارير",
     "maintenance": "المتابعة",
@@ -118,7 +117,6 @@
     "forgot-password": "نسيت كلمة المرور",
     "account-access": "هل تحتاج إلى حساب؟",
     "contact": "اتصل بنا",
-    "onboarding": "إنشاء مؤسسة",
     "accept-invitation": "قبول الدعوة",
     "not-found": "الصفحة غير موجودة"
   },

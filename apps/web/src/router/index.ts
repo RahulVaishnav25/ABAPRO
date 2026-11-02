@@ -12,10 +12,8 @@ const ForbiddenView = () => import('@/views/ForbiddenView.vue');
 const LoginView = () => import('@/views/LoginView.vue');
 const AccountHelpView = () => import('@/views/AccountHelpView.vue');
 const NotFoundView = () => import('@/views/NotFoundView.vue');
-const OnboardingView = () => import('@/views/OnboardingView.vue');
 const AcceptInvitationView = () => import('@/views/AcceptInvitationView.vue');
 const SettingsView = () => import('@/views/SettingsView.vue');
-const TeamView = () => import('@/views/TeamView.vue');
 const TeamsView = () => import('@/views/onboarding/TeamsView.vue');
 const PreferencesView = () => import('@/views/PreferencesView.vue');
 const ParentsView = () => import('@/views/onboarding/ParentsView.vue');
@@ -44,15 +42,14 @@ const shellTitles: Partial<Record<string, string>> = {
   settings: 'Settings',
 };
 
-const featureRoutes: RouteRecordRaw[] = APP_FEATURES.map((feature) => ({
+// The old Team page is replaced by Onboarding › Teams; its address redirects there.
+const featureRoutes: RouteRecordRaw[] = APP_FEATURES.filter((feature) => feature.key !== 'team').map((feature) => ({
   path: feature.route === '/' ? '' : feature.route.replace(/^\//, ''),
   name: feature.key,
   component:
     feature.key === 'settings'
       ? SettingsView
-      : feature.key === 'team'
-        ? TeamView
-        : feature.key === 'clients'
+      : feature.key === 'clients'
           ? ClientsView
           : feature.key === 'assessments'
             ? AssessmentsView
@@ -69,6 +66,7 @@ const featureRoutes: RouteRecordRaw[] = APP_FEATURES.map((feature) => ({
     featureKey: feature.key,
   },
 }));
+featureRoutes.push({ path: 'team', redirect: '/onboarding/teams' });
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -288,18 +286,8 @@ export const router = createRouter({
         },
       ],
     },
-    {
-      path: '/onboarding',
-      component: AuthLayout,
-      children: [
-        {
-          path: '',
-          name: 'onboarding',
-          component: OnboardingView,
-          meta: { title: 'Create organization' },
-        },
-      ],
-    },
+    // The old organisation sign-up page is replaced by the Onboarding section.
+    { path: '/onboarding', redirect: '/onboarding/teams' },
     {
       path: '/invitations/accept',
       component: AuthLayout,

@@ -6,8 +6,6 @@ import type {
   CreateOrganizationRequest,
   DashboardResponse,
   PlatformDashboard,
-  InvitationCreated,
-  InvitationDraft,
   LogoutResult,
   OrganizationDirectoryItem,
   OrganizationSettingsView,
@@ -76,10 +74,6 @@ export function invitationsRequest(): Promise<Array<{ id: string; email: string;
   return apiRequest('/organization/invitations');
 }
 
-export function createInvitationRequest(body: InvitationDraft): Promise<InvitationCreated> {
-  return apiRequest<InvitationCreated>('/organization/invitations', { method: 'POST', body });
-}
-
 export function dashboardRequest(): Promise<DashboardResponse> {
   return apiRequest<DashboardResponse>('/dashboard');
 }
@@ -114,10 +108,6 @@ export function changeMemberRoleRequest(membershipId: string, role: string): Pro
 
 export function revokeMemberRequest(membershipId: string): Promise<{ status: string }> {
   return apiRequest(encodedPath`/team/members/${membershipId}/revoke`, { method: 'POST' });
-}
-
-export function revokeInvitationRequest(invitationId: string): Promise<{ status: string }> {
-  return apiRequest(encodedPath`/team/invitations/${invitationId}/revoke`, { method: 'POST' });
 }
 
 export function auditHistoryRequest(): Promise<AuditEventView[]> {

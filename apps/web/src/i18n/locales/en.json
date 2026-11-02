@@ -107,7 +107,6 @@
     "clinics": "Clinics",
     "clinic-detail": "Clinic",
     "settings": "Settings",
-    "team": "Team",
     "preferences": "Preferences",
     "reports": "Reports",
     "maintenance": "Maintenance",
@@ -118,7 +117,6 @@
     "forgot-password": "Forgot password",
     "account-access": "Need an account?",
     "contact": "Contact us",
-    "onboarding": "Create organisation",
     "accept-invitation": "Accept invitation",
     "not-found": "Page not found"
   },

@@ -31,9 +31,6 @@ const crumbs = computed(() => {
       return trail;
     }
   }
-  if (route.path === '/team' || route.path.startsWith('/team/')) {
-    return [root, { label: t('routes.settings'), to: '/settings' }, { label, to: route.path }];
-  }
   if (route.path === '/programs/tasks' || route.path.startsWith('/programs/tasks/')) {
     const trail = [root, { label: t('routes.programs'), to: '/programs' }, { label: t('routes.tasks'), to: '/programs/tasks' }];
     if (route.path !== '/programs/tasks') {
