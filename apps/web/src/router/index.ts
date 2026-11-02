@@ -322,11 +322,16 @@ export const router = createRouter({
   ],
 });
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from) => {
   const auth = useAuthStore();
   if (!auth.ready) {
     await auth.restore();
   }
+  // Straight after signing in, a saved page this person cannot open (perhaps saved while someone else
+  // was signed in) leads to their home page rather than to Access denied.
+  const justSignedIn = from.name === 'login';
+  const home = auth.user?.platformAdmin ? 'platform-dashboard' : 'dashboard';
+  const deny = () => (justSignedIn && to.name !== home ? { name: home } : { name: 'forbidden' });
 
   const isPublic = to.matched.some((record) => record.meta.public);
   if (!isPublic && !auth.isAuthenticated) {
@@ -334,14 +339,14 @@ router.beforeEach(async (to) => {
   }
   // The therapy workspace is the therapist's view of their assigned clients.
   if (to.name === 'therapy-workspace' && auth.isAuthenticated && auth.user?.role !== 'therapist') {
-    return { name: 'forbidden' };
+    return deny();
   }
   // Therapists work only with their assigned clients, so organisation and clinic pages are closed to them.
   if (auth.user?.role === 'therapist' && (to.path.startsWith('/organizations') || to.path.startsWith('/clinics'))) {
-    return { name: 'forbidden' };
+    return deny();
   }
   if (to.meta.platformAdmin && auth.isAuthenticated && !auth.user?.platformAdmin) {
-    return { name: 'forbidden' };
+    return deny();
   }
   if (auth.isAuthenticated && auth.user?.platformAdmin && to.name === 'dashboard') {
     return { name: 'platform-dashboard' };
@@ -377,11 +382,11 @@ router.beforeEach(async (to) => {
   const allowed = to.meta.anyPermission;
   if (allowed?.length && auth.isAuthenticated && !allowed.some((permission) => auth.can(permission))) {
     if (auth.user?.platformAdmin) return true;
-    return { name: 'forbidden' };
+    return deny();
   }
   if (!allowed?.length && to.meta.permission && auth.isAuthenticated && !auth.can(to.meta.permission)) {
     if (auth.user?.platformAdmin) return true;
-    return { name: 'forbidden' };
+    return deny();
   }
   return true;
 });

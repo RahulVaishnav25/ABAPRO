@@ -8,4 +8,11 @@ describe('safeRedirect', () => {
     expect(safeRedirect('//example.com')).toBe('/');
     expect(safeRedirect(undefined)).toBe('/');
   });
+
+  it('never returns someone to a page that only explains why they cannot continue', () => {
+    expect(safeRedirect('/forbidden')).toBe('/');
+    expect(safeRedirect('/no-clinic')).toBe('/');
+    expect(safeRedirect('/login?redirect=/clients')).toBe('/');
+    expect(safeRedirect('/clients?status=active')).toBe('/clients?status=active');
+  });
 });
