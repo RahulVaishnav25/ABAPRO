@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import {
   INVITABLE_ROLES,
   PERMISSION_CATALOG,
-  ROLE_LABELS,
   type InvitableRole,
   type OrganizationSettingsView,
   type Permission,
@@ -19,7 +19,9 @@ import {
 } from '@/api/resources';
 import BrandingForm from '@/components/branding/BrandingForm.vue';
 import RegionalSettingsSection from '@/components/settings/RegionalSettingsSection.vue';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import AppButton from '@/components/ui/AppButton.vue';
+import AppCheckbox from '@/components/ui/AppCheckbox.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
@@ -29,11 +31,13 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useBrandingStore } from '@/stores/branding';
 import { useToastStore } from '@/stores/toast';
+import { roleName } from '@/i18n';
 import { errorMessage, useLoader } from '@/lib/loader';
 
 const auth = useAuthStore();
 const branding = useBrandingStore();
 const toast = useToastStore();
+const { t, te } = useI18n();
 
 const settings = ref<OrganizationSettingsView | null>(null);
 
@@ -51,7 +55,12 @@ const selectedRole = ref<InvitableRole>('therapist');
 const selectedPermissions = ref<Permission[]>([]);
 const roleSaving = ref(false);
 const roleError = ref('');
-const roleOptions = INVITABLE_ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }));
+const roleOptions = computed(() => INVITABLE_ROLES.map((value) => ({ value, label: roleName(value) })));
+const permissionLabel = (key: string, fallback: string) => {
+  const id = `permissions.items.${key.replace(/[.]/g, '_')}`;
+  return te(id) ? t(id) : fallback;
+};
+const groupLabel = (group: string) => (te(`permissions.groups.${group}`) ? t(`permissions.groups.${group}`) : group);
 const selectedRule = computed(() => roleRules.value.find((item) => item.role === selectedRole.value) ?? null);
 const catalogGroups = computed(() => {
   const ceiling = new Set(selectedRule.value?.ceiling ?? []);
@@ -59,7 +68,7 @@ const catalogGroups = computed(() => {
   for (const item of PERMISSION_CATALOG) {
     if (!ceiling.has(item.key)) continue;
     const list = groups.get(item.group) ?? [];
-    list.push({ key: item.key, label: item.label });
+    list.push({ key: item.key, label: permissionLabel(item.key, item.label) });
     groups.set(item.group, list);
   }
   return [...groups.entries()];
@@ -73,7 +82,7 @@ const canManageOrgBranding = computed(() => {
 
 const { loading, error, load } = useLoader(async () => {
   settings.value = await organizationSettingsRequest();
-}, 'Organization settings could not be loaded.');
+}, t('settings.error'));
 
 async function loadPlatform(): Promise<void> {
   const [accounts, roles] = await Promise.all([signInAccountsRequest(), platformRolesRequest()]);
@@ -97,15 +106,15 @@ function togglePermission(permission: Permission, checked: boolean): void {
 async function addSuperAdmin(): Promise<void> {
   adminError.value = '';
   if (!adminName.value.trim()) {
-    adminError.value = 'Full name is required.';
+    adminError.value = t('settings.admins.errors.name');
     return;
   }
-  if (!adminEmail.value.trim()) {
-    adminError.value = 'A valid email address is required.';
+  if (!adminEmail.value.trim().includes('@')) {
+    adminError.value = t('settings.admins.errors.email');
     return;
   }
   if (adminPassword.value.length < 10) {
-    adminError.value = 'Password must be at least 10 characters.';
+    adminError.value = t('settings.admins.errors.password');
     return;
   }
 
@@ -120,10 +129,10 @@ async function addSuperAdmin(): Promise<void> {
     adminName.value = '';
     adminEmail.value = '';
     adminPassword.value = '';
-    toast.push({ tone: 'success', title: 'Super Admin created successfully.' });
+    toast.push({ tone: 'success', title: t('settings.admins.created') });
     await loadPlatform();
   } catch (createError) {
-    adminError.value = errorMessage(createError, 'The super admin could not be added.');
+    adminError.value = errorMessage(createError, t('settings.admins.error'));
   } finally {
     adminSaving.value = false;
   }
@@ -134,13 +143,39 @@ async function saveRole(): Promise<void> {
   roleSaving.value = true;
   try {
     await updatePlatformRoleRequest(selectedRole.value, [...selectedPermissions.value]);
-    toast.push({ tone: 'success', title: 'Role rules updated', message: ROLE_LABELS[selectedRole.value] });
+    toast.push({ tone: 'success', title: t('settings.roles.saved'), message: roleName(selectedRole.value) });
     await loadPlatform();
   } catch (saveError) {
-    roleError.value = errorMessage(saveError, 'The role rules could not be saved.');
+    roleError.value = errorMessage(saveError, t('settings.roles.error'));
   } finally {
     roleSaving.value = false;
   }
+}
+
+/** The sections this person can open, in page order, for the section list. */
+const sections = computed(() =>
+  [
+    { id: 'admins', show: auth.user?.platformAdmin === true },
+    { id: 'platformBranding', show: auth.user?.platformAdmin === true },
+    { id: 'orgBranding', show: canManageOrgBranding.value },
+    { id: 'platformRegion', show: auth.user?.platformAdmin === true },
+    { id: 'orgRegion', show: canManageOrgBranding.value },
+    { id: 'roles', show: auth.user?.platformAdmin === true },
+  ]
+    .filter((section) => section.show)
+    .map((section) => ({ id: section.id, label: t(`settings.nav.${section.id}`) })),
+);
+const activeSection = ref('');
+
+function goTo(id: string): void {
+  activeSection.value = id;
+  document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const first = (word?: string) => Array.from(word ?? '')[0] ?? '';
+  return (words.length > 1 ? first(words[0]) + first(words[words.length - 1]) : first(words[0])).toLocaleUpperCase();
 }
 
 onMounted(async () => {
@@ -152,7 +187,7 @@ onMounted(async () => {
   else loading.value = false;
 
   void Promise.all(tasks).catch((loadError: unknown) => {
-    error.value = errorMessage(loadError, 'Settings could not be loaded.');
+    error.value = errorMessage(loadError, t('settings.error'));
     loading.value = false;
   });
 });
@@ -160,230 +195,302 @@ onMounted(async () => {
 
 <template>
   <PageContainer>
-    <PageHeader
-      title="Settings"
-      :description="auth.user?.platformAdmin ? 'Super admin management, platform & organisation branding, and system roles.' : 'Organisation branding, clinic profile, and preferences.'"
-    />
+    <PageHeader :title="t('settings.title')" :description="auth.user?.platformAdmin ? t('settings.descriptionPlatform') : t('settings.descriptionOrg')" />
 
-    <div class="settings-stack">
-      <!-- 1. SUPER ADMIN MANAGEMENT (Super Admins Only) -->
-      <section v-if="auth.user?.platformAdmin" class="settings-card">
-        <div class="section-heading">
-          <h2>Super Admin Management</h2>
-          <p class="section-desc">Create and oversee platform super administrators with full platform control.</p>
-        </div>
+    <div class="settings-layout" :class="{ 'has-nav': sections.length > 1 }">
+      <nav v-if="sections.length > 1" class="settings-nav" :aria-label="t('settings.sectionsLabel')">
+        <a
+          v-for="section in sections"
+          :key="section.id"
+          :href="`#settings-${section.id}`"
+          class="settings-nav-link"
+          :class="{ 'is-active': activeSection === section.id }"
+          :aria-current="activeSection === section.id ? 'true' : undefined"
+          @click.prevent="goTo(section.id)"
+        >
+          {{ section.label }}
+        </a>
+      </nav>
 
-        <p v-if="adminError" class="form-error" role="alert">{{ adminError }}</p>
+      <div class="settings-stack">
+        <SkeletonBlock v-if="loading" height="160px" />
+        <ErrorState v-else-if="error" :title="t('settings.unavailable')" :description="error" @retry="load" />
 
-        <form class="super-admin-form" @submit.prevent="addSuperAdmin">
-          <AppInput v-model="adminName" label="Full Name" placeholder="e.g. Eleanor Vance" required />
-          <AppInput v-model="adminEmail" label="Email Address" type="email" placeholder="admin@example.com" required />
-          <AppInput
-            v-model="adminPassword"
-            label="Temporary Password"
-            type="password"
-            hint="Minimum 10 characters."
-            required
-          />
-          <div class="form-action-row">
-            <AppButton type="submit" :loading="adminSaving">Create Super Admin</AppButton>
+        <!-- Super admins -->
+        <section v-if="auth.user?.platformAdmin" id="settings-admins" class="settings-card">
+          <div class="section-heading">
+            <h2>{{ t('settings.admins.title') }}</h2>
+            <p class="section-desc">{{ t('settings.admins.description') }}</p>
           </div>
-        </form>
-
-        <div class="super-admins-list">
-          <h3 class="subsection-title">Existing Super Admins</h3>
-          <div class="admins-grid">
-            <div v-for="account in platformAdmins" :key="account.id" class="admin-pill">
-              <span class="admin-avatar">{{ account.name.slice(0, 1) }}</span>
-              <div class="admin-details">
-                <strong class="admin-name">{{ account.name }}</strong>
-                <span class="admin-email">{{ account.email }}</span>
-              </div>
-              <span class="super-admin-badge">Super Admin</span>
+          <ul v-if="platformAdmins.length" class="admin-list" :aria-label="t('settings.admins.existing')">
+            <li v-for="account in platformAdmins" :key="account.id" class="admin-item">
+              <span class="admin-avatar" aria-hidden="true">{{ initials(account.name) }}</span>
+              <span class="admin-text">
+                <strong dir="auto">{{ account.name }}</strong>
+                <small dir="ltr">{{ account.email }}</small>
+              </span>
+              <span class="admin-badge">{{ t('settings.admins.badge') }}</span>
+            </li>
+          </ul>
+          <form class="record-card admin-form" novalidate @submit.prevent="addSuperAdmin">
+            <p v-if="adminError" class="form-alert" role="alert"><AppIcon name="alert" :size="16" />{{ adminError }}</p>
+            <div class="form-grid">
+              <AppInput v-model="adminName" :label="t('settings.admins.name')" required />
+              <AppInput v-model="adminEmail" :label="t('settings.admins.email')" type="email" required autocomplete="off" />
+              <AppInput v-model="adminPassword" :label="t('settings.admins.password')" type="password" :hint="t('settings.admins.passwordHint')" required autocomplete="new-password" />
             </div>
+            <div class="form-actions">
+              <AppButton type="submit" icon="plus" :loading="adminSaving">{{ t('settings.admins.create') }}</AppButton>
+            </div>
+          </form>
+        </section>
+
+        <!-- Platform branding -->
+        <section v-if="auth.user?.platformAdmin" id="settings-platformBranding" class="settings-card">
+          <div class="section-heading">
+            <h2>{{ t('branding.platformTitle') }}</h2>
+            <p class="section-desc">{{ t('branding.platformDescription') }}</p>
           </div>
+          <BrandingForm scope="platform" />
+        </section>
+
+        <!-- Organisation branding -->
+        <section v-if="canManageOrgBranding" id="settings-orgBranding" class="settings-card">
+          <div class="section-heading">
+            <h2>{{ t('branding.orgTitle') }}</h2>
+            <p class="section-desc">{{ t('branding.orgDescription', { organisation: auth.user?.organization?.name ?? '' }) }}</p>
+          </div>
+          <BrandingForm scope="organization" />
+        </section>
+
+        <!-- Language and region: platform defaults for super admins, organisation defaults for organisation admins. -->
+        <div v-if="auth.user?.platformAdmin" id="settings-platformRegion" class="section-anchor">
+          <RegionalSettingsSection scope="platform" />
         </div>
-      </section>
-
-      <!-- 2. PLATFORM BRANDING (Super Admins Only) -->
-      <section v-if="auth.user?.platformAdmin" class="settings-card">
-        <div class="section-heading">
-          <h2>Platform Branding</h2>
-          <p class="section-desc">
-            Global branding applied platform-wide and on the unauthenticated login screen. Stored securely in Firestore.
-          </p>
-        </div>
-
-        <BrandingForm scope="platform" />
-      </section>
-
-      <!-- 3. ORGANISATION BRANDING (Authorised Organisation Admins Only) -->
-      <section v-if="canManageOrgBranding" class="settings-card">
-        <div class="section-heading">
-          <h2>Organisation Branding</h2>
-          <p class="section-desc">
-            Customise branding for <strong>{{ auth.user?.organization?.name }}</strong>. Overrides platform defaults for your team members after signing in.
-          </p>
+        <div v-if="canManageOrgBranding" id="settings-orgRegion" class="section-anchor">
+          <RegionalSettingsSection scope="organization" />
         </div>
 
-        <BrandingForm scope="organization" />
-      </section>
-
-      <!-- Language and region: platform defaults for super admins, organisation defaults for organisation admins. -->
-      <RegionalSettingsSection v-if="auth.user?.platformAdmin" scope="platform" />
-      <RegionalSettingsSection v-if="canManageOrgBranding" scope="organization" />
-
-      <!-- 4. ROLE RULES (Super Admins Only) -->
-      <section v-if="auth.user?.platformAdmin" class="settings-card">
-        <div class="section-heading">
-          <h2>Role Rules</h2>
-          <p class="section-desc">These rules apply throughout the portal. A role can only receive responsibilities inside its limit.</p>
-        </div>
-
-        <p v-if="roleError" class="form-error" role="alert">{{ roleError }}</p>
-        <AppSelect
-          :model-value="selectedRole"
-          label="Role"
-          :options="roleOptions"
-          @update:model-value="chooseRole($event as InvitableRole)"
-        />
-
-        <div v-for="[group, items] in catalogGroups" :key="group" class="group">
-          <h3>{{ group }}</h3>
-          <label v-for="item in items" :key="item.key" class="choice">
-            <input
-              type="checkbox"
-              :checked="selectedPermissions.includes(item.key)"
-              @change="togglePermission(item.key, ($event.target as HTMLInputElement).checked)"
-            />
-            <span>{{ item.label }}</span>
-          </label>
-        </div>
-        <div>
-          <AppButton :loading="roleSaving" @click="saveRole">Save role rules</AppButton>
-        </div>
-      </section>
-
-      <SkeletonBlock v-if="loading" />
-      <ErrorState v-else-if="error" title="Settings unavailable" :description="error" @retry="load" />
+        <!-- Role rules -->
+        <section v-if="auth.user?.platformAdmin" id="settings-roles" class="settings-card">
+          <div class="section-heading">
+            <h2>{{ t('settings.roles.title') }}</h2>
+            <p class="section-desc">{{ t('settings.roles.description') }}</p>
+          </div>
+          <p v-if="roleError" class="form-alert" role="alert"><AppIcon name="alert" :size="16" />{{ roleError }}</p>
+          <div class="role-bar">
+            <AppSelect :model-value="selectedRole" :label="t('settings.roles.role')" :options="roleOptions" @update:model-value="chooseRole($event as InvitableRole)" />
+            <span class="role-count">{{ t('settings.roles.count', { n: selectedPermissions.length, total: selectedRule?.ceiling.length ?? 0 }) }}</span>
+          </div>
+          <div class="permission-groups">
+            <fieldset v-for="[group, items] in catalogGroups" :key="group" class="permission-group">
+              <legend>{{ groupLabel(group) }}</legend>
+              <AppCheckbox
+                v-for="item in items"
+                :key="item.key"
+                :model-value="selectedPermissions.includes(item.key)"
+                :label="item.label"
+                @update:model-value="togglePermission(item.key, Boolean($event))"
+              />
+            </fieldset>
+          </div>
+          <div class="form-actions">
+            <AppButton :loading="roleSaving" @click="saveRole">{{ t('settings.roles.save') }}</AppButton>
+          </div>
+        </section>
+      </div>
     </div>
   </PageContainer>
 </template>
 
 <style scoped>
-.settings-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.subsection-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-ink);
-  margin: 12px 0 8px;
-}
-
-.super-admin-form {
+.settings-layout {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--space-6);
+}
+
+.settings-layout.has-nav {
+  grid-template-columns: 220px minmax(0, 1fr);
   align-items: start;
 }
 
-.super-admin-form :deep(.field) {
-  width: 100%;
-}
-
-.form-action-row {
-  grid-column: 1 / -1;
-}
-
-.admins-grid {
+.settings-nav {
+  position: sticky;
+  top: calc(var(--topbar-height) + var(--space-4));
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
+  gap: 2px;
 }
 
-.admin-pill {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.admin-avatar {
-  width: 32px;
-  height: 32px;
-  background: var(--color-primary);
-  color: #ffffff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.85rem;
-  flex-shrink: 0;
-}
-
-.admin-details {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-
-.admin-name {
-  font-size: 0.88rem;
-  color: var(--color-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.admin-email {
-  font-size: 0.76rem;
+.settings-nav-link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 2px solid var(--color-border);
   color: var(--color-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
 }
 
-.super-admin-badge {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #b42318;
-  background: #fdeceb;
-  padding: 2px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
+.settings-nav-link:hover {
+  border-inline-start-color: var(--color-border-strong);
+  color: var(--color-ink);
 }
 
-.group {
-  display: grid;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.choice {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 0.92rem;
-}
-
-.form-error {
-  color: var(--color-danger);
-  font-size: 0.88rem;
+.settings-nav-link.is-active {
+  border-inline-start-color: var(--color-primary);
+  color: var(--color-primary-ink);
   font-weight: 600;
 }
 
-@media (max-width: 820px) {
-  .super-admin-form {
-    grid-template-columns: 1fr;
+.settings-nav-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.settings-stack {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.settings-card,
+.section-anchor {
+  scroll-margin-top: calc(var(--topbar-height) + var(--space-4));
+}
+
+.admin-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.admin-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.admin-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-text strong,
+.admin-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-text small {
+  justify-self: start;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.admin-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.admin-form {
+  gap: var(--space-4);
+}
+
+.role-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-5);
+}
+
+.role-bar > :first-child {
+  width: min(320px, 100%);
+}
+
+.role-count {
+  padding-bottom: 10px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.permission-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.permission-group {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.permission-group legend {
+  padding: 0 4px;
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+@media (max-width: 960px) {
+  .settings-layout.has-nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-nav {
+    position: static;
+    display: flex;
+    gap: var(--space-2);
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .settings-nav-link {
+    flex: none;
+    padding: 6px var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
+  }
+
+  .settings-nav-link.is-active {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
   }
 }
 </style>

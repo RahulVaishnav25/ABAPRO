@@ -27,6 +27,7 @@ const describedBy = computed(() => {
   <div class="field">
     <label class="field-label" :for="inputId">{{ label }}</label>
     <textarea
+      dir="auto"
       :id="inputId"
       v-model="model"
       class="control"

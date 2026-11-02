@@ -36,6 +36,7 @@ const describedBy = computed(() => [hintId.value, errorId.value].filter(Boolean)
       {{ label }}<span v-if="required" class="required-mark" aria-hidden="true">*</span>
     </label>
     <input
+      dir="auto"
       :id="inputId"
       v-model="model"
       class="control"

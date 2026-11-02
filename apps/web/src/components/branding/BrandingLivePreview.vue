@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import appIconUrl from '@/assets/brand/app-icon.png';
-import AppButton from '@/components/ui/AppButton.vue';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import { adjustBrightness, hexToRgba } from '@/lib/theme';
 
 const props = withDefaults(
@@ -16,30 +17,20 @@ const props = withDefaults(
       loginSubtitle?: string;
     };
     isPlatform?: boolean;
-    isDirty?: boolean;
-    saving?: boolean;
   }>(),
   {
     isPlatform: false,
-    isDirty: false,
-    saving: false,
   },
 );
 
-const emit = defineEmits<{
-  save: [];
-  cancel: [];
-  reset: [];
-}>();
+const { t } = useI18n();
 
 const activeTab = ref<'portal' | 'login'>('portal');
 
 const effectiveLogo = computed(() => props.draft.logoUrl?.trim() || appIconUrl);
-const effectiveName = computed(() => props.draft.portalName?.trim() || (props.isPlatform ? 'ABAPro' : 'My Organisation'));
-const effectiveHeadline = computed(() => props.draft.loginHeadline?.trim() || 'Better care starts with clarity.');
-const effectiveSubtitle = computed(
-  () => props.draft.loginSubtitle?.trim() || "One simple workspace for your team, your sessions, and every client's progress.",
-);
+const effectiveName = computed(() => props.draft.portalName?.trim() || (props.isPlatform ? 'ABAPro' : t('branding.preview.myOrganisation')));
+const effectiveHeadline = computed(() => props.draft.loginHeadline?.trim() || t('branding.preview.defaultHeadline'));
+const effectiveSubtitle = computed(() => props.draft.loginSubtitle?.trim() || t('branding.preview.defaultSubtitle'));
 
 const previewStyles = computed(() => {
   const p = props.draft.primaryColor || '#0e6b62';
@@ -60,26 +51,27 @@ const previewStyles = computed(() => {
   <div class="live-preview-panel" :style="previewStyles">
     <div class="preview-header">
       <div class="preview-title-wrap">
-        <span class="preview-badge">Live Preview</span>
-        <span class="preview-desc">Instant real-time preview (changes remain unapplied to live portal until saved)</span>
+        <span class="preview-badge">{{ t('branding.preview.title') }}</span>
+        <span class="preview-desc">{{ t('branding.preview.hint') }}</span>
       </div>
-      <div class="preview-tabs">
+      <div v-if="isPlatform" class="preview-tabs" role="group" :aria-label="t('branding.preview.tabsLabel')">
         <button
           type="button"
           class="preview-tab"
           :class="{ active: activeTab === 'portal' }"
+          :aria-pressed="activeTab === 'portal'"
           @click="activeTab = 'portal'"
         >
-          App Portal & Buttons
+          {{ t('branding.preview.portal') }}
         </button>
         <button
-          v-if="isPlatform"
           type="button"
           class="preview-tab"
           :class="{ active: activeTab === 'login' }"
+          :aria-pressed="activeTab === 'login'"
           @click="activeTab = 'login'"
         >
-          Login Page
+          {{ t('branding.preview.login') }}
         </button>
       </div>
     </div>
@@ -91,14 +83,14 @@ const previewStyles = computed(() => {
         <!-- Mockup Top Bar -->
         <header class="mock-topbar">
           <div class="mock-topbar-start">
-            <span class="mock-icon-btn">☰</span>
+            <span class="mock-icon-btn"><AppIcon name="menu" :size="14" /></span>
             <span class="mock-portal-title">{{ effectiveName }}</span>
           </div>
           <div class="mock-topbar-end">
-            <span class="mock-bell">🔔</span>
+            <span class="mock-bell"><AppIcon name="notification" :size="14" /></span>
             <div class="mock-user-pill">
               <span class="mock-user-avatar">A</span>
-              <span class="mock-user-name">Admin</span>
+              <span class="mock-user-name">{{ t('branding.preview.admin') }}</span>
             </div>
           </div>
         </header>
@@ -108,29 +100,17 @@ const previewStyles = computed(() => {
           <!-- Mockup Sidebar -->
           <aside class="mock-sidebar">
             <div class="mock-brand">
-              <img :src="effectiveLogo" alt="Brand" class="mock-logo" />
+              <img :src="effectiveLogo" alt="" class="mock-logo" />
               <div class="mock-brand-info">
                 <strong class="mock-brand-name">{{ effectiveName }}</strong>
-                <span class="mock-brand-sub">Management</span>
+                <span class="mock-brand-sub">{{ t('branding.preview.management') }}</span>
               </div>
             </div>
 
             <nav class="mock-nav">
-              <div class="mock-nav-item active">
-                <span class="mock-nav-icon">📊</span>
-                <span>Dashboard</span>
-              </div>
-              <div class="mock-nav-item">
-                <span class="mock-nav-icon">📋</span>
-                <span>Programs</span>
-              </div>
-              <div class="mock-nav-item">
-                <span class="mock-nav-icon">☑️</span>
-                <span>Tasks</span>
-              </div>
-              <div class="mock-nav-item">
-                <span class="mock-nav-icon">⚙️</span>
-                <span>Settings</span>
+              <div v-for="(item, index) in ['dashboard', 'programs', 'tasks', 'settings']" :key="item" class="mock-nav-item" :class="{ active: index === 0 }">
+                <span class="mock-nav-icon"><AppIcon :name="item" :size="14" /></span>
+                <span>{{ t(`branding.preview.${item}`) }}</span>
               </div>
             </nav>
           </aside>
@@ -138,37 +118,27 @@ const previewStyles = computed(() => {
           <!-- Mockup Main Workspace with Buttons -->
           <main class="mock-main">
             <div class="mock-content-card">
-              <h3 class="mock-card-title">Branded UI Components</h3>
-              <p class="mock-card-copy">
-                These elements automatically inherit your primary and secondary palette:
-              </p>
+              <h3 class="mock-card-title">{{ t('branding.preview.components') }}</h3>
+              <p class="mock-card-copy">{{ t('branding.preview.componentsHint') }}</p>
 
               <!-- Buttons Preview Showcase -->
               <div class="mock-buttons-section">
-                <span class="mock-section-label">Buttons</span>
+                <span class="mock-section-label">{{ t('branding.preview.buttons') }}</span>
                 <div class="mock-button-row">
-                  <button type="button" class="mock-btn-primary">
-                    Primary Button
-                  </button>
-                  <button type="button" class="mock-btn-secondary">
-                    Secondary Button
-                  </button>
-                  <button type="button" class="mock-btn-soft">
-                    Soft Accent
-                  </button>
-                  <button type="button" class="mock-btn-outline">
-                    Outline
-                  </button>
+                  <span class="mock-btn-primary">{{ t('branding.preview.primaryButton') }}</span>
+                  <span class="mock-btn-secondary">{{ t('branding.preview.secondaryButton') }}</span>
+                  <span class="mock-btn-soft">{{ t('branding.preview.soft') }}</span>
+                  <span class="mock-btn-outline">{{ t('branding.preview.outline') }}</span>
                 </div>
               </div>
 
               <!-- Status & Badges Showcase -->
               <div class="mock-badges-section">
-                <span class="mock-section-label">Badges & Accents</span>
+                <span class="mock-section-label">{{ t('branding.preview.badges') }}</span>
                 <div class="mock-badge-row">
-                  <span class="mock-badge mock-badge-primary">Active Target</span>
-                  <span class="mock-badge mock-badge-secondary">Baseline 100%</span>
-                  <span class="mock-badge mock-badge-outline">Criteria Met</span>
+                  <span class="mock-badge mock-badge-primary">{{ t('branding.preview.badge1') }}</span>
+                  <span class="mock-badge mock-badge-secondary">{{ t('branding.preview.badge2') }}</span>
+                  <span class="mock-badge mock-badge-outline">{{ t('branding.preview.badge3') }}</span>
                 </div>
               </div>
             </div>
@@ -180,68 +150,33 @@ const previewStyles = computed(() => {
       <div v-else class="mockup-login">
         <div class="mock-login-left">
           <div class="mock-login-brand">
-            <img :src="effectiveLogo" alt="Brand" class="mock-login-logo" />
+            <img :src="effectiveLogo" alt="" class="mock-login-logo" />
             <span>{{ effectiveName }}</span>
           </div>
           <h2 class="mock-login-headline">{{ effectiveHeadline }}</h2>
           <p class="mock-login-subtitle">{{ effectiveSubtitle }}</p>
           <div class="mock-login-bullet">
-            <span>✓</span> Connected clinical workspace
+            <AppIcon name="check" :size="14" /> {{ t('branding.preview.bullet') }}
           </div>
         </div>
 
         <div class="mock-login-right">
           <div class="mock-login-card">
-            <h4>Sign in to {{ effectiveName }}</h4>
+            <h4>{{ t('branding.preview.signInTo', { name: effectiveName }) }}</h4>
             <div class="mock-input-field">
-              <span class="mock-input-label">Email</span>
+              <span class="mock-input-label">{{ t('branding.preview.email') }}</span>
               <div class="mock-input-box">admin@example.com</div>
             </div>
             <div class="mock-input-field">
-              <span class="mock-input-label">Password</span>
+              <span class="mock-input-label">{{ t('branding.preview.password') }}</span>
               <div class="mock-input-box">••••••••••••</div>
             </div>
-            <button type="button" class="mock-btn-primary full">Sign in</button>
+            <span class="mock-btn-primary full">{{ t('branding.preview.signIn') }}</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- PREVIEW CONTROLS BAR -->
-    <div class="preview-actions-bar">
-      <div class="preview-status">
-        <span v-if="isDirty" class="status-unsaved">● Unsaved edits in preview</span>
-        <span v-else class="status-synced">✓ Matches saved branding</span>
-      </div>
-      <div class="preview-btns">
-        <AppButton
-          type="button"
-          variant="secondary"
-          size="sm"
-          @click="emit('reset')"
-        >
-          Reset to Defaults
-        </AppButton>
-        <AppButton
-          type="button"
-          variant="secondary"
-          size="sm"
-          :disabled="!isDirty"
-          @click="emit('cancel')"
-        >
-          Cancel
-        </AppButton>
-        <button
-          type="button"
-          class="btn-save-branding"
-          :disabled="saving"
-          @click="emit('save')"
-        >
-          <span v-if="saving" class="spinner" aria-hidden="true"></span>
-          Save Branding
-        </button>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -713,74 +648,26 @@ const previewStyles = computed(() => {
 }
 
 /* ACTIONS BAR */
-.preview-actions-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 18px;
-  background: #ffffff;
-  border-top: 1px solid var(--color-border);
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.preview-status {
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
-.status-unsaved {
-  color: #d97706;
-}
-
-.status-synced {
-  color: #16a34a;
-}
-
-.preview-btns {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.btn-save-branding {
+.mock-btn-primary,
+.mock-btn-secondary,
+.mock-btn-soft,
+.mock-btn-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 8px 18px;
-  background: #b42318;
-  color: #ffffff;
-  font-weight: 600;
-  font-size: 0.88rem;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background-color 0.15s ease;
 }
 
-.btn-save-branding:hover:not(:disabled) {
-  background: #912018;
+.mock-icon-btn,
+.mock-bell,
+.mock-nav-icon {
+  display: inline-grid;
+  place-items: center;
 }
 
-.btn-save-branding:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #ffffff;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.mock-login-bullet {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 @media (max-width: 680px) {
