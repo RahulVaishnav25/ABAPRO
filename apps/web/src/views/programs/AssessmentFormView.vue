@@ -76,6 +76,7 @@ const { loading, error, load } = useLoader(async () => {
     status.value = assessment.status;
     assessedOn.value = assessment.assessedOn ?? '';
     reviewOn.value = assessment.reviewOn ?? '';
+    clinicianId.value = assessment.assignedClinicianId ?? '';
     summary.value = assessment.summary;
     resultsNote.value = assessment.resultsNote;
     programs.value = assessment.programs;

@@ -194,6 +194,30 @@ describe.sequential('program and target management', () => {
     expect((viewed.body as ProgramDetail).title).toBe('Requesting program');
   });
 
+  it("keeps an assessment's assigned clinician when it is edited", async () => {
+    const supervisor = new CookieJar();
+    const clinician = await inviteAndAccept(admin, supervisor, 'programs-supervisor@example.com', 'Sam Supervisor', 'clinical_supervisor');
+    const created = await api(admin, '/api/v1/assessments', {
+      method: 'POST',
+      body: JSON.stringify({ clientId, name: 'Supervised checklist', assessmentType: 'Skill checklist', assignedClinicianId: clinician.id }),
+    });
+    expect(created.response.status, created.text).toBe(201);
+    const detail = created.body as AssessmentDetail;
+    // The detail carries the clinician's id, so an edit form can keep the assignment.
+    expect(detail.assignedClinicianId).toBe(clinician.id);
+    expect(detail.clinicianName).toBe('Sam Supervisor');
+
+    const read = (await api(admin, `/api/v1/assessments/${detail.id}`)).body as AssessmentDetail;
+    expect(read.assignedClinicianId).toBe(clinician.id);
+    const edited = await api(admin, `/api/v1/assessments/${detail.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ clientId, name: 'Supervised checklist, revised', assessmentType: read.assessmentType, assignedClinicianId: read.assignedClinicianId ?? undefined }),
+    });
+    expect(edited.response.status, edited.text).toBe(200);
+    expect(edited.body as AssessmentDetail).toMatchObject({ name: 'Supervised checklist, revised', assignedClinicianId: clinician.id, clinicianName: 'Sam Supervisor' });
+    expect(((await api(admin, '/api/v1/assessments')).body as AssessmentDetail[]).find((item) => item.id === detail.id)?.assignedClinicianId).toBe(clinician.id);
+  });
+
   it('versions measurement changes and requires a reason', async () => {
     const noReason = await api(admin, `/api/v1/programs/${programId}/targets/${trialTargetId}`, {
       method: 'PATCH',

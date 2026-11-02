@@ -98,6 +98,8 @@ export interface AssessmentSummary {
   status: AssessmentStatus;
   assessedOn: string | null;
   reviewOn: string | null;
+  /** The assigned clinical supervisor, so an edit can keep the assignment. */
+  assignedClinicianId: string | null;
   clinicianName: string | null;
   programCount: number;
 }

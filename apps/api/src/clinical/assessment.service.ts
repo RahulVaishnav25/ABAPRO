@@ -39,13 +39,14 @@ export class AssessmentService {
         status: AssessmentSummary['status'];
         assessed_on: string | null;
         review_on: string | null;
+        assigned_clinician_id: string | null;
         clinician_name: string | null;
         program_count: number | string;
       }>(
         `SELECT a.id, a.client_id, c.display_name AS client_name, a.name, a.assessment_type, a.status,
                 to_char(a.assessed_on, 'YYYY-MM-DD') AS assessed_on,
                 to_char(a.review_on, 'YYYY-MM-DD') AS review_on,
-                u.name AS clinician_name,
+                a.assigned_clinician_id, u.name AS clinician_name,
                 (SELECT count(*) FROM client_programs p WHERE p.assessment_id = a.id) AS program_count
          FROM assessments a
          JOIN clients c ON c.id = a.client_id
@@ -63,6 +64,7 @@ export class AssessmentService {
         status: row.status,
         assessedOn: row.assessed_on ? asString(row.assessed_on) : null,
         reviewOn: row.review_on ? asString(row.review_on) : null,
+        assignedClinicianId: row.assigned_clinician_id ? asString(row.assigned_clinician_id) : null,
         clinicianName: row.clinician_name ? asString(row.clinician_name) : null,
         programCount: Number(row.program_count ?? 0),
       }));
@@ -289,13 +291,14 @@ export class AssessmentService {
       status: AssessmentSummary['status'];
       assessed_on: string | null;
       review_on: string | null;
+      assigned_clinician_id: string | null;
       clinician_name: string | null;
       summary: string;
       results_note: string;
     }>(
       `SELECT a.id, a.client_id, c.display_name AS client_name, a.template_id, a.name, a.assessment_type, a.status,
               to_char(a.assessed_on, 'YYYY-MM-DD') AS assessed_on, to_char(a.review_on, 'YYYY-MM-DD') AS review_on,
-              u.name AS clinician_name, a.summary, a.results_note
+              a.assigned_clinician_id, u.name AS clinician_name, a.summary, a.results_note
        FROM assessments a
        JOIN clients c ON c.id = a.client_id
        LEFT JOIN users u ON u.id = a.assigned_clinician_id
@@ -332,6 +335,7 @@ export class AssessmentService {
       status: row.status,
       assessedOn: row.assessed_on ? asString(row.assessed_on) : null,
       reviewOn: row.review_on ? asString(row.review_on) : null,
+      assignedClinicianId: row.assigned_clinician_id ? asString(row.assigned_clinician_id) : null,
       clinicianName: row.clinician_name ? asString(row.clinician_name) : null,
       programCount: programs.length,
       summary: asString(row.summary),
