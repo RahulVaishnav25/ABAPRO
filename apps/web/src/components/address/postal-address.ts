@@ -1,3 +1,5 @@
+import { formatRegion } from '@/lib/format';
+
 export interface PostalAddress {
   line1: string;
   line2: string;
@@ -20,8 +22,10 @@ export function emptyPostalAddress(country = ''): PostalAddress {
   return { line1: '', line2: '', landmark: '', state: '', country, city: '', postalCode: '' };
 }
 
+/** The country's name in the user's language, falling back to the English name. */
 export function countryLabel(code: string): string {
-  return ADDRESS_COUNTRIES.find((country) => country.value === code)?.label ?? code;
+  const name = formatRegion(code);
+  return name && name !== code ? name : ADDRESS_COUNTRIES.find((country) => country.value === code)?.label ?? code;
 }
 
 export function postalAddressLines(address: PostalAddress): string[] {

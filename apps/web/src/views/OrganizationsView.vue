@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import type { OrganizationDirectoryItem, OrganizationDirectoryPage } from '@abapro/shared';
 import { apiRequest } from '@/api/client';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppTable from '@/components/ui/AppTable.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
-import FilterBar from '@/components/ui/FilterBar.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
-import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import { countryLabel } from '@/components/address/postal-address';
 import { useLoader } from '@/lib/loader';
-import { formatRegion } from '@/lib/format';
+import { useRouter } from 'vue-router';
 
 const router = useRouter();
+const { t } = useI18n();
 const search = ref('');
 const country = ref('');
 const page = ref(1);
@@ -26,12 +27,17 @@ const items = ref<OrganizationDirectoryItem[]>([]);
 let searchTimer = 0;
 
 const countryOptions = computed(() => [
-  { value: '', label: 'All countries' },
-  ...countries.value.map((code) => ({ value: code, label: formatRegion(code) })),
+  { value: '', label: t('orgs.allCountries') },
+  ...countries.value.map((code) => ({ value: code, label: countryLabel(code) })),
 ]);
-const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
-const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize + 1));
-const rangeEnd = computed(() => Math.min(page.value * pageSize, total.value));
+const columns = computed(() => [
+  { key: 'name', label: t('orgs.columns.name') },
+  { key: 'contact', label: t('orgs.columns.contact') },
+  { key: 'country', label: t('orgs.columns.country') },
+  { key: 'clinics', label: t('orgs.columns.clinics') },
+]);
+const rows = computed(() => items.value.map((item) => ({ id: item.id, name: item.name, item })));
+const itemOf = (row: Record<string, unknown>) => row.item as OrganizationDirectoryItem;
 
 const { loading, error, load } = useLoader(async () => {
   const params = new URLSearchParams();
@@ -44,17 +50,7 @@ const { loading, error, load } = useLoader(async () => {
   total.value = directory.total;
   page.value = directory.page;
   countries.value = directory.countries;
-}, 'Organisations could not be loaded.');
-
-function clinicSummary(item: OrganizationDirectoryItem): string {
-  if (item.clinics.length === 0) return 'No clinics yet';
-  const names = item.clinics.map((clinic) => `${clinic.name}, ${clinic.location}`).join(' · ');
-  return `${item.clinics.length} ${item.clinics.length === 1 ? 'clinic' : 'clinics'} · ${names}`;
-}
-
-function openOrganisation(id: string): void {
-  void router.push(`/organizations/${id}`);
-}
+}, t('orgs.error'));
 
 function changePage(next: number): void {
   page.value = next;
@@ -81,137 +77,102 @@ onMounted(() => {
 
 <template>
   <PageContainer>
-    <PageHeader title="Organisations" description="Every organisation on this portal. Open one to see its clinics, clients, and people.">
+    <PageHeader :title="t('orgs.title')" :description="t('orgs.description')">
       <template #actions>
-        <RouterLink class="create-link" to="/organizations/new">Create organisation</RouterLink>
+        <AppButton icon="plus" @click="router.push('/organizations/new')">{{ t('orgs.create') }}</AppButton>
       </template>
     </PageHeader>
-    <FilterBar>
-      <AppInput v-model="search" class="organisation-search" label="Search" placeholder="Organisation, clinic, or location" />
-      <AppSelect v-model="country" label="Country" :options="countryOptions" />
-    </FilterBar>
-    <SkeletonBlock v-if="loading" height="220px" />
-    <ErrorState v-else-if="error" title="Organisations unavailable" :description="error" @retry="load" />
-    <template v-else>
-      <EmptyState v-if="total === 0" title="No organisations yet" description="Create an organisation and its clinics in one flow, or change the search and country filter." />
-      <div v-else class="table-card">
-        <div class="table-scroll">
-          <table class="data-table">
-            <caption class="visually-hidden">Organisations</caption>
-            <thead>
-              <tr>
-                <th scope="col">Organisation</th>
-                <th scope="col">Contact</th>
-                <th scope="col">Country</th>
-                <th scope="col">Clinics</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in items" :key="item.id" class="organisation-row" @click="openOrganisation(item.id)">
-                <th scope="row">
-                  <RouterLink :to="`/organizations/${item.id}`" @click.stop>{{ item.name }}</RouterLink>
-                </th>
-                <td>{{ item.contactEmail }}</td>
-                <td>{{ formatRegion(item.country) }}</td>
-                <td class="clinics-cell">
-                  <span class="clinics-text" :title="clinicSummary(item)">{{ clinicSummary(item) }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="pager">
-          <p>Showing {{ rangeStart }}–{{ rangeEnd }} of {{ total }}</p>
-          <div class="pager-actions page-controls">
-            <AppButton variant="secondary" size="sm" :disabled="page <= 1" @click="changePage(page - 1)">Previous</AppButton>
-            <span>Page {{ page }} of {{ pageCount }}</span>
-            <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="changePage(page + 1)">Next</AppButton>
-          </div>
-        </div>
-      </div>
-    </template>
+    <div class="filter-bar">
+      <AppInput v-model="search" type="search" :label="t('orgs.search')" :placeholder="t('orgs.searchPlaceholder')" />
+      <AppSelect v-model="country" :label="t('orgs.country')" :options="countryOptions" />
+    </div>
+    <ErrorState v-if="error" :title="t('orgs.unavailable')" :description="error" @retry="load" />
+    <AppTable
+      v-else
+      :caption="t('orgs.caption')"
+      :columns="columns"
+      :rows="rows"
+      row-key="id"
+      :loading="loading && items.length === 0"
+      :total="total"
+      :page="page"
+      :page-size="pageSize"
+      @update:page="changePage"
+    >
+      <template #cell-name="{ row }">
+        <RouterLink class="org-link" :to="`/organizations/${row.id}`">
+          <span class="org-mark" aria-hidden="true">{{ String(row.name).trim().charAt(0).toLocaleUpperCase() }}</span>
+          <strong dir="auto">{{ row.name }}</strong>
+        </RouterLink>
+      </template>
+      <template #cell-contact="{ row }">
+        <span class="stack">
+          <span dir="ltr">{{ itemOf(row).contactEmail }}</span>
+          <small v-if="itemOf(row).contactPhone" dir="ltr">{{ itemOf(row).contactPhone }}</small>
+        </span>
+      </template>
+      <template #cell-country="{ row }">{{ countryLabel(itemOf(row).country) }}</template>
+      <template #cell-clinics="{ row }">
+        <span class="stack">
+          <span>{{ t('orgs.clinicCount', itemOf(row).clinics.length) }}</span>
+          <small v-if="itemOf(row).clinics.length" class="clinic-names" :title="itemOf(row).clinics.map((clinic) => clinic.name).join(', ')">
+            {{ itemOf(row).clinics.map((clinic) => clinic.name).join(', ') }}
+          </small>
+        </span>
+      </template>
+      <template #empty>
+        <EmptyState icon="organisations" :title="t('orgs.empty')" :description="t('orgs.emptyHint')" />
+      </template>
+    </AppTable>
   </PageContainer>
 </template>
 
 <style scoped>
-.table-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.organisation-row {
-  cursor: pointer;
-}
-
-.organisation-row:hover {
-  background: var(--color-surface-muted);
-}
-
-.organisation-row a {
-  font-weight: 700;
+.org-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-ink);
   text-decoration: none;
 }
 
-.organisation-row a:hover {
+.org-link:hover strong,
+.org-link:focus-visible strong {
+  color: var(--color-primary-ink);
   text-decoration: underline;
 }
 
-.clinics-cell {
-  width: 36%;
-  max-width: 0;
+.org-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
+  font-weight: 700;
 }
 
-.clinics-text {
+.stack {
+  display: grid;
+  min-width: 0;
+}
+
+.stack > * {
+  justify-self: start;
+}
+
+.stack small {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.clinic-names {
   display: block;
+  max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.organisation-search {
-  flex: 1 1 420px;
-  width: min(100%, 520px);
-  min-width: min(100%, 420px);
-}
-
-@media (max-width: 720px) {
-  .organisation-search {
-    flex: 0 1 auto;
-    width: 100%;
-    min-width: 0;
-  }
-}
-
-.page-controls {
-  align-items: center;
-  justify-content: space-between;
-  width: min(100%, 320px);
-}
-
-@media (max-width: 720px) {
-  .page-controls {
-    width: 100%;
-  }
-}
-
-.page-controls > span {
-  flex: 1;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.create-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: white;
-  font-weight: 700;
-  text-decoration: none;
 }
 </style>

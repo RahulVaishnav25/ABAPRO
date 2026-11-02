@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
-import PageHeader from '@/components/ui/PageHeader.vue';
+
+const { t } = useI18n();
 </script>
 
 <template>
   <PageContainer>
-    <PageHeader
-      title="No clinic yet"
-      description="Your account is signed in. A clinic administrator needs to invite you before records are available."
-    />
+    <EmptyState icon="clinics" :title="t('clinics.none.title')" :description="t('clinics.none.description')" />
   </PageContainer>
 </template>

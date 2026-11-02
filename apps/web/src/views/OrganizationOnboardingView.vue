@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import type { CreateOrganizationRequest } from '@abapro/shared';
 import { createOrganizationRequest, createSignInAccountRequest } from '@/api/resources';
@@ -7,6 +8,7 @@ import { countryLabel, postalAddressLines, storedPostalAddress } from '@/compone
 import ClinicFormFields from '@/components/organization/ClinicFormFields.vue';
 import { clinicDraftFrom, emptyClinicForm, emptyOrganizationForm, type ClinicFormValue } from '@/components/organization/form-values';
 import OrganizationFormFields from '@/components/organization/OrganizationFormFields.vue';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
@@ -23,6 +25,9 @@ interface AccountForm {
 const auth = useAuthStore();
 const toast = useToastStore();
 const router = useRouter();
+const { t } = useI18n();
+const STEP_KEYS = ['organisation', 'clinics', 'accounts', 'review'] as const;
+const stepLabels = computed(() => STEP_KEYS.map((key) => t(`orgs.onboarding.steps.${key}`)));
 const step = ref<1 | 2 | 3 | 4>(1);
 const saving = ref(false);
 const formError = ref('');
@@ -64,7 +69,7 @@ function continueFromOrganisation(): void {
   formError.value = '';
   organization.country = profile.address.country;
   if (profile.name.trim().length < 2 || !profile.contactEmail.trim() || !profile.contactPhone.trim() || !profile.address.country) {
-    formError.value = 'Enter the organisation name, contact email, contact phone, and country.';
+    formError.value = t('orgs.onboarding.errors.organisation');
     return;
   }
   step.value = 2;
@@ -74,12 +79,12 @@ function continueFromClinics(): void {
   formError.value = '';
   const ready = clinics.value.every((clinic) => clinic.name.trim().length >= 2);
   if (!ready) {
-    formError.value = 'Each clinic needs a name.';
+    formError.value = t('orgs.onboarding.errors.clinicName');
     return;
   }
   const names = new Set(clinics.value.map((clinic) => clinic.name.trim().toLowerCase()));
   if (names.size !== clinics.value.length) {
-    formError.value = 'Each clinic needs a different name.';
+    formError.value = t('orgs.onboarding.errors.clinicUnique');
     return;
   }
   step.value = 3;
@@ -92,18 +97,18 @@ function accountDraftStarted(): boolean {
 function addAccount(requireDraft = true): boolean {
   formError.value = '';
   if (!accountDraftStarted()) {
-    if (requireDraft) formError.value = 'Enter a name, email, and password before adding an account.';
+    if (requireDraft) formError.value = t('orgs.onboarding.errors.accountDraft');
     return !requireDraft;
   }
   const name = accountName.value.trim();
   const email = accountEmail.value.trim().toLowerCase();
   const password = accountPassword.value;
   if (name.length < 2 || !email.includes('@') || password.length < 10) {
-    formError.value = 'Each sign-in account needs a name, an email, and a password of at least 10 characters.';
+    formError.value = t('orgs.onboarding.errors.account');
     return false;
   }
   if (accounts.value.some((account) => account.email === email)) {
-    formError.value = 'Each sign-in account needs a different email.';
+    formError.value = t('orgs.onboarding.errors.accountUnique');
     return false;
   }
   accounts.value.push({ name, email, password });
@@ -123,12 +128,16 @@ function continueFromAccounts(): void {
 }
 
 function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const first = (word?: string) => Array.from(word ?? '')[0] ?? '';
+  return (words.length > 1 ? first(words[0]) + first(words[words.length - 1]) : first(words[0])).toLocaleUpperCase();
+}
+
+/** Earlier steps can be revisited from the progress bar; later ones need Continue, which checks each step. */
+function goToStep(index: number): void {
+  if (index + 1 >= step.value) return;
+  formError.value = '';
+  step.value = (index + 1) as 1 | 2 | 3 | 4;
 }
 
 function addressPreview(address: ClinicFormValue['address']): string {
@@ -160,16 +169,16 @@ async function confirm(): Promise<void> {
       await createSignInAccountRequest(account);
       createdAccountEmails.value.push(account.email);
     }
-    toast.push({ tone: 'success', title: 'Organisation created', message: profile.name.trim() });
+    toast.push({ tone: 'success', title: t('orgs.onboarding.created'), message: profile.name.trim() });
     await router.push('/organizations');
   } catch (error) {
     formError.value = organisationCreated.value
       ? error instanceof Error
-        ? `The organisation was created, but a sign-in account could not be created. ${error.message}`
-        : 'The organisation was created, but a sign-in account could not be created.'
+        ? `${t('orgs.onboarding.errors.created')} ${error.message}`
+        : t('orgs.onboarding.errors.created')
       : error instanceof Error
         ? error.message
-        : 'The organisation could not be created.';
+        : t('orgs.onboarding.errors.failed');
   } finally {
     saving.value = false;
   }
@@ -178,300 +187,310 @@ async function confirm(): Promise<void> {
 
 <template>
   <PageContainer>
-    <PageHeader title="Create organisation" description="Add the organisation and every clinic in one flow." />
-    <ol class="steps">
-      <li :class="{ current: step === 1 }">1. Organisation</li>
-      <li :class="{ current: step === 2 }">2. Clinics</li>
-      <li :class="{ current: step === 3 }">3. Sign-in accounts</li>
-      <li :class="{ current: step === 4 }">4. Review</li>
-    </ol>
-    <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
-
-    <form v-if="step === 1" class="panel" @submit.prevent="continueFromOrganisation">
-      <OrganizationFormFields v-model="profile" />
-      <AppButton type="submit">Continue</AppButton>
-    </form>
-
-    <form v-else-if="step === 2" class="panel" @submit.prevent="continueFromClinics">
-      <section v-for="(_, index) in clinics" :key="index" class="clinic">
-        <header class="clinic-head">
-          <h2>Clinic {{ index + 1 }}</h2>
-          <AppButton v-if="clinics.length > 1" type="button" variant="ghost" @click="removeClinic(index)">Remove</AppButton>
-        </header>
-        <ClinicFormFields v-model="clinics[index]" />
-      </section>
-      <AppButton type="button" variant="secondary" block @click="addClinic">Add clinic</AppButton>
-      <div class="actions">
-        <AppButton type="button" variant="secondary" @click="step = 1">Back</AppButton>
-        <AppButton type="submit">Continue</AppButton>
-      </div>
-    </form>
-
-    <form v-else-if="step === 3" class="panel" @submit.prevent="continueFromAccounts">
-      <h2>Sign-in accounts</h2>
-      <p>Create the email and password a person will use on the sign-in page. You can skip this step.</p>
-      <ul v-if="accounts.length" class="person-list">
-        <li v-for="account in accounts" :key="account.email" class="person">
-          <span class="avatar" aria-hidden="true">{{ initials(account.name) }}</span>
-          <div>
-            <strong>{{ account.name }}</strong>
-            <span>{{ account.email }}</span>
-          </div>
-          <AppButton type="button" variant="ghost" @click="removeAccount(account.email)">Remove</AppButton>
-        </li>
-      </ul>
-      <p v-else class="quiet">No accounts added yet.</p>
-      <div class="account-form">
-        <AppInput v-model="accountName" label="Name" />
-        <AppInput v-model="accountEmail" label="Email" type="email" />
-        <AppInput v-model="accountPassword" label="Password" type="password" hint="At least 10 characters." />
-      </div>
-      <AppButton type="button" variant="secondary" @click="addAccount()">Add account</AppButton>
-      <div class="actions">
-        <AppButton type="button" variant="secondary" @click="step = 2">Back</AppButton>
-        <AppButton type="submit">Review</AppButton>
-      </div>
-    </form>
-
-    <section v-else class="panel review">
-      <article class="summary">
-        <h2>Organisation</h2>
-        <dl class="facts">
-          <div>
-            <dt>Name</dt>
-            <dd>{{ profile.name }}</dd>
-          </div>
-          <div>
-            <dt>Contact email</dt>
-            <dd>{{ profile.contactEmail }}</dd>
-          </div>
-          <div>
-            <dt>Contact phone</dt>
-            <dd>{{ profile.contactPhone }}</dd>
-          </div>
-          <div>
-            <dt>Country</dt>
-            <dd>{{ countryLabel(profile.address.country) }}</dd>
-          </div>
-          <div v-if="profile.companyIdentificationNumber">
-            <dt>Company identification number</dt>
-            <dd>{{ profile.companyIdentificationNumber }}</dd>
-          </div>
-          <div v-if="profile.taxNumber">
-            <dt>Tax number</dt>
-            <dd>{{ profile.taxNumber }}</dd>
-          </div>
-        </dl>
-        <p v-if="postalAddressLines(profile.address).length" class="postal">{{ addressPreview(profile.address) }}</p>
-      </article>
-
-      <article class="summary">
-        <h2>Clinics</h2>
-        <ul class="person-list">
-          <li v-for="clinic in clinics" :key="clinic.name" class="clinic-card">
-            <div>
-              <strong>{{ clinic.name }}</strong>
-            </div>
-            <p v-if="clinic.contactEmail || clinic.contactPhone">{{ [clinic.contactEmail, clinic.contactPhone].filter(Boolean).join(' · ') }}</p>
-            <p v-if="postalAddressLines(clinic.address).length" class="postal">{{ addressPreview(clinic.address) }}</p>
+    <PageHeader :title="t('orgs.onboarding.title')" :description="t('orgs.onboarding.description')" back-to="/organizations" :back-label="t('orgs.title')" />
+    <div class="wizard">
+      <nav class="stepper" :aria-label="t('orgs.onboarding.stepsLabel')">
+        <ol>
+          <li v-for="(label, index) in stepLabels" :key="label" :class="{ 'is-current': index + 1 === step, 'is-done': index + 1 < step }" :aria-current="index + 1 === step ? 'step' : undefined">
+            <button type="button" class="step" :disabled="index + 1 >= step" @click="goToStep(index)">
+              <span class="step-number" aria-hidden="true">
+                <AppIcon v-if="index + 1 < step" name="check" :size="14" />
+                <template v-else>{{ index + 1 }}</template>
+              </span>
+              <span>{{ label }}</span>
+            </button>
           </li>
-        </ul>
-      </article>
+        </ol>
+      </nav>
 
-      <article class="summary">
-        <h2>Sign-in accounts</h2>
-        <ul v-if="accounts.length" class="person-list">
-          <li v-for="account in accounts" :key="account.email" class="person">
-            <span class="avatar" aria-hidden="true">{{ initials(account.name) }}</span>
-            <div>
-              <strong>{{ account.name }}</strong>
-              <span>{{ account.email }}</span>
+      <div class="settings-card">
+        <p class="step-count">{{ t('orgs.onboarding.stepOf', { n: step, total: 4 }) }}</p>
+        <p v-if="formError" class="form-alert" role="alert"><AppIcon name="alert" :size="16" />{{ formError }}</p>
+
+        <form v-if="step === 1" class="form-stack" novalidate @submit.prevent="continueFromOrganisation">
+          <h2>{{ t('orgs.onboarding.steps.organisation') }}</h2>
+          <OrganizationFormFields v-model="profile" />
+          <div class="wizard-nav">
+            <AppButton type="submit" icon-end="arrow-right">{{ t('orgs.onboarding.continue') }}</AppButton>
+          </div>
+        </form>
+
+        <form v-else-if="step === 2" class="form-stack" novalidate @submit.prevent="continueFromClinics">
+          <h2>{{ t('orgs.onboarding.steps.clinics') }}</h2>
+          <section v-for="(_, index) in clinics" :key="index" class="record-card">
+            <header class="card-header">
+              <h3>{{ t('orgs.onboarding.clinicN', { n: index + 1 }) }}</h3>
+              <AppButton v-if="clinics.length > 1" type="button" variant="ghost" size="sm" icon="close" @click="removeClinic(index)">{{ t('orgs.onboarding.remove') }}</AppButton>
+            </header>
+            <ClinicFormFields v-model="clinics[index]" />
+          </section>
+          <AppButton type="button" variant="secondary" icon="plus" @click="addClinic">{{ t('orgs.onboarding.addClinic') }}</AppButton>
+          <div class="wizard-nav">
+            <AppButton type="button" variant="secondary" icon="arrow-left" @click="step = 1">{{ t('orgs.onboarding.back') }}</AppButton>
+            <AppButton type="submit" icon-end="arrow-right">{{ t('orgs.onboarding.continue') }}</AppButton>
+          </div>
+        </form>
+
+        <form v-else-if="step === 3" class="form-stack" novalidate @submit.prevent="continueFromAccounts">
+          <div class="section-heading">
+            <h2>{{ t('orgs.onboarding.accountsTitle') }}</h2>
+            <p class="section-desc">{{ t('orgs.onboarding.accountsHint') }}</p>
+          </div>
+          <ul v-if="accounts.length" class="person-list">
+            <li v-for="account in accounts" :key="account.email" class="person">
+              <span class="avatar" aria-hidden="true">{{ initials(account.name) }}</span>
+              <div class="person-text">
+                <strong dir="auto">{{ account.name }}</strong>
+                <span>{{ account.email }}</span>
+              </div>
+              <AppButton type="button" variant="ghost" size="sm" icon="close" @click="removeAccount(account.email)">{{ t('orgs.onboarding.remove') }}</AppButton>
+            </li>
+          </ul>
+          <p v-else class="muted">{{ t('orgs.onboarding.noAccounts') }}</p>
+          <div class="record-card">
+            <div class="form-grid">
+              <AppInput v-model="accountName" :label="t('orgs.onboarding.name')" />
+              <AppInput v-model="accountEmail" :label="t('orgs.onboarding.email')" type="email" />
+              <AppInput v-model="accountPassword" :label="t('orgs.onboarding.password')" type="password" :hint="t('orgs.onboarding.passwordHint')" />
             </div>
-          </li>
-        </ul>
-        <p v-else class="quiet">No sign-in accounts. People can be added later.</p>
-      </article>
+            <div class="form-actions">
+              <AppButton type="button" variant="secondary" icon="plus" @click="addAccount()">{{ t('orgs.onboarding.addAccount') }}</AppButton>
+            </div>
+          </div>
+          <div class="wizard-nav">
+            <AppButton type="button" variant="secondary" icon="arrow-left" @click="step = 2">{{ t('orgs.onboarding.back') }}</AppButton>
+            <AppButton type="submit" icon-end="arrow-right">{{ t('orgs.onboarding.review') }}</AppButton>
+          </div>
+        </form>
 
-      <div class="actions">
-        <AppButton type="button" variant="secondary" @click="step = 3">Back</AppButton>
-        <AppButton type="button" :loading="saving" @click="confirm">Create organisation</AppButton>
+        <section v-else class="form-stack review">
+          <h2>{{ t('orgs.onboarding.steps.review') }}</h2>
+          <article class="record-card">
+            <h3>{{ t('orgs.onboarding.organisation') }}</h3>
+            <dl class="detail-list">
+              <div>
+                <dt>{{ t('orgs.fields.name') }}</dt>
+                <dd>{{ profile.name }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('orgs.fields.contactEmail') }}</dt>
+                <dd>{{ profile.contactEmail }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('orgs.fields.contactPhone') }}</dt>
+                <dd>{{ profile.contactPhone }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('address.country') }}</dt>
+                <dd>{{ countryLabel(profile.address.country) }}</dd>
+              </div>
+              <div v-if="profile.companyIdentificationNumber">
+                <dt>{{ t('orgs.fields.companyId') }}</dt>
+                <dd>{{ profile.companyIdentificationNumber }}</dd>
+              </div>
+              <div v-if="profile.taxNumber">
+                <dt>{{ t('orgs.fields.taxNumber') }}</dt>
+                <dd>{{ profile.taxNumber }}</dd>
+              </div>
+            </dl>
+            <p v-if="postalAddressLines(profile.address).length" class="postal">{{ addressPreview(profile.address) }}</p>
+          </article>
+
+          <article class="record-card">
+            <h3>{{ t('orgs.onboarding.clinics') }} <span class="count">{{ clinics.length }}</span></h3>
+            <ul class="person-list">
+              <li v-for="clinic in clinics" :key="clinic.name" class="clinic-row">
+                <strong dir="auto">{{ clinic.name }}</strong>
+                <span v-if="clinic.contactEmail || clinic.contactPhone" class="muted">{{ [clinic.contactEmail, clinic.contactPhone].filter(Boolean).join(' · ') }}</span>
+                <span v-if="postalAddressLines(clinic.address).length" class="postal">{{ addressPreview(clinic.address) }}</span>
+              </li>
+            </ul>
+          </article>
+
+          <article class="record-card">
+            <h3>{{ t('orgs.onboarding.accountsTitle') }} <span class="count">{{ accounts.length }}</span></h3>
+            <ul v-if="accounts.length" class="person-list">
+              <li v-for="account in accounts" :key="account.email" class="person">
+                <span class="avatar" aria-hidden="true">{{ initials(account.name) }}</span>
+                <div class="person-text">
+                  <strong dir="auto">{{ account.name }}</strong>
+                  <span>{{ account.email }}</span>
+                </div>
+              </li>
+            </ul>
+            <p v-else class="muted">{{ t('orgs.onboarding.noAccountsReview') }}</p>
+          </article>
+
+          <div class="wizard-nav">
+            <AppButton type="button" variant="secondary" icon="arrow-left" @click="step = 3">{{ t('orgs.onboarding.back') }}</AppButton>
+            <AppButton type="button" icon="check" :loading="saving" @click="confirm">{{ t('orgs.onboarding.createButton') }}</AppButton>
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
   </PageContainer>
 </template>
 
 <style scoped>
-.steps {
+.wizard {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 920px;
+}
+
+.stepper ol {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 16px;
+  gap: var(--space-2);
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.steps li {
-  padding: 6px 12px;
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3) 0 6px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface);
   color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
 
-.current {
-  border-color: transparent;
-  background: var(--color-primary-soft);
-  color: var(--color-primary-ink);
+.step:disabled {
+  cursor: default;
+}
+
+.step-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
   font-weight: 700;
 }
 
-.panel {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+.is-current .step {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
+  font-weight: 600;
 }
 
-.grid,
-.actions {
+.is-current .step-number,
+.is-done .step-number {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.is-done .step {
+  color: var(--color-ink);
+}
+
+.is-done .step:hover {
+  border-color: var(--color-primary);
+}
+
+.step-count {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+h2 {
+  font-size: var(--text-lg);
+}
+
+h3 {
+  font-size: var(--text-base);
+}
+
+.wizard-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-}
-
-.grid > * {
-  flex: 1 1 220px;
-}
-
-.actions {
   justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 
-.clinic {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.clinic-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.account-form {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+.wizard-nav > :only-child {
+  margin-inline-start: auto;
 }
 
 .person-list {
   display: grid;
-  gap: 10px;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.person,
-.clinic-card {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
+.person {
+  display: flex;
   align-items: center;
-  padding: 12px 14px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-surface-muted);
+  background: var(--color-surface);
 }
 
-.clinic-card {
-  grid-template-columns: 1fr;
-  align-items: start;
+.person-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.person-text span,
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
 .avatar {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--color-primary-soft);
   color: var(--color-primary-ink);
+  font-size: 0.75rem;
   font-weight: 700;
+  line-height: 1;
 }
 
-.person strong,
-.clinic-card strong {
-  display: block;
-  color: var(--color-ink);
-}
-
-.person span,
-.clinic-card span,
-.quiet {
-  color: var(--color-text-muted);
-}
-
-.review {
-  gap: 16px;
-}
-
-.summary {
-  display: grid;
-  gap: 12px;
-}
-
-.facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 20px;
-  margin: 0;
-}
-
-.facts div {
+.clinic-row {
   display: grid;
   gap: 2px;
-}
-
-dt {
-  color: var(--color-text-subtle);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-dd {
-  margin: 0;
-  color: var(--color-ink);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
 }
 
 .postal {
-  margin: 0;
   color: var(--color-text);
+  font-size: var(--text-sm);
   white-space: pre-line;
 }
 
-h2 {
-  margin: 0;
-  font-size: 1.05rem;
-}
-
-.form-error {
-  color: var(--color-danger);
-}
-
-@media (max-width: 800px) {
-  .account-form,
-  .facts {
-    grid-template-columns: 1fr;
-  }
+.count {
+  margin-inline-start: 6px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 </style>

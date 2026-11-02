@@ -1,24 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useAuthStore } from '@/stores/auth';
-import { RouterLink, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import type { ClinicDirectoryItem, ClinicDirectoryPage } from '@abapro/shared';
 import { apiRequest } from '@/api/client';
-import { displayStoredAddress } from '@/components/address/postal-address';
-import AppButton from '@/components/ui/AppButton.vue';
+import { countryLabel, displayStoredAddress } from '@/components/address/postal-address';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
+import AppTable from '@/components/ui/AppTable.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
-import FilterBar from '@/components/ui/FilterBar.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
-import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useLoader } from '@/lib/loader';
-import { formatRegion } from '@/lib/format';
+import { useAuthStore } from '@/stores/auth';
 
-const router = useRouter();
 const auth = useAuthStore();
+const { t } = useI18n();
 const platformAdmin = computed(() => auth.user?.platformAdmin === true);
 const search = ref('');
 const organizationId = ref('');
@@ -32,17 +30,23 @@ const items = ref<ClinicDirectoryItem[]>([]);
 let searchTimer = 0;
 
 const organizationOptions = computed(() => [
-  { value: '', label: 'All organisations' },
+  { value: '', label: t('clinics.allOrganisations') },
   ...organizations.value.map((organization) => ({ value: organization.id, label: organization.name })),
 ]);
 const countryOptions = computed(() => [
-  { value: '', label: 'All countries' },
-  ...countries.value.map((code) => ({ value: code, label: formatRegion(code) })),
+  { value: '', label: t('clinics.allCountries') },
+  ...countries.value.map((code) => ({ value: code, label: countryLabel(code) })),
 ]);
-const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
-const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize + 1));
-const rangeEnd = computed(() => Math.min(page.value * pageSize, total.value));
 const filtered = computed(() => Boolean(search.value.trim() || organizationId.value || country.value));
+const columns = computed(() => [
+  { key: 'name', label: t('clinics.columns.name') },
+  ...(platformAdmin.value ? [{ key: 'organisation', label: t('clinics.columns.organisation') }] : []),
+  { key: 'location', label: t('clinics.columns.location') },
+  { key: 'country', label: t('clinics.columns.country') },
+  { key: 'clients', label: t('clinics.columns.clients'), align: 'end' as const },
+]);
+const rows = computed(() => items.value.map((item) => ({ id: item.id, name: item.name, item })));
+const itemOf = (row: Record<string, unknown>) => row.item as ClinicDirectoryItem;
 
 const { loading, error, load } = useLoader(async () => {
   const params = new URLSearchParams();
@@ -57,19 +61,10 @@ const { loading, error, load } = useLoader(async () => {
   page.value = directory.page;
   countries.value = directory.countries;
   organizations.value = directory.organizations;
-}, 'Clinics could not be loaded.');
-
-function childSummary(count: number): string {
-  if (count === 0) return 'No clients';
-  return `${count} ${count === 1 ? 'client' : 'clients'}`;
-}
+}, t('clinics.error'));
 
 function locationLabel(item: ClinicDirectoryItem): string {
   return displayStoredAddress(item.address, item.country) || item.location;
-}
-
-function openClinic(id: string): void {
-  void router.push(`/clinics/${id}`);
 }
 
 function changePage(next: number): void {
@@ -97,134 +92,88 @@ onMounted(() => {
 
 <template>
   <PageContainer>
-    <PageHeader
-      title="Clinics"
-      :description="platformAdmin ? 'Every clinic on this portal, with the organisation it belongs to. Open one to see its details and clients.' : 'Clinics in your organisation. Open one to see its details and clients.'"
-    />
-    <FilterBar>
-      <AppInput v-model="search" class="clinic-search" label="Search" placeholder="Clinic, organisation, or location" />
-      <AppSelect v-if="platformAdmin" v-model="organizationId" label="Organisation" :options="organizationOptions" />
-      <AppSelect v-if="platformAdmin" v-model="country" label="Country" :options="countryOptions" />
-    </FilterBar>
-    <SkeletonBlock v-if="loading" height="220px" />
-    <ErrorState v-else-if="error" title="Clinics unavailable" :description="error" @retry="load" />
-    <template v-else>
-      <EmptyState
-        v-if="total === 0"
-        :title="filtered ? 'No clinics match' : 'No clinics yet'"
-        :description="filtered ? 'Change the search, organisation, or country filter.' : 'Clinics appear here after an organisation is created.'"
-      />
-      <div v-else class="table-card">
-        <div class="table-scroll">
-          <table class="data-table">
-            <caption class="visually-hidden">Clinics</caption>
-            <thead>
-              <tr>
-                <th scope="col">Clinic</th>
-                <th scope="col">Organisation</th>
-                <th scope="col">Location</th>
-                <th scope="col">Country</th>
-                <th scope="col">Clients</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in items" :key="item.id" class="clinic-row" @click="openClinic(item.id)">
-                <th scope="row">
-                  <RouterLink :to="`/clinics/${item.id}`" @click.stop>{{ item.name }}</RouterLink>
-                </th>
-                <td>
-                  <RouterLink :to="`/organizations/${item.organizationId}`" @click.stop>{{ item.organizationName }}</RouterLink>
-                </td>
-                <td class="location-cell">
-                  <span class="location-text" :title="locationLabel(item)">{{ locationLabel(item) }}</span>
-                </td>
-                <td>{{ formatRegion(item.country) }}</td>
-                <td class="children-cell">{{ childSummary(item.childCount) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="pager">
-          <p>Showing {{ rangeStart }}–{{ rangeEnd }} of {{ total }}</p>
-          <div class="pager-actions page-controls">
-            <AppButton variant="secondary" size="sm" :disabled="page <= 1" @click="changePage(page - 1)">Previous</AppButton>
-            <span>Page {{ page }} of {{ pageCount }}</span>
-            <AppButton variant="secondary" size="sm" :disabled="page >= pageCount" @click="changePage(page + 1)">Next</AppButton>
-          </div>
-        </div>
-      </div>
-    </template>
+    <PageHeader :title="t('clinics.title')" :description="platformAdmin ? t('clinics.descriptionAll') : t('clinics.description')" />
+    <div class="filter-bar">
+      <AppInput v-model="search" type="search" :label="t('clinics.search')" :placeholder="t('clinics.searchPlaceholder')" />
+      <AppSelect v-if="platformAdmin" v-model="organizationId" :label="t('clinics.organisation')" :options="organizationOptions" />
+      <AppSelect v-if="platformAdmin" v-model="country" :label="t('clinics.country')" :options="countryOptions" />
+    </div>
+    <ErrorState v-if="error" :title="t('clinics.unavailable')" :description="error" @retry="load" />
+    <AppTable
+      v-else
+      :caption="t('clinics.caption')"
+      :columns="columns"
+      :rows="rows"
+      row-key="id"
+      :loading="loading && items.length === 0"
+      :total="total"
+      :page="page"
+      :page-size="pageSize"
+      @update:page="changePage"
+    >
+      <template #cell-name="{ row }">
+        <RouterLink class="clinic-link" :to="`/clinics/${row.id}`">
+          <span class="clinic-mark" aria-hidden="true"><AppIcon name="clinics" :size="16" /></span>
+          <strong dir="auto">{{ row.name }}</strong>
+        </RouterLink>
+      </template>
+      <template #cell-organisation="{ row }">
+        <RouterLink class="muted-link" :to="`/organizations/${itemOf(row).organizationId}`">{{ itemOf(row).organizationName }}</RouterLink>
+      </template>
+      <template #cell-location="{ row }">
+        <span class="location" :title="locationLabel(itemOf(row))">{{ locationLabel(itemOf(row)) || '—' }}</span>
+      </template>
+      <template #cell-country="{ row }">{{ countryLabel(itemOf(row).country) }}</template>
+      <template #cell-clients="{ row }">{{ itemOf(row).childCount }}</template>
+      <template #empty>
+        <EmptyState
+          icon="clinics"
+          :title="filtered ? t('clinics.noMatches') : t('clinics.empty')"
+          :description="filtered ? t('clinics.noMatchesHint') : t('clinics.emptyHint')"
+        />
+      </template>
+    </AppTable>
   </PageContainer>
 </template>
 
 <style scoped>
-.table-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.clinic-row {
-  cursor: pointer;
-}
-
-.clinic-row:hover {
-  background: var(--color-surface-muted);
-}
-
-.clinic-row a {
-  font-weight: 700;
+.clinic-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-ink);
   text-decoration: none;
 }
 
-.clinic-row a:hover {
+.clinic-link:hover strong,
+.clinic-link:focus-visible strong,
+.muted-link:hover,
+.muted-link:focus-visible {
+  color: var(--color-primary-ink);
   text-decoration: underline;
 }
 
-.location-cell {
-  width: 28%;
-  max-width: 0;
+.clinic-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-ink);
 }
 
-.location-text {
+.muted-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.location {
   display: block;
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.children-cell {
-  white-space: nowrap;
-}
-
-.clinic-search {
-  flex: 1 1 420px;
-  width: min(100%, 520px);
-  min-width: min(100%, 420px);
-}
-
-.page-controls {
-  align-items: center;
-  justify-content: space-between;
-  width: min(100%, 320px);
-}
-
-.page-controls > span {
-  flex: 1;
-  text-align: center;
-  white-space: nowrap;
-}
-
-@media (max-width: 720px) {
-  .clinic-search {
-    flex: 0 1 auto;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .page-controls {
-    width: 100%;
-  }
 }
 </style>

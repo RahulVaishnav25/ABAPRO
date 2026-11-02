@@ -747,8 +747,8 @@ onMounted(async () => {
                     <StatusBadge v-if="guardian.emergencyContact" tone="warning" :label="t('clients.fields.emergencyContact')" />
                   </p>
                   <p class="record-meta">
-                    <span>{{ guardian.email || t('clients.profile.noEmail') }}</span>
-                    <span>{{ guardian.phone || t('clients.profile.noPhone') }}</span>
+                    <span :dir="guardian.email ? 'ltr' : undefined">{{ guardian.email || t('clients.profile.noEmail') }}</span>
+                    <span :dir="guardian.phone ? 'ltr' : undefined">{{ guardian.phone || t('clients.profile.noPhone') }}</span>
                   </p>
                   <p class="record-meta">
                     <span>{{ t('clients.profile.channelsList', { list: guardian.channels.map((channel) => t(`clients.channels.${channel}`)).join(', ') || t('clients.none') }) }}</span>

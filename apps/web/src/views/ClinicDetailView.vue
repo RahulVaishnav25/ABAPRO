@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import type { ClinicDetail } from '@abapro/shared';
 import { apiRequest, encodedPath } from '@/api/client';
 import { displayStoredAddress } from '@/components/address/postal-address';
+import AppIcon from '@/components/navigation/AppIcon.vue';
 import ClinicFormFields from '@/components/organization/ClinicFormFields.vue';
 import { clinicDraftFrom, clinicFormFrom, emptyClinicForm, type ClinicFormValue } from '@/components/organization/form-values';
 import AppButton from '@/components/ui/AppButton.vue';
+import AppTable from '@/components/ui/AppTable.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import PageContainer from '@/components/ui/PageContainer.vue';
 import PageHeader from '@/components/ui/PageHeader.vue';
@@ -17,21 +21,31 @@ import { errorMessage, useLoader } from '@/lib/loader';
 
 const route = useRoute();
 const toast = useToastStore();
+const { t } = useI18n();
 const saving = ref(false);
 const editing = ref(false);
 const editError = ref('');
 const clinic = ref<ClinicDetail | null>(null);
 const draft = ref<ClinicFormValue>(emptyClinicForm());
 
-const childSentence = computed(() => {
-  const count = clinic.value?.childCount ?? 0;
-  if (count === 0) return 'No clients are enrolled at this clinic yet.';
-  if (count === 1) return '1 client is enrolled at this clinic.';
-  return `${count} clients are enrolled at this clinic.`;
-});
+const childSentence = computed(() => t('clinics.detail.enrolled', clinic.value?.childCount ?? 0));
+const columns = computed(() => [
+  { key: 'name', label: t('clinics.detail.columns.name'), sortable: true },
+  { key: 'code', label: t('clinics.detail.columns.code'), sortable: true },
+  { key: 'status', label: t('clinics.detail.columns.status'), sortable: true },
+]);
+const rows = computed(() =>
+  (clinic.value?.children ?? []).map((child) => ({
+    id: child.id,
+    name: child.displayName,
+    code: child.clientCode,
+    status: child.status === 'active' ? t('clinics.detail.active') : t('clinics.detail.inactive'),
+    active: child.status === 'active',
+  })),
+);
 
 function recorded(value: string | null | undefined): string {
-  return value?.trim() ? value : 'Not recorded';
+  return value?.trim() ? value : t('clinics.detail.notRecorded');
 }
 
 function startEdit(): void {
@@ -45,7 +59,7 @@ async function saveClinic(): Promise<void> {
   if (!clinic.value) return;
   editError.value = '';
   if (draft.value.name.trim().length < 2) {
-    editError.value = 'Each clinic needs a name.';
+    editError.value = t('clinics.detail.nameRequired');
     return;
   }
   saving.value = true;
@@ -55,9 +69,9 @@ async function saveClinic(): Promise<void> {
       body: clinicDraftFrom(draft.value, clinic.value),
     });
     editing.value = false;
-    toast.push({ tone: 'success', title: 'Clinic updated' });
+    toast.push({ tone: 'success', title: t('clinics.detail.updated') });
   } catch (saveError) {
-    editError.value = errorMessage(saveError, 'The clinic could not be updated.');
+    editError.value = errorMessage(saveError, t('clinics.detail.updateError'));
   } finally {
     saving.value = false;
   }
@@ -67,7 +81,7 @@ const { loading, error, load } = useLoader(async () => {
   editing.value = false;
   clinic.value = null;
   clinic.value = await apiRequest<ClinicDetail>(encodedPath`/clinics/${String(route.params.clinicId)}`);
-}, 'This clinic could not be loaded.');
+}, t('clinics.detail.error'));
 
 watch(() => route.params.clinicId, () => {
   void load();
@@ -81,141 +95,117 @@ onMounted(() => {
 <template>
   <PageContainer>
     <SkeletonBlock v-if="loading" height="220px" />
-    <ErrorState v-else-if="error || !clinic" title="Clinic unavailable" :description="error || 'This clinic could not be loaded.'" @retry="load" />
-    <template v-else>
-      <PageHeader :title="clinic.name">
+    <ErrorState v-else-if="error || !clinic" :title="t('clinics.detail.unavailable')" :description="error || t('clinics.detail.error')" @retry="load" />
+    <div v-else class="clinic-detail">
+      <PageHeader :title="clinic.name" back-to="/clinics" :back-label="t('clinics.title')">
+        <template #meta>
+          <RouterLink class="org-link" :to="`/organizations/${clinic.organizationId}`">{{ clinic.organizationName }}</RouterLink>
+        </template>
         <template v-if="!editing" #actions>
-          <AppButton type="button" variant="secondary" @click="startEdit">Edit clinic</AppButton>
+          <AppButton type="button" variant="secondary" icon="edit" @click="startEdit">{{ t('clinics.detail.edit') }}</AppButton>
         </template>
       </PageHeader>
 
-      <section class="panel" aria-labelledby="clinic-details-heading">
-        <h2 id="clinic-details-heading">Clinic details</h2>
-        <p v-if="editError" class="form-error" role="alert">{{ editError }}</p>
-        <form v-if="editing" class="edit-form" @submit.prevent="saveClinic">
+      <section class="settings-card" aria-labelledby="clinic-details-heading">
+        <header class="card-header">
+          <h2 id="clinic-details-heading">{{ t('clinics.detail.details') }}</h2>
+        </header>
+        <form v-if="editing" class="form-stack" novalidate @submit.prevent="saveClinic">
+          <p v-if="editError" class="form-alert" role="alert"><AppIcon name="alert" :size="16" />{{ editError }}</p>
           <ClinicFormFields v-model="draft" />
-          <div class="edit-actions">
-            <AppButton type="button" variant="secondary" @click="editing = false">Cancel</AppButton>
-            <AppButton type="submit" :loading="saving">Save clinic</AppButton>
+          <div class="form-actions">
+            <AppButton type="button" variant="secondary" @click="editing = false">{{ t('common.cancel') }}</AppButton>
+            <AppButton type="submit" :loading="saving">{{ t('clinics.detail.save') }}</AppButton>
           </div>
         </form>
-        <dl v-else class="details">
+        <dl v-else class="detail-list">
           <div>
-            <dt>Organisation</dt>
+            <dt>{{ t('clinics.detail.organisation') }}</dt>
             <dd><RouterLink :to="`/organizations/${clinic.organizationId}`">{{ clinic.organizationName }}</RouterLink></dd>
           </div>
           <div>
-            <dt>Address</dt>
+            <dt>{{ t('clinics.detail.email') }}</dt>
+            <dd><span dir="ltr">{{ recorded(clinic.contactEmail) }}</span></dd>
+          </div>
+          <div>
+            <dt>{{ t('clinics.detail.phone') }}</dt>
+            <dd><span dir="ltr">{{ recorded(clinic.contactPhone) }}</span></dd>
+          </div>
+          <div class="is-wide">
+            <dt>{{ t('clinics.detail.address') }}</dt>
             <dd>{{ recorded(displayStoredAddress(clinic.address, clinic.country) || clinic.location) }}</dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd>{{ recorded(clinic.contactEmail) }}</dd>
-          </div>
-          <div>
-            <dt>Phone</dt>
-            <dd>{{ recorded(clinic.contactPhone) }}</dd>
           </div>
         </dl>
       </section>
 
-      <section class="panel" aria-labelledby="clinic-children-heading">
-        <h2 id="clinic-children-heading">Clients</h2>
-        <p class="child-count">{{ childSentence }}</p>
-        <div v-if="clinic.children.length > 0" class="table-scroll">
-          <table class="data-table">
-            <caption class="visually-hidden">Clients enrolled at {{ clinic.name }}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Client ID</th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="child in clinic.children" :key="child.id">
-                <th scope="row">{{ child.displayName }}</th>
-                <td>{{ child.clientCode }}</td>
-                <td>
-                  <StatusBadge :tone="child.status === 'active' ? 'success' : 'neutral'" :label="child.status === 'active' ? 'Active' : 'Inactive'" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <section class="settings-card" aria-labelledby="clinic-children-heading">
+        <header class="card-header">
+          <div class="section-heading">
+            <h2 id="clinic-children-heading">{{ t('clinics.detail.clients') }} <span class="count">{{ clinic.childCount }}</span></h2>
+            <p class="section-desc">{{ childSentence }}</p>
+          </div>
+        </header>
+        <EmptyState v-if="clinic.children.length === 0" icon="clients" :title="t('clinics.detail.clients')" :description="childSentence" />
+        <AppTable
+          v-else
+          :caption="t('clinics.detail.clientsCaption', { name: clinic.name })"
+          :columns="columns"
+          :rows="rows"
+          row-key="id"
+          :page-size="10"
+          :searchable="clinic.children.length > 10"
+          density="compact"
+        >
+          <template #cell-name="{ row }">
+            <RouterLink class="row-link" :to="`/clients/${row.id}`" dir="auto">{{ row.name }}</RouterLink>
+          </template>
+          <template #cell-status="{ row }">
+            <StatusBadge :tone="row.active ? 'success' : 'neutral'" :label="String(row.status)" />
+          </template>
+        </AppTable>
       </section>
-    </template>
+    </div>
   </PageContainer>
 </template>
 
 <style scoped>
-.panel {
+.clinic-detail {
   display: grid;
-  gap: 14px;
-  margin-bottom: 16px;
-  padding: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  gap: var(--space-5);
 }
 
-h2 {
-  margin: 0;
-}
-
-.section-heading,
-.edit-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.edit-form {
-  display: grid;
-  gap: 12px;
-}
-
-.edit-actions {
-  justify-content: flex-end;
-}
-
-.details {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px 20px;
-  margin: 0;
-}
-
-dt {
+.org-link {
   color: var(--color-text-muted);
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-dd {
-  margin: 4px 0 0;
-}
-
-dd a {
-  font-weight: 700;
+  font-weight: 500;
   text-decoration: none;
 }
 
-dd a:hover {
+.org-link:hover,
+.org-link:focus-visible,
+.row-link:hover,
+.row-link:focus-visible {
+  color: var(--color-primary-ink);
   text-decoration: underline;
 }
 
-.child-count {
-  margin: 0;
-  color: var(--color-text-muted);
+.row-link {
+  color: var(--color-ink);
+  font-weight: 600;
+  text-decoration: none;
 }
 
-.form-error {
-  margin: 0;
-  color: var(--color-danger);
+.detail-list .is-wide {
+  grid-column: 1 / -1;
+}
+
+.count {
+  margin-inline-start: 6px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  vertical-align: middle;
 }
 </style>

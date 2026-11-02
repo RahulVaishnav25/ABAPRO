@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import AppInput from '@/components/ui/AppInput.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
-import { ADDRESS_COUNTRIES, type PostalAddress } from './postal-address';
+import { ADDRESS_COUNTRIES, countryLabel, type PostalAddress } from './postal-address';
 
 const model = defineModel<PostalAddress>({ required: true });
 
@@ -11,31 +13,35 @@ withDefaults(
     countryRequired?: boolean;
   }>(),
   {
-    legend: 'Address',
+    legend: undefined,
     countryRequired: false,
   },
 );
 
-const countries = ADDRESS_COUNTRIES.map((country) => ({ value: country.value, label: country.label }));
+const { t, locale } = useI18n();
+const countries = computed(() => {
+  void locale.value;
+  return ADDRESS_COUNTRIES.map((country) => ({ value: country.value, label: countryLabel(country.value) }));
+});
 </script>
 
 <template>
   <fieldset class="address-fields">
-    <legend>{{ legend }}</legend>
-    <AppInput v-model="model.line1" label="Address line 1" autocomplete="address-line1" />
-    <AppInput v-model="model.line2" label="Address line 2" autocomplete="address-line2" />
-    <AppInput v-model="model.landmark" label="Landmark" />
-    <div class="address-grid">
-      <AppInput v-model="model.state" label="State" autocomplete="address-level1" />
+    <legend>{{ legend ?? t('address.legend') }}</legend>
+    <AppInput v-model="model.line1" :label="t('address.line1')" autocomplete="address-line1" />
+    <AppInput v-model="model.line2" :label="t('address.line2')" autocomplete="address-line2" />
+    <AppInput v-model="model.landmark" :label="t('address.landmark')" />
+    <div class="form-grid">
+      <AppInput v-model="model.city" :label="t('address.city')" autocomplete="address-level2" />
+      <AppInput v-model="model.state" :label="t('address.state')" autocomplete="address-level1" />
+      <AppInput v-model="model.postalCode" :label="t('address.postalCode')" autocomplete="postal-code" />
       <AppSelect
         v-model="model.country"
-        label="Country"
+        :label="t('address.country')"
         :options="countries"
         :required="countryRequired"
-        :placeholder="countryRequired ? undefined : 'Select country'"
+        :placeholder="countryRequired ? undefined : t('address.selectCountry')"
       />
-      <AppInput v-model="model.city" label="City" autocomplete="address-level2" />
-      <AppInput v-model="model.postalCode" label="ZIP code" autocomplete="postal-code" />
     </div>
   </fieldset>
 </template>
@@ -43,9 +49,9 @@ const countries = ADDRESS_COUNTRIES.map((country) => ({ value: country.value, la
 <style scoped>
 .address-fields {
   display: grid;
-  gap: 12px;
+  gap: var(--space-4);
   margin: 0;
-  padding: 16px;
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface-muted);
@@ -53,19 +59,8 @@ const countries = ADDRESS_COUNTRIES.map((country) => ({ value: country.value, la
 
 .address-fields legend {
   padding: 0 4px;
-  font-weight: 700;
   color: var(--color-ink);
-}
-
-.address-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-@media (max-width: 720px) {
-  .address-grid {
-    grid-template-columns: 1fr;
-  }
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 </style>
